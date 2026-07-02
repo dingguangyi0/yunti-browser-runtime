@@ -107,6 +107,8 @@ export function createToolDispatcher({
         result = await typeTextByUid(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_press_key") {
         result = await pressKeyByUid(tabId, session, event.arguments || {})
+      } else if (event.tool === "yunti_scroll") {
+        result = await scrollPage(tabId, session, event.arguments || {})
       } else {
         result = await chrome.tabs.sendMessage(tabId, {
           type: "yunti_execute_tool",
@@ -710,6 +712,27 @@ export function createToolDispatcher({
       tool: "yunti_fill",
       arguments: args,
     })
+  }
+
+  async function scrollPage(tabId, session, args = {}) {
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_scroll",
+      arguments: args,
+    })
+
+    if (!result || typeof result !== "object" || result.scrolled !== true) {
+      return result
+    }
+
+    return {
+      ...result,
+      browserSessionId: session.browserSessionId,
+      action: "scroll",
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
+    }
   }
 
   function validateFillArgs(args = {}) {

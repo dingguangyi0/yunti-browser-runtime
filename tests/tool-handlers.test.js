@@ -395,6 +395,11 @@ test("dispatcher preserves current action result shapes", async () => {
       target: "document",
       before: { left: 0, top: 0 },
       after: { left: 0, top: 600 },
+      browserSessionId: "tab-1",
+      action: "scroll",
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
     })
   } finally {
     harness.restore()

@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 多路径结构化切片，下一步 scroll result | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 多路径结构化切片，下一步补齐剩余 action paths | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -72,10 +72,10 @@
   和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
   `observe -> click uid -> observe/verify` 真实浏览器闭环。
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
-  keyboard/fill select、coordinate click/hover、selector hover/click passthrough。
-- P6.2 下一切片：为 `yunti_scroll` content-script passthrough 结果追加非破坏性的
-  `action`、`ok`、`recoverable`、`nextStepHint` 字段，同时保留 `scrolled`、`deltaX/Y`、
-  `target`、`before/after` 等现有兼容字段。
+  keyboard/fill select、coordinate click/hover、selector hover/click passthrough 和
+  scroll passthrough。
+- P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 selector fill、
+  contenteditable/type/press key、drag 或 upload，同时保留所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1803,6 +1803,19 @@ P6.1 真实浏览器闭环验证 runbook：
   的 `scrollIntoView`、`element.click()` 或失败返回语义。
 - `tests/tool-handlers.test.js` 已新增 selector click passthrough 断言，确保结构化字段不会替代或
   破坏既有 content-script selector click 返回。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 9 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 78 个 node:test 用例，其中 77 个
+  通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
+  npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
+  因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 `yunti_scroll` content-script passthrough 结果增量追加
+  结构化字段：`action: "scroll"`、`ok`、`recoverable`、`nextStepHint` 和
+  `browserSessionId`，同时保留 content-script 返回的 `scrolled`、`deltaX/Y`、`target`、
+  `before/after` 兼容字段；本切片不改 document/container 滚动选择、坐标命中或
+  `scrollBy` 派发语义。
+- `tests/tool-handlers.test.js` 已更新 scroll passthrough 断言，确保结构化字段不会替代或
+  破坏既有 scroll 返回。
 - 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
   通过 9 项。
 - 最新完整验证：`npm run release:check` 通过，覆盖 78 个 node:test 用例，其中 77 个

@@ -97,9 +97,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 
 ## Select Guidance
 
-- Current `yunti_select` runtime behavior remains selector/value compatible.
-- P6.2 has planned `uid` and visible option `text` contract fields, but agents
-  should not omit `selector` until the runtime slice lands.
+- Current `yunti_select` runtime behavior supports selector/value and uid/value.
+- Visible option `text` remains planned; pass option `value` until that runtime
+  slice lands.
 - Before retrying a failed select, inspect available options with observe,
   snapshot, evaluate, or a stable selector instead of blindly repeating it.
 

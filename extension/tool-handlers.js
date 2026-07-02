@@ -755,6 +755,64 @@ export function createToolDispatcher({
   }
 
   async function selectElement(tabId, session, args = {}) {
+    const uid = String(args.uid || "").trim()
+    const value = String(args.value ?? "")
+    if (uid) {
+      const { x, y } = await resolveUidCenter(tabId, session, uid)
+      await ensureCdpAttached(tabId, "1.3")
+      const result = await chromeDebuggerSendCommand(
+        { tabId },
+        "Runtime.evaluate",
+        {
+          expression: `(() => {
+            const el = document.elementFromPoint(${x}, ${y});
+            if (!el) return { ok: false, code: "ELEMENT_NOT_FOUND", error: "No element found at uid coordinates" };
+            if (el.tagName.toLowerCase() !== "select") {
+              return { ok: false, code: "NOT_SELECT", error: "Element at uid is not a select element" };
+            }
+            const option = Array.from(el.options).find((item) => item.value === ${JSON.stringify(value)});
+            if (!option) {
+              return {
+                ok: false,
+                code: "OPTION_NOT_FOUND",
+                error: "Option value not found",
+                availableValues: Array.from(el.options).map((item) => item.value).slice(0, 50),
+              };
+            }
+            el.value = option.value;
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            return {
+              ok: true,
+              value: option.value,
+              selectedIndex: el.selectedIndex,
+              optionText: option.text.slice(0, 80),
+            };
+          })()`,
+          returnByValue: true,
+        }
+      )
+      const selectResult = result?.result?.value
+      if (!selectResult?.ok) {
+        const suffix = selectResult?.availableValues?.length
+          ? ` Available values: ${selectResult.availableValues.join(", ")}.`
+          : ""
+        throw new Error(`${selectResult?.error || `Cannot select value at uid ${uid}`}.${suffix} Observe again, inspect available options, or retry with selector/value fallback.`)
+      }
+      return {
+        selected: true,
+        uid,
+        value: selectResult.value,
+        selectedIndex: selectResult.selectedIndex,
+        browserSessionId: session.browserSessionId,
+        action: "select",
+        target: { uid, method: "uid.value" },
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Uid select dispatched by option value. Observe again, read page state, or evaluate the select value to verify the intended change.",
+      }
+    }
+
     const selector = String(args.selector || "").trim()
     const result = await chrome.tabs.sendMessage(tabId, {
       type: "yunti_execute_tool",

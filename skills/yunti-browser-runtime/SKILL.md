@@ -79,8 +79,8 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 
 ## Select Guidance
 
-- Current `yunti_select` runtime behavior remains selector/value compatible.
-- P6.2 has planned `uid` and visible option `text` contract fields, but do not omit `selector` until the runtime slice lands.
+- Current `yunti_select` runtime behavior supports selector/value and uid/value.
+- Visible option `text` remains planned; pass option `value` until that runtime slice lands.
 - Before retrying a failed select, inspect available options with observe, snapshot, evaluate, or a stable selector instead of blindly repeating it.
 
 ## Safety

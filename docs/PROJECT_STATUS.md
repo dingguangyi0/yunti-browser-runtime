@@ -383,6 +383,21 @@ fill/select/scroll semantics.
   with 13 files. This slice only updates schema, usage hints, docs, and skill
   guidance, so `YUNTI_E2E=1 npm run test:e2e` was not rerun; the token residue
   grep returned no matches.
+- `yunti_select` now supports the `uid + value` runtime path while preserving
+  selector/value compatibility. The uid path reuses the latest observe/snapshot
+  uid map, matches select options by option value, dispatches change/input
+  events, and returns structured action result fields. Visible option text
+  selection remains intentionally deferred to the next runtime slice.
+- Latest P6.2 select uid/value runtime targeted validation: `git diff --check`
+  passed and `node --test tests/tool-handlers.test.js tests/bridge.test.js`
+  passed 85 tests.
+- Latest P6.2 select uid/value runtime full validation: `git diff --check`
+  passed; `npm run release:check` passed with 90 node:test cases total, 89
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
 
 ## Decisions
 
@@ -436,9 +451,9 @@ fill/select/scroll semantics.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   broadening into P6.2 action semantics.
 - Continue P6.2 in small compatibility-preserving slices: next candidates are
-  implementing `yunti_select` uid and visible text runtime semantics, then
-  deeper fill/select/scroll semantics now that first-pass structured action
-  result coverage is complete.
+  implementing `yunti_select` visible text runtime semantics, then deeper
+  fill/select/scroll semantics now that first-pass structured action result
+  coverage is complete.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

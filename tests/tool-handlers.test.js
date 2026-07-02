@@ -546,6 +546,74 @@ test("selector select preserves content result with structured result", async ()
   }
 })
 
+test("uid select value path preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select-uid",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-plan",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 20, y: 30, width: 120, height: 24 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            ok: true,
+            value: "pro",
+            selectedIndex: 1,
+            optionText: "Pro",
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-uid",
+      tool: "yunti_select",
+      arguments: { uid: "yunti-plan", value: "pro" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: true,
+      uid: "yunti-plan",
+      value: "pro",
+      selectedIndex: 1,
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { uid: "yunti-plan", method: "uid.value" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Uid select dispatched by option value. Observe again, read page state, or evaluate the select value to verify the intended change.",
+    })
+    assert.deepEqual(
+      harness.sentMessages.map((item) => item.message.tool),
+      ["yunti_observe_page"]
+    )
+    assert.equal(harness.cdpCommands.at(-1).method, "Runtime.evaluate")
+    assert.match(harness.cdpCommands.at(-1).params.expression, /item\.value === "pro"/)
+  } finally {
+    harness.restore()
+  }
+})
+
 test("fill form preserves aggregate fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

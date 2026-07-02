@@ -583,13 +583,14 @@ test("mcp usage hints document select uid and visible text planning", async () =
   const selectHints = payload.tools.yunti_select
 
   assert.equal(selectHints.schema.required.includes("value"), true)
-  assert.equal(selectHints.schema.required.includes("selector"), true)
+  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.includes("selector")), true)
+  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.includes("uid")), true)
   assert.equal(selectHints.schema.properties.uid.type, "string")
   assert.equal(selectHints.schema.properties.text.type, "string")
-  assert.match(selectHints.notes.join("\n"), /selector\/value compatible/)
-  assert.match(selectHints.notes.join("\n"), /uid and visible text support/)
+  assert.match(selectHints.notes.join("\n"), /selector\/value and uid\/value/)
+  assert.match(selectHints.notes.join("\n"), /Visible option text is still planned/)
   assert.match(selectHints.recovery.join("\n"), /available options/)
-  assert.match(selectHints.commonMistakes.join("\n"), /Do not omit selector/)
+  assert.match(selectHints.commonMistakes.join("\n"), /visible option text/)
   assert.match(selectHints.commonMistakes.join("\n"), /selector\/value compatibility/)
 })
 

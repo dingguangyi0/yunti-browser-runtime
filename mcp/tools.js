@@ -1192,11 +1192,13 @@ export function toolUsageHints(args = {}) {
         "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot when available, then verify the selected option afterward.",
         "Use visible option text when the user-facing label is clearer than the option value.",
         "Current successful results preserve selected, element, value, text, uid/selector, browserSessionId, action, target, ok, recoverable, and nextStepHint.",
+        "Uid option misses and non-select uid targets now return structured selected=false diagnostics with code, matchMode, targetOption, availableValues/availableTexts when available, and recoveryHint.",
       ],
       recovery: [
         "Selector path fails: observe again, inspect the select element, then retry with a stable selector or wait for the form to render.",
         "Uid path fails: refresh with yunti_observe_page before retrying the same uid.",
-        "Option is not found: inspect available options with yunti_take_snapshot or yunti_evaluate_script before retrying.",
+        "Option is not found: read recoveryHint, inspect available options via availableValues/availableTexts, then retry with the correct uid/text, uid/value, or selector/value fallback.",
+        "Uid target is not a select element: read recoveryHint.decision, observe again, target the actual select uid, or use selector/value fallback.",
         "Wrong tab or stale route: refresh targets with yunti_list_browser_targets and route through the intended browserSessionId.",
       ],
       commonMistakes: [

@@ -140,8 +140,13 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   and uid/visible text.
 - Use `text` with a fresh uid when the user-facing option label is clearer than
   the option value; selector path remains selector/value compatible.
+- Uid option misses and non-select uid targets return structured
+  `selected: false` diagnostics with `code`, `matchMode`, `targetOption`, and
+  `recoveryHint`; option misses include `availableValues` / `availableTexts`
+  when the page exposes them.
 - Before retrying a failed select, inspect available options with observe,
-  snapshot, evaluate, or a stable selector instead of blindly repeating it.
+  snapshot, evaluate, a stable selector, or `recoveryHint.decision` instead of
+  blindly repeating it.
 
 ## Safety Rules
 

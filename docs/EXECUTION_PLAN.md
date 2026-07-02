@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、contenteditable fill、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry 诊断；下一步继续收敛更深 scroll/select 语义 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select 失败诊断、contenteditable fill、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry 诊断；下一步继续收敛更深 scroll/select 语义 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -76,7 +76,8 @@
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
   upload uid/selector path、coordinate drag、standalone `yunti_select` content-script
   passthrough、aggregate `yunti_fill_form` summary；`yunti_select` 也已补齐 selector/value、
-  uid/value、uid/text 三条路径；更深语义已推进到 contenteditable fill、fresh
+  uid/value、uid/text 三条路径，并开始返回 uid option miss / non-select uid target
+  的结构化失败诊断；更深语义已推进到 contenteditable fill、fresh
   observed scroll container uid、scroll no-movement、directional `edgeHint`、结构化
   `recoveryHint`、机器可读 `decision` 和可执行 `suggestedRetry` 诊断。
 - P6.2 第一轮 action result 覆盖、select uid/text、contenteditable fill 和 scroll
@@ -2009,6 +2010,19 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
   `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
   残留检查无输出。
+- `yunti_select` uid 失败路径已开始返回结构化可恢复诊断：当 uid path 选项未命中时，
+  返回 `selected: false`、`code: "OPTION_NOT_FOUND"`、`matchMode`、`targetOption`、
+  `availableValues` / `availableTexts` 和 `recoveryHint`，提示先检查可用选项再重试；当
+  uid 指向非 select 元素时，返回 `code: "NOT_SELECT"` 和
+  `recoveryHint.decision: "use-select-element-or-selector-fallback"`。本切片保留
+  selector/value、uid/value、uid/text 成功路径和兼容字段，不恢复为抛错式失败。
+- 最新 targeted 验证：`node --test tests/tool-handlers.test.js tests/bridge.test.js`
+  通过 93 项。
+- 最新 full 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js
+  tests/bridge.test.js` 通过 93 项；`npm run release:check` 通过，覆盖 98 个 node:test
+  用例，其中 97 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
+  包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
+  test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
 - P6.2 action path 覆盖清单已重新审计：主要 action result surfaces 均有结构化字段覆盖，
   `yunti_select` 的 selector/value、uid/value、uid/text 路径均已落地并记录；下一步明确
   转向更深 fill/select/scroll 语义增强，而不是继续停留在 select 缺口。

@@ -929,12 +929,7 @@ export function createToolDispatcher({
       )
       const selectResult = result?.result?.value
       if (!selectResult?.ok) {
-        const available = matchMode === "text" ? selectResult?.availableTexts : selectResult?.availableValues
-        const label = matchMode === "text" ? "texts" : "values"
-        const suffix = available?.length
-          ? ` Available ${label}: ${available.join(", ")}.`
-          : ""
-        throw new Error(`${selectResult?.error || `Cannot select option at uid ${uid}`}.${suffix} Observe again, inspect available options, or retry with selector/value fallback.`)
+        return buildUidSelectFailureResult(session, uid, matchMode, targetOption, selectResult)
       }
       return {
         selected: true,
@@ -973,6 +968,49 @@ export function createToolDispatcher({
       ok: true,
       recoverable: false,
       nextStepHint: "Select dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
+    }
+  }
+
+  function buildUidSelectFailureResult(session, uid, matchMode, targetOption, selectResult = {}) {
+    const availableValues = Array.isArray(selectResult.availableValues) ? selectResult.availableValues : undefined
+    const availableTexts = Array.isArray(selectResult.availableTexts) ? selectResult.availableTexts : undefined
+    const recoveryHint = {
+      reason: "uid-select-failed",
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+      nextAction: "inspect-available-options",
+      decision: "inspect-options-before-retry",
+      uid,
+      matchMode,
+      targetOption,
+      ...(availableValues ? { availableValues } : {}),
+      ...(availableTexts ? { availableTexts } : {}),
+      message: "The select option could not be matched. Inspect available options before retrying, refresh observation if the uid may be stale, or use selector/value fallback.",
+    }
+
+    if (selectResult.code === "ELEMENT_NOT_FOUND") {
+      recoveryHint.nextAction = "observe-again"
+      recoveryHint.decision = "refresh-observation-before-retry"
+    } else if (selectResult.code === "NOT_SELECT") {
+      recoveryHint.nextAction = "inspect-target-element"
+      recoveryHint.decision = "use-select-element-or-selector-fallback"
+    }
+
+    return {
+      selected: false,
+      uid,
+      browserSessionId: session.browserSessionId,
+      action: "select",
+      target: { uid, method: matchMode === "text" ? "uid.text" : "uid.value" },
+      ok: false,
+      recoverable: true,
+      code: selectResult.code || "UID_SELECT_FAILED",
+      error: selectResult.error || `Cannot select option at uid ${uid}`,
+      matchMode,
+      targetOption,
+      ...(availableValues ? { availableValues } : {}),
+      ...(availableTexts ? { availableTexts } : {}),
+      recoveryHint,
+      nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",
     }
   }
 

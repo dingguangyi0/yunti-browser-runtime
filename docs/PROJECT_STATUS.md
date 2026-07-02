@@ -7,11 +7,12 @@ implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`. Current implementation focus is P6.2 structured
 action results and deeper action semantics. Standalone `yunti_select` and
 aggregate `yunti_fill_form` are complete; `yunti_select` supports
-selector/value, uid/value, and uid/text; contenteditable fill and uid-targeted
-scroll are covered; and scroll no-movement diagnostics now include directional
-`edgeHint`, structured `recoveryHint`, machine-readable `decision`, and
-executable `suggestedRetry` parameters. The next compatibility-preserving
-slice should continue into deeper scroll/select semantics.
+selector/value, uid/value, uid/text, and structured uid failure diagnostics;
+contenteditable fill and uid-targeted scroll are covered; and scroll
+no-movement diagnostics now include directional `edgeHint`, structured
+`recoveryHint`, machine-readable `decision`, and executable `suggestedRetry`
+parameters. The next compatibility-preserving slice should continue into
+deeper scroll/select semantics.
 
 ## Current State
 
@@ -414,6 +415,23 @@ slice should continue into deeper scroll/select semantics.
   passed, and 1 real-browser smoke skipped by default; npm package contents
   validation passed with 42 files; extension zip contents validation passed
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
+- `yunti_select` uid failure paths now return structured recovery diagnostics.
+  Option misses return `selected: false`, `code: "OPTION_NOT_FOUND"`,
+  `matchMode`, `targetOption`, available option values/texts when exposed by
+  the page, and `recoveryHint`; non-select uid targets return `code:
+  "NOT_SELECT"` plus `recoveryHint.decision` pointing agents toward the actual
+  select element or selector/value fallback.
+- Latest P6.2 select uid failure diagnostic targeted validation:
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 93
+  tests.
+- Latest P6.2 select uid failure diagnostic full validation: `git diff
+  --check` passed; `node --test tests/tool-handlers.test.js tests/bridge.test.js`
+  passed 93 tests; `npm run release:check` passed with 98 node:test cases
+  total, 97 passed, and 1 real-browser smoke skipped by default; npm package
+  contents validation passed with 42 files; extension zip contents validation
+  passed with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
 - P6.2 action path coverage was re-audited after select uid/text support.

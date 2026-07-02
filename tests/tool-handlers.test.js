@@ -1030,6 +1030,158 @@ test("uid select visible text path preserves compatibility fields with structure
   }
 })
 
+test("uid select option miss returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select-miss",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-plan",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 20, y: 30, width: 120, height: 24 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            ok: false,
+            code: "OPTION_NOT_FOUND",
+            error: "Option text not found",
+            availableValues: ["free", "pro"],
+            availableTexts: ["Free", "Pro"],
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-uid-miss",
+      tool: "yunti_select",
+      arguments: { uid: "yunti-plan", text: "Enterprise" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: false,
+      uid: "yunti-plan",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { uid: "yunti-plan", method: "uid.text" },
+      ok: false,
+      recoverable: true,
+      code: "OPTION_NOT_FOUND",
+      error: "Option text not found",
+      matchMode: "text",
+      targetOption: "Enterprise",
+      availableValues: ["free", "pro"],
+      availableTexts: ["Free", "Pro"],
+      recoveryHint: {
+        reason: "uid-select-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+        nextAction: "inspect-available-options",
+        decision: "inspect-options-before-retry",
+        uid: "yunti-plan",
+        matchMode: "text",
+        targetOption: "Enterprise",
+        availableValues: ["free", "pro"],
+        availableTexts: ["Free", "Pro"],
+        message: "The select option could not be matched. Inspect available options before retrying, refresh observation if the uid may be stale, or use selector/value fallback.",
+      },
+      nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid select non-select target returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select-not-select",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-label",
+            role: "text",
+            name: "Plan",
+            rect: { x: 20, y: 30, width: 120, height: 24 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            ok: false,
+            code: "NOT_SELECT",
+            error: "Element at uid is not a select element",
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-uid-not-select",
+      tool: "yunti_select",
+      arguments: { uid: "yunti-label", value: "pro" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: false,
+      uid: "yunti-label",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { uid: "yunti-label", method: "uid.value" },
+      ok: false,
+      recoverable: true,
+      code: "NOT_SELECT",
+      error: "Element at uid is not a select element",
+      matchMode: "value",
+      targetOption: "pro",
+      recoveryHint: {
+        reason: "uid-select-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+        nextAction: "inspect-target-element",
+        decision: "use-select-element-or-selector-fallback",
+        uid: "yunti-label",
+        matchMode: "value",
+        targetOption: "pro",
+        message: "The select option could not be matched. Inspect available options before retrying, refresh observation if the uid may be stale, or use selector/value fallback.",
+      },
+      nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("fill form preserves aggregate fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

@@ -71,12 +71,13 @@
 - P6.1：`yunti_observe_page` schema、tool hints、bridge routing、content-script observer
   和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
   `observe -> click uid -> observe/verify` 真实浏览器闭环。
-- P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
+- P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖主要单动作路径：uid click/hover/fill
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
   upload uid/selector path、coordinate drag。
-- P6.2 下一切片：整理 action result 覆盖清单，再进入更深的 fill/select/scroll 语义增强，
-  同时保留所有既有兼容字段与 CDP fallback。
+- P6.2 剩余 action result 缺口：standalone `yunti_select` content-script passthrough 和
+  aggregate `yunti_fill_form` 仍是 compatibility-shaped；下一步先补这两个小切片，再进入更深
+  的 fill/select/scroll 语义增强，同时保留所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1890,6 +1891,45 @@ P6.1 真实浏览器闭环验证 runbook：
   通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
   npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
   因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+
+### Action result 覆盖清单（2026-07-03）
+
+已完成结构化字段的 action paths：
+
+- `yunti_click`：uid path、coordinate fallback、selector passthrough；保留 `clicked`、
+  `uid`、`selector`、`x/y`、`method`、`element` 等兼容字段。
+- `yunti_hover`：uid path、coordinate fallback、selector fallback；保留 `hovered`、
+  `uid`、`selector`、`x/y`、`method` 等兼容字段。
+- `yunti_fill`：uid keyboard path、uid select path、selector passthrough；保留 `filled`、
+  `uid`、`selector`、`method`、`value`、`valueLength`、`element` 等兼容字段。
+- `yunti_scroll`：content-script passthrough；保留 `scrolled`、`deltaX/Y`、`target`、
+  `before/after` 等兼容字段。注意 scroll 原有 `target` 是兼容字段，结构化字段只增量补
+  `action`、`ok`、`recoverable`、`nextStepHint`、`browserSessionId`。
+- `yunti_type_text`：uid CDP keyboard path、selector passthrough；保留 `typed`、`uid`、
+  `text`、`method`、`element`、`textLength`、`mode` 等兼容字段。
+- `yunti_press_key`：uid CDP keyboard path、selector passthrough；保留 `pressed`、`uid`、
+  `key`、`element`、`valueChanged` 等兼容字段。
+- `yunti_upload_file`：uid path、selector path；保留 `uploaded`、`fileCount`、`filePaths`
+  等兼容字段。
+- `yunti_drag`：coordinate path；保留 `dragged`、`from`、`to`、`steps` 等兼容字段。
+
+尚未补齐结构化字段的 action surfaces：
+
+- `yunti_select` standalone content-script passthrough 仍返回 `selected`、`element`、`value`；
+  下一切片应增量追加 `action: "select"`、`target`、`ok`、`recoverable`、
+  `nextStepHint`、`browserSessionId`，不改 `input/change` 事件派发语义。
+- `yunti_fill_form` aggregate summary 仍返回 `filled`、`failed`、`results`、
+  `browserSessionId`；下一切片应增量追加 `action: "fill_form"`、`target`、`ok`、
+  `recoverable`、`nextStepHint`，不改逐字段调用 `fillByUid` / content-script fill 的语义。
+
+本覆盖清单确认 P6.2 action result 第一阶段尚未结束；在 `yunti_select` 和
+`yunti_fill_form` 补齐前，不进入更深的 fill/select/scroll 语义增强。
+
+最新验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 86 个
+node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
+内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；本切片只更新
+文档和 skill，不涉及真实浏览器行为，未额外运行 `YUNTI_E2E=1 npm run test:e2e`；token
+残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

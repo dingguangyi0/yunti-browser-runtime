@@ -516,6 +516,14 @@ test("scroll no movement reports recoverable boundary diagnostic", async () => {
       moved: false,
       code: "NO_SCROLL_MOVEMENT",
       edgeHint: "possible-bottom-edge",
+      recoveryHint: {
+        reason: "no-scroll-movement",
+        recommendedTools: ["yunti_observe_page", "yunti_scroll"],
+        nextAction: "observe-for-scrollable-container",
+        edgeHint: "possible-bottom-edge",
+        currentTarget: "document-or-coordinate-container",
+        message: "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid.",
+      },
       ok: false,
       recoverable: true,
       nextStepHint: "Scroll dispatched but before/after positions did not change (possible-bottom-edge). Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.",
@@ -561,6 +569,79 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaX: -180, deltaY: 0 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-left-edge")
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid scroll no movement includes observed container recovery metadata", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-scroll-recovery",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [],
+        scrollableContainers: [
+          {
+            uid: "scroll-2",
+            tag: "div",
+            name: "Results",
+            rect: { x: 20, y: 100, width: 320, height: 240 },
+            canScrollVertical: true,
+            canScrollHorizontal: false,
+            pixelsAbove: 0,
+            pixelsBelow: 480,
+            pixelsLeft: 0,
+            pixelsRight: 0,
+          },
+        ],
+      },
+    ],
+    contentToolResponses: {
+      yunti_scroll: {
+        scrolled: true,
+        deltaX: 0,
+        deltaY: 300,
+        target: "div#results",
+        before: { left: 0, top: 0 },
+        after: { left: 0, top: 0 },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-container-no-move",
+      tool: "yunti_scroll",
+      arguments: { uid: "scroll-2", deltaY: 300 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result.recoveryHint, {
+      reason: "no-scroll-movement",
+      recommendedTools: ["yunti_observe_page", "yunti_scroll"],
+      nextAction: "try-opposite-direction-or-nearest-container",
+      edgeHint: "possible-bottom-edge",
+      uid: "scroll-2",
+      currentTarget: "scrollable-container",
+      lastObservedContainer: {
+        uid: "scroll-2",
+        canScrollVertical: true,
+        canScrollHorizontal: false,
+        pixelsAbove: 0,
+        pixelsBelow: 480,
+        pixelsLeft: 0,
+        pixelsRight: 0,
+      },
+      message: "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid.",
+    })
   } finally {
     harness.restore()
   }

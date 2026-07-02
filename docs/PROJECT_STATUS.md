@@ -5,10 +5,12 @@
 Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`. Current implementation focus is P6.2 structured
-action results; standalone `yunti_select` and aggregate `yunti_fill_form` are
-complete, `yunti_select` now supports selector/value, uid/value, and uid/text,
-and the next compatibility-preserving slice should move into deeper
-fill/select/scroll semantics.
+action results and deeper action semantics. Standalone `yunti_select` and
+aggregate `yunti_fill_form` are complete; `yunti_select` supports
+selector/value, uid/value, and uid/text; contenteditable fill and uid-targeted
+scroll are covered; and scroll no-movement diagnostics now include directional
+`edgeHint` plus structured `recoveryHint`. The next compatibility-preserving
+slice should continue into deeper scroll/select semantics.
 
 ## Current State
 
@@ -482,6 +484,20 @@ fill/select/scroll semantics.
 - Latest P6.2 scroll edge-hint full validation: `git diff --check` passed;
   `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 90
   tests; `npm run release:check` passed with 95 node:test cases total, 94
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
+- P6.2 scroll no-movement diagnostics now include structured `recoveryHint`.
+  For `NO_SCROLL_MOVEMENT`, the result includes reason, nextAction,
+  recommendedTools, currentTarget, edgeHint, and, for fresh scrollable container
+  uids, lastObservedContainer scrollability and remaining-pixel metadata.
+- Latest P6.2 scroll recovery-hint targeted validation:
+  `node --test tests/tool-handlers.test.js` passed 26 tests.
+- Latest P6.2 scroll recovery-hint full validation: `git diff --check` passed;
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 91
+  tests; `npm run release:check` passed with 96 node:test cases total, 95
   passed, and 1 real-browser smoke skipped by default; npm package contents
   validation passed with 42 files; extension zip contents validation passed
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped

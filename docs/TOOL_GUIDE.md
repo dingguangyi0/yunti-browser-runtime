@@ -122,10 +122,13 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   When direction can be inferred, it also includes `edgeHint` such as
   `possible-bottom-edge`, `possible-top-edge`, `possible-right-edge`, or
   `possible-left-edge`.
+- `NO_SCROLL_MOVEMENT` results include `recoveryHint` with a structured
+  `nextAction`, `recommendedTools`, current target type, and last observed
+  container metadata when a fresh container uid was used.
 - After scrolling, observe again and compare document or container `before` /
   `after` positions before assuming the needed element is visible. Stop
-  repeating the same scroll when `moved: false` appears; use `edgeHint` to
-  choose a different container, direction, or recovery path.
+  repeating the same scroll when `moved: false` appears; use `recoveryHint` and
+  `edgeHint` to choose a different container, direction, or recovery path.
 
 ## Select Guidance
 

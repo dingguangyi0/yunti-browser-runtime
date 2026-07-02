@@ -778,6 +778,7 @@ export function createToolDispatcher({
       : undefined
     const noMovement = moved === false
     const edgeHint = noMovement ? inferScrollEdgeHint(result.deltaX, result.deltaY) : undefined
+    const recoveryHint = noMovement ? buildScrollRecoveryHint(session, uid, edgeHint) : undefined
 
     return {
       ...result,
@@ -788,6 +789,7 @@ export function createToolDispatcher({
       ...(moved !== undefined ? { moved } : {}),
       ...(noMovement ? { code: "NO_SCROLL_MOVEMENT" } : {}),
       ...(edgeHint ? { edgeHint } : {}),
+      ...(recoveryHint ? { recoveryHint } : {}),
       ok: !noMovement,
       recoverable: noMovement,
       nextStepHint: noMovement
@@ -806,6 +808,42 @@ export function createToolDispatcher({
     if (Number.isFinite(x) && x > 0) return "possible-right-edge"
     if (Number.isFinite(x) && x < 0) return "possible-left-edge"
     return "no-delta"
+  }
+
+  function buildScrollRecoveryHint(session, uid, edgeHint) {
+    const hint = {
+      reason: "no-scroll-movement",
+      recommendedTools: ["yunti_observe_page", "yunti_scroll"],
+      nextAction: "observe-again",
+    }
+    if (edgeHint) hint.edgeHint = edgeHint
+    if (uid) {
+      hint.uid = uid
+      hint.currentTarget = "scrollable-container"
+      const target = pageUidStore.get(session.browserSessionId)?.uidMap?.[uid]
+      if (target) {
+        hint.lastObservedContainer = {
+          uid,
+          canScrollVertical: Boolean(target.canScrollVertical),
+          canScrollHorizontal: Boolean(target.canScrollHorizontal),
+          ...(Number.isFinite(Number(target.pixelsAbove)) ? { pixelsAbove: Number(target.pixelsAbove) } : {}),
+          ...(Number.isFinite(Number(target.pixelsBelow)) ? { pixelsBelow: Number(target.pixelsBelow) } : {}),
+          ...(Number.isFinite(Number(target.pixelsLeft)) ? { pixelsLeft: Number(target.pixelsLeft) } : {}),
+          ...(Number.isFinite(Number(target.pixelsRight)) ? { pixelsRight: Number(target.pixelsRight) } : {}),
+        }
+      }
+    } else {
+      hint.currentTarget = "document-or-coordinate-container"
+    }
+    if (edgeHint === "possible-bottom-edge" || edgeHint === "possible-top-edge") {
+      hint.nextAction = uid ? "try-opposite-direction-or-nearest-container" : "observe-for-scrollable-container"
+    } else if (edgeHint === "possible-right-edge" || edgeHint === "possible-left-edge") {
+      hint.nextAction = uid ? "try-opposite-horizontal-direction-or-nearest-container" : "observe-for-horizontal-container"
+    } else if (edgeHint === "no-delta") {
+      hint.nextAction = "provide-nonzero-scroll-delta"
+    }
+    hint.message = "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid."
+    return hint
   }
 
   async function selectElement(tabId, session, args = {}) {

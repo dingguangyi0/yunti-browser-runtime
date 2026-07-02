@@ -230,6 +230,9 @@ authentication OTP.
   `https://registry.npmjs.org/` with a 40-file tarball, then failed with npm
   `E403` because the account requires two-factor authentication OTP or a
   granular access token with bypass 2FA enabled.
+- A temporary npm token publish retry also reached official npm publish after
+  passing the full local release gate, but npm returned the same `E403`; the
+  token does not satisfy npm's publish-time bypass 2FA requirement.
 - Next required release step: rerun
   `npm run release:publish -- --otp=<6-digit-code>` with a current npm OTP, or
   configure an npm granular access token that can publish with bypass 2FA; after

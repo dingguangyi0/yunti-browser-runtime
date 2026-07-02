@@ -12,6 +12,10 @@ then reaches `npm publish --registry=https://registry.npmjs.org/`. The registry
 rejects the publish with `E403` because the logged-in account requires
 two-factor authentication for package publishing.
 
+A temporary npm token retry also passed the local release gate and reached
+official npm publish, but npm returned the same `E403`. That token does not
+satisfy the publish-time bypass 2FA requirement.
+
 Resolution:
 
 ```bash

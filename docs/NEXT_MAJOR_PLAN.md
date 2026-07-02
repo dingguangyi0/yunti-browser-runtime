@@ -1,30 +1,130 @@
-# Next Major Plan: 0.2.0 Agentic Page Runtime
+# Next Major Plan: 0.2.0 Best Browser Automation Runtime
 
 This document is the durable planning contract for the next major development
 cycle after `yunti-browser-runtime@0.1.3`.
 
 ## Goal
 
-Make Yunti Browser Runtime easier for external agents to use reliably on real
-Chrome/Edge pages:
+Build the most useful browser automation operation layer for AI agents and
+developers: local-first, LLM-agnostic, MCP-native, and able to operate the
+user's real Chrome/Edge browser through fine-grained, inspectable tools.
+
+`0.2.0` should strengthen Yunti's own direction while absorbing the best
+practical ideas from the broader browser automation ecosystem:
 
 - observe pages in a compact, agent-friendly text form;
 - act through stable element ids and robust DOM action semantics;
 - verify each step with clear recovery hints;
 - keep sensitive page content redacted by default;
+- combine page-level DOM automation with browser-level CDP, tabs, screenshots,
+  network, console, file upload, and diagnostics;
+- make both human operators and external agents confident about what happened
+  and what to do next;
 - preserve the current local-first, zero-config install path.
 
-## Inspiration
+Execution should stay incremental. The first implementation slice should focus
+on Page Agent / browser-use style page observation and indexed actions. Other
+ecosystem lessons are backlog inputs for later phases after the observe/action
+spine is stable.
 
-The next version is informed by Alibaba's Page Agent project:
+## Yunti-First Principle
 
-- Page Agent has a clean split between page controller, agent loop, and optional
-  extension/MCP surfaces.
-- Its strongest ideas for Yunti are text-based DOM observation, indexed
-  interactive elements, scroll hints, explicit step history, user takeover/stop
-  controls, and content masking hooks.
-- Yunti should not copy Page Agent's LLM-in-runtime model as the default. Yunti's
-  core value remains being a local MCP browser runtime for any external agent.
+Yunti should not become a clone of any single existing tool. Every browser
+automation project is a source of ingredients, not the target architecture.
+
+Yunti's distinctive strengths are:
+
+- local MCP bridge that any agent can connect to;
+- fine-grained `yunti_*` tools instead of a single opaque task runner;
+- real user Chrome/Edge state, tabs, login sessions, screenshots, CDP, network
+  observations, and console diagnostics;
+- zero LLM API dependency inside the runtime;
+- zero-config local install path after extension loading;
+- security boundaries based on local loopback, optional token hardening, and
+  explicit redaction.
+
+## Ecosystem Lessons To Absorb
+
+The order matters. Start with Page Agent / browser-use for P6.1 and P6.2, then
+fold in other automation-system lessons step by step.
+
+### browser-use / Page Agent
+
+What to absorb first:
+
+- text-oriented DOM observation;
+- indexed interactive elements;
+- scroll hints and scrollable-container metadata;
+- better DOM action semantics;
+- task history/activity concepts for optional diagnostics;
+- content masking hooks.
+
+How Yunti should differ:
+
+- do not move the LLM loop into the runtime core;
+- keep Yunti as the browser hands/eyes for any external agent;
+- preserve fine-grained tools instead of only natural-language task execution.
+
+### Playwright / Puppeteer / Selenium
+
+What to absorb:
+
+- reliable action semantics for click, fill, select, keyboard, upload, wait, and
+  navigation;
+- clear locator strategy and auto-waiting behavior;
+- trace-style debugging and reproducible action logs;
+- screenshot/video/artifact thinking for failures;
+- browser context and tab management discipline.
+
+How Yunti should differ:
+
+- operate the user's already-open real browser instead of forcing a separate
+  test-runner profile;
+- expose capabilities through MCP tools that external agents can compose;
+- keep install and runtime local-first.
+
+### Chrome DevTools Protocol
+
+What to absorb:
+
+- complete browser-level power: targets, runtime evaluation, screenshots,
+  network, console, performance, DOM, file upload, and emulation;
+- precise low-level escape hatches when high-level DOM actions are not enough.
+
+How Yunti should differ:
+
+- wrap CDP with safer, friendlier workflows and recovery hints;
+- avoid forcing agents to know raw CDP for common tasks.
+
+### BrowserGym / Web Evaluation Harnesses
+
+What to absorb:
+
+- scenario-based task evaluation;
+- deterministic smoke pages and fixtures;
+- measurable success/failure criteria for browser actions;
+- regression suites for common interaction patterns.
+
+How Yunti should differ:
+
+- prioritize real local browser usefulness over benchmark-only behavior.
+
+### Browser Extensions And Local Runtimes
+
+What to absorb:
+
+- easy install/update paths;
+- visible runtime health and connection status;
+- permission transparency;
+- optional debugging UI that does not block first use.
+
+How Yunti should differ:
+
+- keep the default popup zero-config;
+- make richer UI optional and diagnostic, not mandatory.
+
+When a design choice conflicts with Yunti's current strengths, keep Yunti's
+current strengths.
 
 ## Non Goals
 
@@ -33,13 +133,20 @@ The next version is informed by Alibaba's Page Agent project:
   natural-language `execute_task` tool.
 - Do not make a hub tab, side panel, or UI console mandatory for first use.
 - Do not mix remote multi-user mode into the local single-user core.
+- Do not remove CDP, network, console, screenshot, or tab-level capabilities in
+  favor of a narrower page-only agent abstraction.
+- Do not treat compatibility or API parity with any reference project as a goal.
+- Do not optimize only for benchmarks while making real user-browser automation
+  harder.
 - Do not weaken the local loopback security boundary or publish real secrets in
   docs, config output, logs, or tests.
 
 ## Release Theme
 
-`0.2.0` should be a compatibility-preserving release. Existing tools continue to
-work, while agents are guided toward a stronger default workflow:
+`0.2.0` should be a compatibility-preserving enhancement release that makes
+Yunti feel like the most practical browser automation layer for agents. Existing
+tools continue to work, while agents are guided toward a stronger default
+workflow:
 
 ```text
 yunti_observe_page -> yunti_click/fill/select/scroll by uid -> observe/verify
@@ -50,11 +157,24 @@ prefer `yunti_observe_page` once implemented.
 
 ## Phase Plan
 
+### P6.0 Product Direction Guardrail
+
+Status: complete.
+
+The release direction is Yunti-first and ecosystem-informed:
+
+- keep Yunti local-first, LLM-agnostic, MCP-native, and real-browser-oriented;
+- absorb useful ideas from Playwright, Puppeteer, Selenium, CDP, browser-use,
+  Page Agent, BrowserGym, and extension runtimes;
+- do not clone a single project or weaken Yunti's current strengths.
+
 ### P6.1 Agent-Friendly Page Observation
 
 Status: planned.
 
-Create `yunti_observe_page`, a higher-level observation tool that returns:
+Create `yunti_observe_page`, a higher-level observation tool. Use Page Agent's
+PageController/browser-state approach as the first concrete reference, adapted
+to Yunti's MCP/extension architecture. It returns:
 
 - current `browserSessionId`, URL, title, origin, and captured timestamp;
 - viewport size, page size, scroll position, pages above/below, and pixels
@@ -82,7 +202,9 @@ Acceptance:
 Status: planned.
 
 Extract DOM actions from the current content/tool handler code into a focused
-module such as `extension/dom-actions.js`.
+module such as `extension/dom-actions.js`. Use Page Agent's action sequencing
+as the first reference for click/input/select/scroll behavior, then evolve with
+additional lessons from Playwright/CDP in later increments.
 
 Scope:
 
@@ -201,7 +323,13 @@ Acceptance:
 5. P6.5 optional console
 6. P6.6 store distribution readiness
 
-The first two phases should be treated as the technical core of `0.2.0`.
+The first two phases should be treated as the technical core of `0.2.0`, but
+they must remain additive enhancements to Yunti's MCP tool surface.
+
+For the first implementation cycle, do not attempt to absorb every ecosystem
+lesson at once. Complete the Page-Agent-informed observe/action foundation
+first, then add Playwright/CDP/BrowserGym-style reliability and diagnostics in
+separate follow-up increments.
 
 ## Compatibility Rules
 
@@ -209,6 +337,8 @@ The first two phases should be treated as the technical core of `0.2.0`.
   migration path.
 - Add aliases only when they reduce agent confusion.
 - Avoid breaking package install, MCP config printer, doctor, and bridge startup.
+- Preserve Yunti's CDP, tab, network, console, screenshot, and fine-grained DOM
+  action capabilities.
 - Maintain Node.js `>=22`.
 - Keep local default tokenless loopback behavior unless binding is non-loopback
   or `YUNTI_BROWSER_BRIDGE_TOKEN` is explicitly configured.

@@ -42,11 +42,18 @@
 - Extension popup stays zero-config on first run.
 - Token, bridge URL, and page match customization stay in advanced settings.
 
-## Phase 6: Agentic Page Runtime
+## Phase 6: Best Browser Automation Runtime
 
 See [NEXT_MAJOR_PLAN.md](NEXT_MAJOR_PLAN.md) for the durable `0.2.0` execution
 plan.
 
+- Keep the release Yunti-first: build the best local browser automation
+  operation layer for agents instead of pivoting to any single reference
+  project's shape.
+- Absorb practical strengths from Playwright, Puppeteer, Selenium, CDP,
+  browser-use, Page Agent, BrowserGym, and extension runtimes.
+- Sequence the work: first implement the Page Agent / browser-use inspired
+  observe/action spine, then absorb the other ecosystem lessons step by step.
 - Add agent-friendly page observation with text DOM, stable uids, and scroll
   hints.
 - Improve DOM actions for click, fill, select, contenteditable, and scrollable

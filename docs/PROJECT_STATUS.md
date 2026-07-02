@@ -3,8 +3,8 @@
 ## Current Phase
 
 Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
-planning the next major cycle, `0.2.0 Agentic Page Runtime`, documented in
-`docs/NEXT_MAJOR_PLAN.md`.
+planning the next major cycle, `0.2.0 Best Browser Automation Runtime`,
+documented in `docs/NEXT_MAJOR_PLAN.md`.
 
 ## Current State
 
@@ -102,11 +102,19 @@ planning the next major cycle, `0.2.0 Agentic Page Runtime`, documented in
   `yunti_list_browser_targets` to refresh the route inventory.
 - The content script must not call product-specific login APIs in the
   standalone runtime.
-- `0.2.0` should absorb Page Agent's useful ideas around text DOM observation,
-  indexed actions, scroll hints, history/activity concepts, and content masking,
-  while keeping Yunti's core as an LLM-agnostic local MCP runtime.
+- `0.2.0` is a Yunti-first enhancement cycle aimed at becoming the most useful
+  local browser automation operation layer for agents and developers.
+- Reference projects such as Playwright, Puppeteer, Selenium, CDP, browser-use,
+  Page Agent, BrowserGym, and extension runtimes are sources of practical ideas,
+  not product shapes to copy.
+- Implementation should proceed step by step: first use Page Agent/browser-use
+  as the concrete reference for P6.1 page observation and P6.2 indexed actions,
+  then absorb Playwright/CDP/BrowserGym-style reliability and diagnostics later.
 - Yunti should not require an LLM API key, mandatory hub tab, side panel, or
   single black-box `execute_task` tool in the default path.
+- Yunti should preserve its own distinctive capabilities: fine-grained MCP
+  tools, real Chrome/Edge state, CDP, screenshots, network/console diagnostics,
+  tab control, local bridge routing, and zero-config local install.
 
 ## Open Work
 

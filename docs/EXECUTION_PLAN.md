@@ -59,7 +59,7 @@
 | P5.2 | 已完成 | 扩展 popup 与安装引导简化 |
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
-| P6.1 | 文档准备中 | Agent 友好的页面观察契约 |
+| P6.1 | 文档准备中 | Agent 友好的页面观察字段契约 |
 | P6.2 | 计划中 | 稳定 DOM action 层 |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
@@ -1404,6 +1404,18 @@ metadata 与当前 `package.json` 一致。
 - 将 P6.1-P6.6 写入本执行计划和 `docs/ROADMAP.md`。
 - 将 `docs/PROJECT_STATUS.md` 的当前阶段更新为 `0.2.0` 规划状态。
 
+### 多视角审稿结论
+
+已从产品、架构/API、Agent 工作流、安全隐私、测试发布五个视角审阅 `0.2.0` 计划。
+共识如下：
+
+- 方向正确：Yunti-first、本地优先、MCP 原生、真实浏览器状态和细粒度工具必须保留。
+- 需要把“最好用”变成可验证承诺：更少误点、更少盲目重试、更清晰恢复、更低安装心智。
+- P6.1 必须前置最小安全基线，不能等到 P6.4 才处理 DOM observation 脱敏。
+- `yunti_observe_page` 需要字段级输入/输出契约、uid 生命周期、错误码和工具兼容矩阵。
+- P6.1/P6.2 需要 deterministic fixture，而不是只写能力描述。
+- P6.3 的 skill/tool hints 和可复制工作流提示词应在 P6.1 schema 合并时同步更新。
+
 ### 目标
 
 避免上下文压缩或线程切换后丢失下一大版本方向，尤其避免因为阅读单一参考项目而偏离
@@ -1469,6 +1481,57 @@ Yunti 的 MCP/extension/bridge 架构。
 - 默认不返回 password、token-like、credential-like 输入值；完整 DOM 脱敏策略放到
   P6.4 深化。
 
+### 字段级契约草案
+
+输入：
+
+- `browserSessionId`：可选目标浏览器 session。
+- `mode`：默认 `viewport`；后续支持有边界的 `fullPage`。
+- `maxElements` / `maxTextLength`：默认限量，防止一次返回过多页面内容。
+- `includeHidden`：默认 false。
+- `includeTextTree` / `includeRects`：默认 true。
+- `redaction`：默认 `balanced`；`strict` 用于更强隐私；`off` 仅允许显式本地调试，
+  不进入默认 agent workflow。
+
+输出：
+
+- `observationId`、`browserSessionId`、`capturedAt`、`uidMapVersion`。
+- `page`：URL、脱敏 URL preview、title、origin、readyState。
+- `viewport`：width、height、devicePixelRatio。
+- `scroll`：x/y、page size、pixels/pages above/below。
+- `elements[]`：`uid`、`role`、`tag`、`name`、`text`、`label`、`placeholder`、
+  `valuePreview`、`valueRedacted`、`type`、`hrefPreview`、`rect`、`visible`、
+  `disabled`、`editable`、`checked`、`selected`、`scrollable`、`containerUid`。
+- `textTree`：面向 Agent 的紧凑文本树。
+- `scrollableContainers[]`：`uid`、`tag`、`name`、`rect`、`scrollTop`、
+  `scrollHeight`、`clientHeight`、`canScrollVertical`、`canScrollHorizontal`、
+  各方向剩余像素。
+- `limits`、`redactions`、`hints[]`、`warnings[]`。
+
+uid 生命周期：
+
+- uid 只对当前 `browserSessionId` 的最近一次 observe/snapshot 有效，不承诺跨刷新或跨
+  页面永久稳定。
+- action 应接受来自 `yunti_observe_page` 或 `yunti_take_snapshot` 的 uid，但错误提示
+  必须说明应重新 observe 还是重新 snapshot。
+- stale uid 使用结构化错误码，例如 `STALE_OBSERVATION_UID`，并提示重新
+  `yunti_observe_page`。
+- uid map 只放内存，不写入 learning memory、task history 或长期诊断日志。
+
+最小脱敏基线：
+
+- P6.1 默认 `balanced`，隐藏 password、hidden token、token/secret/auth/cookie/session/
+  api-key/credential/otp-like 值、JWT-like、Bearer-like、private-key-like 和长随机串。
+- DOM observation 默认使用属性白名单，不返回任意 attributes。
+- URL query 默认摘要化或局部脱敏。
+- DOM redaction 不代表 screenshot redaction；截图按真实可见像素处理。
+
+受限/降级状态：
+
+- content script 不可用、browser internal page、跨域 iframe 内容省略、session stale、
+  tab changed、无可见交互元素、页面仍在 loading、动作验证不确定时，都需要返回
+  `hints[]` 或结构化错误。
+
 ### 本阶段不做
 
 - 不把 LLM task loop 放进 runtime。
@@ -1483,6 +1546,8 @@ Yunti 的 MCP/extension/bridge 架构。
 - Page Agent 参考审计已沉淀为 Yunti 术语，不再依赖上下文记忆。
 - 后续代码实现再进入 schema、content script collection、dispatcher routing、测试和
   skill/docs 更新。
+- P6.1 完成必须包括 schema 单测、bridge routing 单测、content fixture 单测、真实浏览器
+  smoke、skill 更新和 `yunti_get_tool_usage_hints` 更新。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -1528,6 +1593,30 @@ Yunti 的 MCP/extension/bridge 架构。
 - 不要求用户打开 mandatory replay/trace UI。
 - 不移除现有 CDP fallback 能力。
 
+### 动作优先级与结果契约
+
+动作优先级：
+
+- P0：`observe -> click uid -> observe`。
+- P0：`observe -> fill uid -> verify value`，覆盖 input、textarea、contenteditable。
+- P0：页面滚动与 container 滚动恢复。
+- P1：select visible text/value、tab 选择/切换、新 tab 续接、等待与验证模板。
+- P2：把 console/network/screenshot/CDP 诊断接入“为什么没成功”的恢复建议。
+
+动作结果至少包含：
+
+- action 名称、target uid/selector/coordinate、`browserSessionId`。
+- 成功/失败状态，失败时给结构化 code。
+- `nextStepHint` 和 recoverable 标记。
+- 必要时包含 before/after 摘要，例如 scroll position、value length、selected option、
+  URL/title 变化、toast/dialog 状态。
+
+`yunti_select` 兼容缺口：
+
+- 当前 selector/value 路径保留。
+- P6.2 需要增加 uid 与 visible text 支持，并写明如何与 `yunti_observe_page` 的 uid
+  衔接。
+
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
 ## P6.3 Agent 工作流契约
@@ -1539,6 +1628,15 @@ Yunti 的 MCP/extension/bridge 架构。
 将 `observe -> act -> verify` 作为默认 Agent 使用范式写入 skill、tool hints 和文档，
 减少盲目重试和坐标操作。
 
+P6.3 的一部分应前置到 P6.1 schema 合并时完成：
+
+- `yunti_get_tool_usage_hints` 必须同步新增 observe-first guidance。
+- `skills/yunti-browser-runtime/SKILL.md` 应加入默认循环：
+  `hints -> list targets -> observe -> act by uid -> wait if needed -> observe -> verify -> recover or continue`。
+- `docs/TOOL_GUIDE.md` 应补点击、填表、滚动找元素、切 tab、等待异步结果五个最小用例。
+- 提供可复制提示词，指导外部 Agent 避免盲目重复失败动作，并在提交、删除、支付、
+  上传敏感文件或修改生产数据前请求用户确认。
+
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
 ## P6.4 DOM 脱敏与页面内容策略
@@ -1549,6 +1647,14 @@ Yunti 的 MCP/extension/bridge 架构。
 
 把 DOM observation 的敏感内容脱敏提升为一等能力，与现有 network/console redaction
 形成统一安全边界。
+
+P6.1 已前置最小 DOM observation 脱敏基线；P6.4 负责深化：
+
+- `strict` 模式覆盖 email、phone、证件号/银行卡-like、地址-like 和正文中的 credential-like
+  片段。
+- 对齐 DOM、network、console 的敏感词和字段策略。
+- 明确 learning memory、task history、diagnostic artifacts 默认不存 secret，并提供清理路径。
+- 明确截图默认是真实像素，不承诺被 DOM redaction 遮蔽。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -1586,6 +1692,24 @@ npm test
 ```bash
 npm run test:e2e
 ```
+
+P6.1/P6.2 browser behavior 变更合并前必须执行：
+
+```bash
+YUNTI_E2E=1 npm run test:e2e
+```
+
+最小 fixture 矩阵：
+
+- `observe-basic.fixture.html`
+- `observe-redaction.fixture.html`
+- `observe-scroll.fixture.html`
+- `observe-dynamic.fixture.html`
+- `actions-form.fixture.html`
+- `actions-contenteditable.fixture.html`
+- `actions-scroll-container.fixture.html`
+
+这些 fixture 是本地确定性回归，不是 benchmark 优化目标。
 
 涉及文档/开源化时额外检查：
 

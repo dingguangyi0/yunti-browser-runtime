@@ -111,6 +111,11 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   absorb browser-state observation, indexed interactive elements, scrollable
   metadata, action sequencing, and retry discipline; do not copy its built-in
   LLM loop or make its UI model mandatory.
+- A multi-perspective 0.2.0 review has been completed across product,
+  architecture/API, Agent workflow, security/privacy, and test/release strategy.
+  The resulting plan changes emphasize product success metrics, field-level
+  observation contracts, uid lifecycle, P6.1 minimum redaction, deterministic
+  fixtures, and observe-first skill/tool guidance.
 - Implementation should proceed step by step: first use Page Agent/browser-use
   as the concrete reference for P6.1 page observation and P6.2 indexed actions,
   then absorb Playwright/CDP/BrowserGym-style reliability and diagnostics later.
@@ -129,6 +134,8 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Start P6.1 by confirming the `yunti_observe_page` output contract, uid
   relationship, default redaction, and first `observe -> click uid -> observe`
   smoke path before implementation.
+- Before P6.1 code, finalize the field-level contract, `yunti_get_tool_usage_hints`
+  wording, fixture matrix, and minimum DOM observation redaction baseline.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

@@ -22,6 +22,25 @@ practical ideas from the broader browser automation ecosystem:
   and what to do next;
 - preserve the current local-first, zero-config install path.
 
+## Product Promise
+
+`0.2.0` should let any MCP agent operate the user's already-open local
+Chrome/Edge browser in an observable, recoverable, and auditable way without
+asking the user to understand CDP, CSS selectors, browser-extension tokens, or
+complex setup.
+
+The practical promise is:
+
+- fewer mis-clicks because agents act through fresh observed uids;
+- fewer blind retries because actions return recovery hints;
+- less user setup friction because the local zero-config path remains the
+  default;
+- clearer safety boundaries because observation, diagnostics, and screenshots
+  document what they do and do not redact;
+- stronger real-browser workflows because Yunti keeps tabs, CDP, screenshots,
+  network, console, file upload, and diagnostics alongside page-level DOM
+  automation.
+
 Execution should stay incremental. The first implementation slice should focus
 on Page Agent / browser-use style page observation and indexed actions. Other
 ecosystem lessons are backlog inputs for later phases after the observe/action
@@ -115,6 +134,12 @@ What not to copy:
   network, console, screenshot, file upload, and diagnostics capabilities.
 - Numeric indexes can inspire the UX, but Yunti should keep `uid` naming
   aligned with existing `yunti_take_snapshot` and action tools.
+
+Page Agent / browser-use should remain the first DOM observation/action
+reference only. Yunti's product boundary remains broader: MCP connection,
+real-browser sessions, tab routing, CDP escape hatches, network/console
+diagnostics, screenshots, uploads, local installation, and explicit safety
+controls.
 
 ### Playwright / Puppeteer / Selenium
 
@@ -227,6 +252,29 @@ yunti_observe_page -> yunti_click/fill/select/scroll by uid -> observe/verify
 `yunti_take_snapshot` remains available. Newer docs and skill instructions should
 prefer `yunti_observe_page` once implemented.
 
+Success metrics:
+
+- an agent can identify the active browser page and interact with it without
+  asking the user for tokens or selectors;
+- `observe -> action by uid -> observe` becomes the documented default path;
+- common failures return actionable next steps instead of opaque errors;
+- sensitive credential-like values are not exposed by default observation;
+- existing `yunti_get_page_snapshot`, `yunti_take_snapshot`, CDP, screenshot,
+  network, console, upload, and tab tools remain compatible;
+- at least one deterministic fixture proves
+  `observe -> click/fill/select/scroll -> observe verify -> recover`.
+
+Tool choice:
+
+- Use `yunti_observe_page` for the normal agent loop once available.
+- Use `yunti_get_page_snapshot` for lightweight route/title/text/auth overview.
+- Use `yunti_take_snapshot` as the compatibility path for existing uid-based
+  action workflows.
+- Use screenshot tools for visual inspection, with the assumption that
+  screenshots may contain all visible sensitive page content.
+- Use CDP tools for low-level browser recovery or capabilities not covered by
+  high-level DOM tools.
+
 ## Phase Plan
 
 ### P6.0 Product Direction Guardrail
@@ -273,6 +321,73 @@ First slice:
 - redact sensitive input values by default, even before the full P6.4 policy is
   complete.
 
+Input contract:
+
+- `browserSessionId`: optional target browser session.
+- `mode`: `viewport` by default, with bounded `fullPage` support later.
+- `maxElements`: bounded element limit.
+- `maxTextLength`: bounded text limit.
+- `includeHidden`: defaults to false.
+- `includeTextTree`: defaults to true.
+- `includeRects`: defaults to true.
+- `redaction`: defaults to `balanced`; `strict` is allowed for stronger
+  privacy; `off` is reserved for explicit local debugging only and must not be
+  used by default agent workflows.
+
+Output contract:
+
+- `observationId`, `browserSessionId`, `capturedAt`, and `uidMapVersion`.
+- `page`: URL, sanitized URL preview, title, origin, and document ready state.
+- `viewport`: width, height, device pixel ratio.
+- `scroll`: x/y position, page size, pixels/pages above and below.
+- `elements[]`: `uid`, `role`, `tag`, `name`, `text`, `label`,
+  `placeholder`, `valuePreview`, `valueRedacted`, `type`, `hrefPreview`,
+  `rect`, `visible`, `disabled`, `editable`, `checked`, `selected`,
+  `scrollable`, and `containerUid` where applicable.
+- `textTree`: compact line-oriented representation of visible interactive
+  elements.
+- `scrollableContainers[]`: `uid`, `tag`, `name`, `rect`, `scrollTop`,
+  `scrollHeight`, `clientHeight`, `canScrollVertical`,
+  `canScrollHorizontal`, and pixels available in each direction.
+- `limits`: returned/max element and text counts plus truncation flags.
+- `redactions`: redaction mode, count, categories, and whether values were
+  suppressed.
+- `hints[]` and `warnings[]`: next-step and degraded-observation guidance.
+
+Uid lifecycle:
+
+- uids from `yunti_observe_page` are valid for the latest observation in the
+  current `browserSessionId`, not permanent selectors.
+- Actions should accept uids from either `yunti_observe_page` or
+  `yunti_take_snapshot`, but errors must explain which refresh step is needed.
+- Stale uid errors should use a structured code such as
+  `STALE_OBSERVATION_UID` and recommend calling `yunti_observe_page` again.
+- uid maps must stay in memory only; they must not be written to learning
+  memory, task history, or persistent diagnostics.
+
+Minimum P6.1 redaction baseline:
+
+- default `balanced` redaction hides password fields, hidden token-like fields,
+  token/secret/auth/cookie/session/api-key/credential/otp-like values, JWT-like
+  values, Bearer-like values, private-key-like values, and long random-looking
+  strings;
+- observation uses an attribute allowlist rather than returning arbitrary DOM
+  attributes;
+- URL query values are summarized or partially redacted by default;
+- screenshot redaction is not implied by DOM redaction;
+- P6.4 will deepen the policy with optional strict PII redaction and aligned
+  DOM/network/console behavior.
+
+Restricted-page and degraded-state hints:
+
+- content script not available;
+- unsupported URL such as browser internal pages;
+- cross-origin iframe content omitted;
+- stale browser session;
+- tab changed or no active browser page;
+- no visible interactive elements;
+- page still loading or action verification uncertain.
+
 Page Agent mapping:
 
 - `BrowserState.header` maps to Yunti's `page`, `viewport`, `scroll`, and
@@ -300,6 +415,9 @@ Acceptance:
 - It redacts sensitive values by default.
 - Unit tests cover schema, routing, stale-session recovery, and a fixture page.
 - E2E smoke can use `observe -> click uid -> observe` on the test page.
+- P6.1 is complete only after schema tests, bridge routing tests, content
+  fixture tests, real-browser smoke, skill guidance, and tool usage hints are
+  updated.
 
 ### P6.2 Robust DOM Action Layer
 
@@ -320,6 +438,18 @@ Scope:
 - support scrolling the document or a scrollable container by uid;
 - return structured action results with before/after summary where useful.
 
+Action priority:
+
+- P0: click by uid, fill input/textarea/contenteditable by uid, and verify by
+  observing again.
+- P0: page and container scrolling recovery.
+- P1: select-by-visible-text, select-by-value, dropdown recovery, tab selection,
+  and wait/verify templates.
+- P2: deeper diagnostics that connect console/network/screenshot/CDP evidence
+  to action recovery hints.
+- Not now: canvas automation, CAPTCHA solving, complex drag workflows, or a
+  black-box task runner.
+
 First slice:
 
 - keep existing `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
@@ -328,6 +458,17 @@ First slice:
 - improve errors so agents understand whether to observe again, scroll, wait, or
   switch tabs;
 - keep selector and coordinate fallbacks available for recovery and debugging.
+
+Action result contract:
+
+- return the action name, `browserSessionId`, target uid/selector/coordinate,
+  success flag or clear failure code, and a human-readable `nextStepHint`;
+- include before/after summaries when useful, such as scroll position, input
+  value length, selected option, URL/title change, or detected toast/popup;
+- mark recoverable failures explicitly so agents know whether to observe,
+  scroll, wait, switch tabs, or ask the user;
+- update `yunti_select` planning to support uid and visible text, while keeping
+  the current selector/value path compatible.
 
 Page Agent mapping:
 
@@ -364,6 +505,12 @@ Scope:
 - add guidance to evaluate the previous action before retrying;
 - discourage repeated blind retries and coordinate-only actions;
 - add examples for form filling, tab switching, dropdowns, and scroll recovery;
+- add a copyable external-agent prompt for the default Yunti workflow;
+- define verification templates for URL changes, visible text, toast messages,
+  element disappearance, input value changes, list/table updates, and dialogs;
+- define recovery taxonomy for stale sessions, stale uids, hidden/disabled
+  elements, covered elements, pending navigation, wrong tab, and restricted
+  pages;
 - consider local task-history tools:
   - `yunti_begin_task`
   - `yunti_record_step`
@@ -374,6 +521,8 @@ Acceptance:
 
 - Skill and tool hints consistently prefer `yunti_observe_page`.
 - Agents can recover from failed action by observing again and using a fresh uid.
+- `yunti_observe_page` release includes updated `yunti_get_tool_usage_hints`;
+  this cannot wait until late P6.3.
 - Optional task-history tools, if implemented, store no secrets and are scoped to
   the local user.
 
@@ -394,6 +543,20 @@ Scope:
   - `off` for local debugging only;
 - show redaction metadata in observation output;
 - keep network and console redaction behavior aligned with DOM redaction.
+
+P6.1 already carries the minimum DOM observation baseline. P6.4 is for expanding
+coverage, making strict mode robust, aligning DOM/network/console terminology,
+and documenting cleanup/diagnostic retention behavior.
+
+Security caveats to keep explicit:
+
+- DOM redaction is not complete data-loss prevention; visible business data can
+  still be returned.
+- Screenshots are real visible pixels and should be treated as sensitive unless
+  future pixel masking exists.
+- External agents may transmit observed page content according to their own
+  policies; Yunti can keep the runtime local but cannot promise what a third
+  party agent does with returned content.
 
 Acceptance:
 
@@ -419,6 +582,8 @@ Acceptance:
 
 - The console is optional and never blocks the first-run path.
 - It exposes no raw secrets.
+- It shows sanitized summaries by default, not raw DOM, screenshots, console
+  payloads, network bodies, or credential-like values.
 - It helps diagnose "extension loaded but no page connected" without asking the
   user to inspect logs manually.
 
@@ -486,6 +651,24 @@ When observation/action behavior changes:
 npm run release:check
 YUNTI_E2E=1 npm run test:e2e
 ```
+
+P6.1/P6.2 fixture matrix:
+
+- `observe-basic.fixture.html`: title, links, buttons, labels, inputs,
+  textarea, select, and visible element metadata.
+- `observe-redaction.fixture.html`: password, hidden token, ordinary search
+  input, credential-looking strings, and redaction metadata.
+- `observe-scroll.fixture.html`: long page and nested scroll container.
+- `observe-dynamic.fixture.html`: DOM change after action and stale uid
+  recovery.
+- `actions-form.fixture.html`: click, fill, select-by-text, select-by-value,
+  and event counters.
+- `actions-contenteditable.fixture.html`: contenteditable edit and verification.
+- `actions-scroll-container.fixture.html`: uid-targeted container scrolling and
+  reached-edge feedback.
+
+The fixture suite is for deterministic local regression, not benchmark
+optimization.
 
 Before publishing `0.2.0`:
 

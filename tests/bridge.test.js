@@ -567,6 +567,32 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
   assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /Target.closeTarget/)
 })
 
+test("mcp usage hints document select uid and visible text planning", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_select" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  const selectHints = payload.tools.yunti_select
+
+  assert.equal(selectHints.schema.required.includes("value"), true)
+  assert.equal(selectHints.schema.required.includes("selector"), true)
+  assert.equal(selectHints.schema.properties.uid.type, "string")
+  assert.equal(selectHints.schema.properties.text.type, "string")
+  assert.match(selectHints.notes.join("\n"), /selector\/value compatible/)
+  assert.match(selectHints.notes.join("\n"), /uid and visible text support/)
+  assert.match(selectHints.recovery.join("\n"), /available options/)
+  assert.match(selectHints.commonMistakes.join("\n"), /Do not omit selector/)
+  assert.match(selectHints.commonMistakes.join("\n"), /selector\/value compatibility/)
+})
+
 test("mcp usage hints include observe-first page operation guidance", async () => {
   const response = await handleJsonRpc({
     jsonrpc: "2.0",

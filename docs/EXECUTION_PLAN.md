@@ -1688,7 +1688,9 @@ P6.1 真实浏览器闭环验证 runbook：
 
 - 当前 selector/value 路径保留。
 - P6.2 需要增加 uid 与 visible text 支持，并写明如何与 `yunti_observe_page` 的 uid
-  衔接。
+  衔接；契约切片先暴露 `uid` / `text` 参数计划和恢复路径，runtime 语义另行小切片实现。
+- uid/text 支持落地前，Agent 不应假设 `yunti_select` 已能通过 uid 或可见文本选择；当前
+  runtime 仍以 selector/value 兼容路径为默认。
 
 最新切片记录（2026-07-03）：
 
@@ -1953,6 +1955,19 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
   `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
   残留检查无输出。
+- `mcp/tools.js` 已为 `yunti_select` 增加 P6.2 uid / visible text 前置契约：schema
+  继续要求当前 runtime 真实支持的 `selector` / `value`，并暴露 planned `uid` 和 `text`
+  参数说明；usage hints 明确当前 runtime 仍保持 selector/value 兼容路径，并记录 observe、
+  inspect options、wait、switch tab 的恢复路径；本切片不改 extension runtime 行为。
+- `tests/bridge.test.js` 已新增 `yunti_select` usage hints 断言，锁住 selector/value
+  兼容边界、planned uid/text 参数和可用选项检查提示。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/bridge.test.js`
+  通过 65 项。
+- 最新 full 验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 89 个
+  node:test 用例，其中 88 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
+  内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；本切片只更新
+  schema、usage hints、文档和 skill，不改真实浏览器 runtime 行为，未额外运行
+  `YUNTI_E2E=1 npm run test:e2e`；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

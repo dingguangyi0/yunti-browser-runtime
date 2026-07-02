@@ -621,14 +621,35 @@ export const TOOLS = [
   },
   {
     name: "yunti_select",
-    description: "Select an option in a select element on the current browser page.",
+    description:
+      "Select an option in a select element on the current browser page. Current runtime supports selector/value; P6.2 is preparing uid and visible text selection while keeping selector/value compatible.",
     inputSchema: {
       type: "object",
       required: ["selector", "value"],
       properties: {
-        browserSessionId: { type: "string" },
-        selector: { type: "string" },
-        value: { type: "string" },
+        browserSessionId: {
+          type: "string",
+          description: "Optional target Yunti browser session.",
+        },
+        selector: {
+          type: "string",
+          description: "Current compatible CSS selector path for the select element.",
+        },
+        uid: {
+          type: "string",
+          description:
+            "Planned P6.2 uid path from yunti_observe_page or yunti_take_snapshot. Prefer fresh observation uids once runtime support lands.",
+        },
+        value: {
+          type: "string",
+          description:
+            "Option value to select. Current runtime matches value through selector path.",
+        },
+        text: {
+          type: "string",
+          description:
+            "Planned P6.2 visible option text fallback. Use when the user-facing label differs from the option value once runtime support lands.",
+        },
       },
     },
   },
@@ -1130,6 +1151,30 @@ export function toolUsageHints(args = {}) {
         "Do not omit value.",
         "Do not pass only x/y coordinates to yunti_fill.",
         "Do not keep retrying a fill without observing whether the field exists and is editable.",
+      ],
+    },
+    yunti_select: {
+      purpose: "Select an option in a select element while preserving the current selector/value path.",
+      required: ["value"],
+      recommended: ["browserSessionId", "selector", "value"],
+      notes: [
+        "Current runtime behavior is selector/value compatible; do not assume uid or visible text selection has landed until the runtime slice is implemented.",
+        "P6.2 prepares uid and visible text support so select can follow observe -> select by fresh uid -> observe/verify.",
+        "When uid support lands, use a fresh uid from yunti_observe_page or yunti_take_snapshot and verify the selected option afterward.",
+        "Use visible option text only when the user-facing label is clearer than the option value, and keep value as the stable fallback.",
+        "Current successful results preserve selected, element, value, selector, browserSessionId, action, target, ok, recoverable, and nextStepHint.",
+      ],
+      recovery: [
+        "Selector path fails: observe again, inspect the select element, then retry with a stable selector or wait for the form to render.",
+        "Planned uid path fails: refresh with yunti_observe_page before retrying the same uid.",
+        "Option is not found: inspect available options with yunti_take_snapshot or yunti_evaluate_script before retrying.",
+        "Wrong tab or stale route: refresh targets with yunti_list_browser_targets and route through the intended browserSessionId.",
+      ],
+      commonMistakes: [
+        "Do not omit selector until the uid runtime slice lands; uid is only a planned contract field in this slice.",
+        "Do not remove selector/value compatibility while adding uid or visible text support.",
+        "Do not treat a selected=true result as final proof when the workflow depends on the changed page state; observe or evaluate the field value.",
+        "Do not blindly retry the same selector if the page is still rendering or the option list is dynamic.",
       ],
     },
   }

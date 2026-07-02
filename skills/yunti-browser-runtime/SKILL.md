@@ -77,6 +77,12 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Treat action results as execution evidence, then verify page state when the task depends on the result.
 - Do not require agents to abandon existing result fields while structured action results are being introduced.
 
+## Select Guidance
+
+- Current `yunti_select` runtime behavior remains selector/value compatible.
+- P6.2 has planned `uid` and visible option `text` contract fields, but do not omit `selector` until the runtime slice lands.
+- Before retrying a failed select, inspect available options with observe, snapshot, evaluate, or a stable selector instead of blindly repeating it.
+
 ## Safety
 
 - Read-only inspection is allowed by default.

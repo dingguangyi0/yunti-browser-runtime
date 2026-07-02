@@ -95,6 +95,14 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Compatibility fields must remain available while structured result fields are
   introduced.
 
+## Select Guidance
+
+- Current `yunti_select` runtime behavior remains selector/value compatible.
+- P6.2 has planned `uid` and visible option `text` contract fields, but agents
+  should not omit `selector` until the runtime slice lands.
+- Before retrying a failed select, inspect available options with observe,
+  snapshot, evaluate, or a stable selector instead of blindly repeating it.
+
 ## Safety Rules
 
 - Read-only inspection is allowed by default.

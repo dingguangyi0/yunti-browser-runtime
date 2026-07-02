@@ -51,6 +51,7 @@
 | P4.13 | 已完成 | doctor JSON smoke 门禁 |
 | P4.14 | 已完成 | 公开文档相对链接门禁 |
 | P4.15 | 已完成 | npm 官方 registry 发布脚本 |
+| P4.16 | 已完成 | 正式发布脚本内置门禁 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1058,9 +1059,9 @@ skill 文档里的本地跳转都能指向实际文件。
 
 实现摘要：
 
-- 新增 `npm run release:dry-run`，执行
+- 新增 `npm run release:dry-run`，先执行 `npm run release:prepublish`，再执行
   `npm publish --dry-run --registry=https://registry.npmjs.org/`。
-- 新增 `npm run release:publish`，执行
+- 新增 `npm run release:publish`，先执行 `npm run release:prepublish`，再执行
   `npm publish --registry=https://registry.npmjs.org/`。
 - README 和 `docs/RELEASE.md` 已改用这两个脚本，避免本机 npm registry mirror
   影响发布预览或正式发布。
@@ -1084,6 +1085,41 @@ skill 文档里的本地跳转都能指向实际文件。
   `Publishing to https://registry.npmjs.org/`。
 - npm publish dry-run tarball 包含 39 个文件。
 
+## P4.16 正式发布脚本内置门禁
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- `release:dry-run` 已改为内置执行 `npm run release:prepublish`。
+- `release:publish` 已改为内置执行 `npm run release:prepublish`。
+- README 和 `docs/RELEASE.md` 已移除需要手动先跑 `release:prepublish` 的发布命令序列。
+
+### 目标
+
+避免人工执行 `release:dry-run` 或 `release:publish` 时绕过 metadata 检查、
+release gate、npm package 内容检查和 extension zip 内容检查。
+
+### 验收标准
+
+- `package.json` 中 `release:dry-run` 包含 `npm run release:prepublish`。
+- `package.json` 中 `release:publish` 包含 `npm run release:prepublish`。
+- `npm run release:dry-run` 会先跑完整 prepublish gate，再生成官方 npm registry
+  dry-run 预览。
+
+### 验收记录
+
+- README 和 `docs/RELEASE.md` 已同步为 `npm run release:dry-run` /
+  `npm run release:publish` 流程。
+- `npm run release:dry-run` 已通过，命令先进入 `npm run release:prepublish`，
+  再执行 `npm publish --dry-run --registry=https://registry.npmjs.org/`。
+- 内置 prepublish gate 通过：repository、homepage、bugs 均返回 HTTP 200；
+  release gate 覆盖公开文档残留、Markdown 链接、版本一致性、CLI smoke、
+  print-config smoke、doctor smoke、`npm run check`、`npm test`、npm package
+  contents 和 extension zip contents。
+- dry-run 输出显示 `Publishing to https://registry.npmjs.org/`，tarball 包含
+  39 个文件。
+
 ## 每阶段完成后的固定检查
 
 ```bash
@@ -1105,8 +1141,8 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P4.3-P4.15 已完成，当前发布前最后动作：
+P4.3-P4.16 已完成，当前发布前最后动作：
 
-- `npm run release:dry-run` 已通过。
+- `npm run release:dry-run` 已通过内置发布前门禁和官方 npm registry 预览。
 - 如确认要发布 `0.1.0`，执行 `npm run release:publish`。
 - 浏览器扩展如需上架商店，发布前还需重新审查 broad host permissions。

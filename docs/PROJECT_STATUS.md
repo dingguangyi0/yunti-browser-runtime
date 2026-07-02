@@ -203,6 +203,12 @@ repository/homepage/bugs URL confirmation is complete for the
   `https://registry.npmmirror.com`, while
   `npm run release:dry-run` passed and showed the official npm registry as the
   target; the dry-run tarball contained 39 files.
+- P4.16 publish script gate chaining is complete: `release:dry-run` and
+  `release:publish` now run `npm run release:prepublish` before reaching npm
+  publish or publish dry-run.
+- Latest P4.16 validation: `npm run release:dry-run` passed, entered
+  `release:prepublish` first, then completed npm publish dry-run against
+  `https://registry.npmjs.org/`; the tarball contained 39 files.
 - Next required release step: if `0.1.0` is confirmed as the first release, run
   `npm run release:publish`.
 

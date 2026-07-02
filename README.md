@@ -204,12 +204,11 @@ learning memory 和核心工具分发。
 仓库 URL 和 npm metadata 已确认公开可达。发布前运行：
 
 ```bash
-npm run release:prepublish
 npm run release:dry-run
 ```
 
-该命令会先执行 `npm run check:metadata`，再执行 `npm run release:check`。
-`release:dry-run` 会显式使用官方 npm registry，避免本机 registry mirror 影响发布预览。
+`release:dry-run` 会先执行 `npm run check:metadata` 和 `npm run release:check`，
+再显式使用官方 npm registry，避免本机 registry mirror 影响发布预览。
 
 真实浏览器 E2E smoke test 默认跳过；需要本机安装 Playwright / Chromium 后显式启用：
 

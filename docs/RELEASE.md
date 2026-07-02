@@ -108,13 +108,13 @@ is set.
 After the external URL confirmation and local release gate pass:
 
 ```bash
-npm run release:prepublish
 npm run release:dry-run
 npm run release:publish
 ```
 
-The publish scripts pin `https://registry.npmjs.org/` so a local mirror registry
-configuration cannot accidentally receive the release.
+The dry-run and publish scripts both run `npm run release:prepublish` before
+publishing. They also pin `https://registry.npmjs.org/` so a local mirror
+registry configuration cannot accidentally receive the release.
 
 After publishing, verify:
 

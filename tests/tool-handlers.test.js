@@ -6,6 +6,7 @@ function createDispatcherHarness(options = {}) {
   const posted = []
   const sentMessages = []
   const cdpCommands = []
+  const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
   const contentToolResponses = options.contentToolResponses || {}
   const originalChrome = globalThis.chrome
   const observations = options.observations || [
@@ -54,6 +55,9 @@ function createDispatcherHarness(options = {}) {
     cdp: {
       chromeDebuggerSendCommand: async (_target, method, params) => {
         cdpCommands.push({ method, params })
+        if (cdpResponses) {
+          return cdpResponses.shift() || {}
+        }
         return {}
       },
       delayCdp: async () => {},
@@ -233,6 +237,73 @@ test("dispatcher preserves current action result shapes", async () => {
       target: "document",
       before: { left: 0, top: 0 },
       after: { left: 0, top: 600 },
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid fill select path preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-select",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 30, y: 90, width: 160, height: 30 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "select",
+            options: [
+              { value: "basic", text: "Basic" },
+              { value: "pro", text: "Pro" },
+            ],
+            selectedIndex: 0,
+          },
+        },
+      },
+      {},
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-select",
+      tool: "yunti_fill",
+      arguments: { uid: "yunti-select", value: "Pro" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: true,
+      uid: "yunti-select",
+      method: "select",
+      value: "pro",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { uid: "yunti-select", method: "select" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Select value dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
     })
   } finally {
     harness.restore()

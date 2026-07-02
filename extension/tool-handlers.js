@@ -631,7 +631,18 @@ export function createToolDispatcher({
               })()`,
             }
           )
-          return { filled: true, uid, method: "select", value: targetOption.value, browserSessionId: session.browserSessionId }
+          return {
+            filled: true,
+            uid,
+            method: "select",
+            value: targetOption.value,
+            browserSessionId: session.browserSessionId,
+            action: "fill",
+            target: { uid, method: "select" },
+            ok: true,
+            recoverable: false,
+            nextStepHint: "Select value dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
+          }
         }
         throw new Error(`Option '${value}' not found in select at uid ${uid}. Use yunti_take_snapshot to inspect the select element or pass an available option value/text.`)
       }

@@ -107,6 +107,10 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Reference projects such as Playwright, Puppeteer, Selenium, CDP, browser-use,
   Page Agent, BrowserGym, and extension runtimes are sources of practical ideas,
   not product shapes to copy.
+- Page Agent has been reviewed as the concrete first reference for P6.1/P6.2:
+  absorb browser-state observation, indexed interactive elements, scrollable
+  metadata, action sequencing, and retry discipline; do not copy its built-in
+  LLM loop or make its UI model mandatory.
 - Implementation should proceed step by step: first use Page Agent/browser-use
   as the concrete reference for P6.1 page observation and P6.2 indexed actions,
   then absorb Playwright/CDP/BrowserGym-style reliability and diagnostics later.

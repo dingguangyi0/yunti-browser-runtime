@@ -1433,6 +1433,29 @@ Yunti 自己的特色。后续实现应直接从仓库文档恢复目标、非�
 第一阶段以 Page Agent 的 PageController / browser-state 思路为主要参考，但实现要适配
 Yunti 的 MCP/extension/bridge 架构。
 
+### Page Agent 参考审计
+
+当前参考源：`alibaba/page-agent`。
+
+可吸收点：
+
+- `PageController.getBrowserState()`：把 URL/title、页面尺寸、滚动提示和可交互 DOM
+  文本合成一个面向 Agent 的观察结果。
+- `updateTree()`：把观察刷新与动作执行分开，适合作为 `observe -> act -> verify`
+  工作流的前置步骤。
+- `selectorMap` 与 simplified HTML：证明 indexed interactive elements 比原始 CSS
+  selector 更适合 Agent 使用；Yunti 需要适配成现有 uid 体系。
+- `data-scrollable`：对多面板业务系统很重要，应结构化进入 `scrollableContainers`。
+- prompt 规则：评估上一步结果、不要盲目重试、只有存在 pixels above/below 时再滚动。
+
+不复制点：
+
+- 不复制内置 LLM loop。
+- 不让 hub/sidebar/operator UI 成为必选项。
+- 不把 Yunti 收窄为单页任务工具；仍保留 tabs、CDP、network、console、screenshot、
+  file upload 和诊断能力。
+- 不追求 Page Agent API 兼容；只吸收思路并转成 Yunti 的 MCP 工具契约。
+
 ### 文档先行约束
 
 在动功能代码前，先确认以下契约：
@@ -1457,6 +1480,7 @@ Yunti 的 MCP/extension/bridge 架构。
 ### 第一批验收
 
 - 文档确认 `yunti_observe_page` 的输出契约、uid 关系、默认脱敏和第一条 smoke 路径。
+- Page Agent 参考审计已沉淀为 Yunti 术语，不再依赖上下文记忆。
 - 后续代码实现再进入 schema、content script collection、dispatcher routing、测试和
   skill/docs 更新。
 
@@ -1473,6 +1497,21 @@ Yunti 的 MCP/extension/bridge 架构。
 
 第一阶段优先参考 Page Agent 的 click/input/select/scroll 事件序列；Playwright/CDP 风格
 的 auto-wait、trace 和更深诊断后续再逐步补。
+
+### Page Agent 参考审计
+
+可吸收点：
+
+- `clickElement()` 的 pointer/mouse/focus/click 顺序。
+- `inputTextElement()` 对 input、textarea、contenteditable 的分支和插入后验证思路。
+- `selectOptionElement()` 的 visible text 选择思路。
+- `scrollVertically()` / `scrollHorizontally()` 的容器优先滚动、边界判断和结果消息。
+
+不复制点：
+
+- 不引入隐藏细粒度工具的大型 action runner。
+- 不移除 selector、coordinate、CDP fallback。
+- 不把动作结果只做自然语言字符串；Yunti 应返回结构化结果，必要时附带人类可读 hint。
 
 ### 文档先行约束
 

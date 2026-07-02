@@ -86,6 +86,36 @@ How Yunti should differ:
 - keep Yunti as the browser hands/eyes for any external agent;
 - preserve fine-grained tools instead of only natural-language task execution.
 
+Reference audit from `alibaba/page-agent`:
+
+- `PageController.getBrowserState()` is the closest reference for P6.1:
+  combine URL/title, page metrics, scroll hints, and compact interactive DOM
+  text into one agent-facing observation.
+- `updateTree()` separates observation refresh from action execution. Yunti
+  should mirror the idea by making `yunti_observe_page` the explicit refresh
+  step before uid-based actions.
+- `selectorMap` and simplified HTML show why indexed elements are easier for
+  agents than raw CSS selectors. Yunti should adapt this into stable `uid`
+  fields while keeping its current `yunti_*` tool style.
+- `data-scrollable` metadata is worth absorbing because multi-panel business
+  apps often need container scrolling instead of page scrolling.
+- Action code around click, input, select, and scroll is useful as an event
+  sequencing reference, especially for contenteditable and scrollable
+  containers.
+- The prompt rules around evaluating previous action results, avoiding blind
+  retries, and scrolling only when there are pixels above/below should inform
+  Yunti skill/tool hints.
+
+What not to copy:
+
+- Page Agent's built-in LLM loop is not Yunti's runtime responsibility.
+- Page Agent's hub/sidebar/operator UI should not become required for Yunti's
+  default local path.
+- Page Agent's single-page-task framing should not remove Yunti's tab, CDP,
+  network, console, screenshot, file upload, and diagnostics capabilities.
+- Numeric indexes can inspire the UX, but Yunti should keep `uid` naming
+  aligned with existing `yunti_take_snapshot` and action tools.
+
 ### Playwright / Puppeteer / Selenium
 
 What to absorb:
@@ -243,6 +273,17 @@ First slice:
 - redact sensitive input values by default, even before the full P6.4 policy is
   complete.
 
+Page Agent mapping:
+
+- `BrowserState.header` maps to Yunti's `page`, `viewport`, `scroll`, and
+  `hints` fields.
+- `BrowserState.content` maps to Yunti's `textTree` plus structured
+  `elements[]`.
+- `BrowserState.footer` maps to Yunti's above/below scroll hints.
+- `selectorMap` maps to Yunti's latest observation uid map.
+- Page Agent's `data-scrollable` string maps to Yunti's structured
+  `scrollableContainers[]`.
+
 Not this phase:
 
 - no LLM task loop inside the runtime;
@@ -287,6 +328,15 @@ First slice:
 - improve errors so agents understand whether to observe again, scroll, wait, or
   switch tabs;
 - keep selector and coordinate fallbacks available for recovery and debugging.
+
+Page Agent mapping:
+
+- `clickElement()` informs Yunti's pointer/mouse/focus/click event order.
+- `inputTextElement()` informs contenteditable fallback sequencing and
+  verification.
+- `selectOptionElement()` informs select-by-visible-text behavior.
+- `scrollVertically()` and `scrollHorizontally()` inform uid-targeted container
+  scroll behavior and reached-edge result messages.
 
 Not this phase:
 

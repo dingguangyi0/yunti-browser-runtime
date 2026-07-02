@@ -128,6 +128,38 @@ test("observe uid map feeds existing uid-based click path", async () => {
   }
 })
 
+test("coordinate click preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness()
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-click-coordinate",
+      tool: "yunti_click",
+      arguments: { x: 12.4, y: 34.6 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      clicked: true,
+      x: 12,
+      y: 35,
+      browserSessionId: "tab-1",
+      method: "coordinate",
+      action: "click",
+      target: { method: "coordinate", x: 12, y: 35 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Coordinate click dispatched. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
+      ["mousePressed", "mouseReleased"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("dispatcher preserves current action result shapes", async () => {
   const harness = createDispatcherHarness({
     observations: [

@@ -733,7 +733,20 @@ export function createToolDispatcher({
   
   async function clickAtCoordinate(tabId, session, x, y) {
     await mouseClick(tabId, x, y, 1)
-    return { clicked: true, x: Math.round(x), y: Math.round(y), browserSessionId: session.browserSessionId, method: "coordinate" }
+    const roundedX = Math.round(x)
+    const roundedY = Math.round(y)
+    return {
+      clicked: true,
+      x: roundedX,
+      y: roundedY,
+      browserSessionId: session.browserSessionId,
+      method: "coordinate",
+      action: "click",
+      target: { method: "coordinate", x: roundedX, y: roundedY },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Coordinate click dispatched. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
+    }
   }
   
   async function resolveSelectorCenter(tabId, selector) {

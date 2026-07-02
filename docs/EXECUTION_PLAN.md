@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、contenteditable fill、uid scroll、scroll no-movement/edgeHint/recoveryHint/suggestedRetry 诊断；下一步继续收敛更深 scroll/select 语义 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、contenteditable fill、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry 诊断；下一步继续收敛更深 scroll/select 语义 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -78,7 +78,7 @@
   passthrough、aggregate `yunti_fill_form` summary；`yunti_select` 也已补齐 selector/value、
   uid/value、uid/text 三条路径；更深语义已推进到 contenteditable fill、fresh
   observed scroll container uid、scroll no-movement、directional `edgeHint`、结构化
-  `recoveryHint` 和可执行 `suggestedRetry` 诊断。
+  `recoveryHint`、机器可读 `decision` 和可执行 `suggestedRetry` 诊断。
 - P6.2 第一轮 action result 覆盖、select uid/text、contenteditable fill 和 scroll
   recovery diagnostics 已补齐；下一步继续进入更深的 scroll/select 语义增强，保留所有
   既有兼容字段与 CDP fallback。
@@ -2073,6 +2073,21 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   路径会保留同一个 fresh container uid，方便 Agent 尝试一次反向滚动后立即重新 observe。
   该字段是纯新增诊断信息，不改变 scroll 派发路径、兼容字段、`nextAction` 或既有
   `recoveryHint` 结构。
+- 最新 targeted 验证：`node --test tests/tool-handlers.test.js tests/bridge.test.js`
+  通过 91 项。
+- 最新 full 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js
+  tests/bridge.test.js` 通过 91 项；`npm run release:check` 通过，覆盖 96 个 node:test
+  用例，其中 95 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
+  包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
+  test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
+- `yunti_scroll` 无位移恢复提示已新增 `recoveryHint.decision`：在
+  `NO_SCROLL_MOVEMENT` 时根据 `edgeHint` 和是否使用 fresh container uid，返回机器可读的
+  恢复决策，例如 `observe-for-scrollable-container`、
+  `observe-for-horizontal-scrollable-container`、
+  `retry-opposite-vertical-on-same-container-once`、
+  `retry-opposite-horizontal-on-same-container-once` 或 `provide-nonzero-delta`。
+  该字段帮助 Agent 在 `nextAction` 和 `suggestedRetry` 之间少做分支判断；本切片仍不改变
+  scroll 派发路径、兼容字段或既有恢复字段。
 - 最新 targeted 验证：`node --test tests/tool-handlers.test.js tests/bridge.test.js`
   通过 91 项。
 - 最新 full 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js

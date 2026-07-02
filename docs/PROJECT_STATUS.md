@@ -9,9 +9,9 @@ action results and deeper action semantics. Standalone `yunti_select` and
 aggregate `yunti_fill_form` are complete; `yunti_select` supports
 selector/value, uid/value, and uid/text; contenteditable fill and uid-targeted
 scroll are covered; and scroll no-movement diagnostics now include directional
-`edgeHint`, structured `recoveryHint`, and executable `suggestedRetry`
-parameters. The next compatibility-preserving slice should continue into
-deeper scroll/select semantics.
+`edgeHint`, structured `recoveryHint`, machine-readable `decision`, and
+executable `suggestedRetry` parameters. The next compatibility-preserving
+slice should continue into deeper scroll/select semantics.
 
 ## Current State
 
@@ -520,6 +520,22 @@ deeper scroll/select semantics.
   passed with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but
   skipped because Playwright/Chromium is not installed locally; the token
   residue grep returned no matches.
+- P6.2 scroll recovery guidance now includes `recoveryHint.decision`. For
+  `NO_SCROLL_MOVEMENT`, the decision is derived from `edgeHint` and whether the
+  scroll used a fresh container uid, producing machine-readable guidance such
+  as observing for a container, retrying the opposite direction once on the
+  same container, or providing a nonzero delta.
+- Latest P6.2 scroll decision-hint targeted validation:
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 91
+  tests.
+- Latest P6.2 scroll decision-hint full validation: `git diff --check` passed;
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 91
+  tests; `npm run release:check` passed with 96 node:test cases total, 95
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
 
 ## Decisions
 

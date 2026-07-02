@@ -842,10 +842,23 @@ export function createToolDispatcher({
     } else if (edgeHint === "no-delta") {
       hint.nextAction = "provide-nonzero-scroll-delta"
     }
+    const decision = buildScrollRecoveryDecision(uid, edgeHint)
+    if (decision) hint.decision = decision
     const suggestedRetry = buildScrollSuggestedRetry(uid, edgeHint, result)
     if (suggestedRetry) hint.suggestedRetry = suggestedRetry
     hint.message = "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid."
     return hint
+  }
+
+  function buildScrollRecoveryDecision(uid, edgeHint) {
+    if (edgeHint === "no-delta") return "provide-nonzero-delta"
+    if (edgeHint === "possible-bottom-edge" || edgeHint === "possible-top-edge") {
+      return uid ? "retry-opposite-vertical-on-same-container-once" : "observe-for-scrollable-container"
+    }
+    if (edgeHint === "possible-right-edge" || edgeHint === "possible-left-edge") {
+      return uid ? "retry-opposite-horizontal-on-same-container-once" : "observe-for-horizontal-scrollable-container"
+    }
+    return undefined
   }
 
   function buildScrollSuggestedRetry(uid, edgeHint, result = {}) {

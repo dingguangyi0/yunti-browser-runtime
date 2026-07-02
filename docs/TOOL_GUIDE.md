@@ -123,15 +123,16 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   `possible-bottom-edge`, `possible-top-edge`, `possible-right-edge`, or
   `possible-left-edge`.
 - `NO_SCROLL_MOVEMENT` results include `recoveryHint` with a structured
-  `nextAction`, `recommendedTools`, current target type, and last observed
-  container metadata when a fresh container uid was used. When the attempted
-  direction is clear, `recoveryHint.suggestedRetry` also provides a one-shot
-  opposite `deltaX` / `deltaY` to try before switching container or stopping.
+  `nextAction`, machine-readable `decision`, `recommendedTools`, current target
+  type, and last observed container metadata when a fresh container uid was
+  used. When the attempted direction is clear, `recoveryHint.suggestedRetry`
+  also provides a one-shot opposite `deltaX` / `deltaY` to try before switching
+  container or stopping.
 - After scrolling, observe again and compare document or container `before` /
   `after` positions before assuming the needed element is visible. Stop
   repeating the same scroll when `moved: false` appears; use `recoveryHint`,
-  `edgeHint`, and `suggestedRetry` to choose a different container, direction,
-  or recovery path.
+  `decision`, `edgeHint`, and `suggestedRetry` to choose a different container,
+  direction, or recovery path.
 
 ## Select Guidance
 

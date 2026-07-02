@@ -522,6 +522,7 @@ test("scroll no movement reports recoverable boundary diagnostic", async () => {
         nextAction: "observe-for-scrollable-container",
         edgeHint: "possible-bottom-edge",
         currentTarget: "document-or-coordinate-container",
+        decision: "observe-for-scrollable-container",
         suggestedRetry: {
           deltaY: -600,
           note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
@@ -559,6 +560,7 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaY: -240 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-top-edge")
+    assert.equal(harness.posted.at(-1).result.recoveryHint.decision, "observe-for-scrollable-container")
     assert.deepEqual(harness.posted.at(-1).result.recoveryHint.suggestedRetry, {
       deltaY: 240,
       note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
@@ -570,6 +572,7 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaX: 180, deltaY: 0 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-right-edge")
+    assert.equal(harness.posted.at(-1).result.recoveryHint.decision, "observe-for-horizontal-scrollable-container")
     assert.deepEqual(harness.posted.at(-1).result.recoveryHint.suggestedRetry, {
       deltaX: -180,
       note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
@@ -581,10 +584,20 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaX: -180, deltaY: 0 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-left-edge")
+    assert.equal(harness.posted.at(-1).result.recoveryHint.decision, "observe-for-horizontal-scrollable-container")
     assert.deepEqual(harness.posted.at(-1).result.recoveryHint.suggestedRetry, {
       deltaX: 180,
       note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
     })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-no-delta",
+      tool: "yunti_scroll",
+      arguments: { deltaX: 0, deltaY: 0 },
+    })
+    assert.equal(harness.posted.at(-1).result.edgeHint, "no-delta")
+    assert.equal(harness.posted.at(-1).result.recoveryHint.decision, "provide-nonzero-delta")
+    assert.equal(harness.posted.at(-1).result.recoveryHint.suggestedRetry, undefined)
   } finally {
     harness.restore()
   }
@@ -647,6 +660,7 @@ test("uid scroll no movement includes observed container recovery metadata", asy
       edgeHint: "possible-bottom-edge",
       uid: "scroll-2",
       currentTarget: "scrollable-container",
+      decision: "retry-opposite-vertical-on-same-container-once",
       lastObservedContainer: {
         uid: "scroll-2",
         canScrollVertical: true,

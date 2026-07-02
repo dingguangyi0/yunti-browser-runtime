@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成第一轮 action result 覆盖，下一步进入更深 fill/select/scroll 语义增强 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖和 select uid/text 支持，下一步进入更深 fill/select/scroll 语义增强 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -75,9 +75,10 @@
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
   upload uid/selector path、coordinate drag、standalone `yunti_select` content-script
-  passthrough、aggregate `yunti_fill_form` summary。
-- P6.2 第一轮 action result 覆盖已补齐；下一步进入更深的 fill/select/scroll 语义增强，
-  继续保留所有既有兼容字段与 CDP fallback。
+  passthrough、aggregate `yunti_fill_form` summary；`yunti_select` 也已补齐 selector/value、
+  uid/value、uid/text 三条路径。
+- P6.2 第一轮 action result 覆盖和 select uid/text 语义已补齐；下一步进入更深的
+  fill/select/scroll 语义增强，继续保留所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1916,11 +1917,14 @@ P6.1 真实浏览器闭环验证 runbook：
 - `yunti_drag`：coordinate path；保留 `dragged`、`from`、`to`、`steps` 等兼容字段。
 - `yunti_select`：standalone content-script passthrough；保留 `selected`、`element`、
   `value` 等兼容字段。
+- `yunti_select`：uid/value 和 uid/text runtime paths；保留 `selected`、`uid`、
+  `value`、`text`、`selectedIndex` 等兼容字段，同时保留 selector/value 兼容路径。
 - `yunti_fill_form`：aggregate summary；保留 `filled`、`failed`、`results`、
   `browserSessionId` 等兼容字段。
 
-本覆盖清单确认 P6.2 action result 第一阶段已覆盖主要 action surfaces；后续可以进入
-更深的 fill/select/scroll 语义增强，但仍必须小切片推进，并保留兼容字段与 CDP fallback。
+本覆盖清单确认 P6.2 action result 第一阶段已覆盖主要 action surfaces，并且 `yunti_select`
+已完成 selector/value、uid/value、uid/text 三条操作路径；后续可以进入更深的
+fill/select/scroll 语义增强，但仍必须小切片推进，并保留兼容字段与 CDP fallback。
 
 最新验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 86 个
 node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
@@ -2002,6 +2006,13 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
   `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
   残留检查无输出。
+- P6.2 action path 覆盖清单已重新审计：主要 action result surfaces 均有结构化字段覆盖，
+  `yunti_select` 的 selector/value、uid/value、uid/text 路径均已落地并记录；下一步明确
+  转向更深 fill/select/scroll 语义增强，而不是继续停留在 select 缺口。
+- 最新覆盖审计验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖
+  91 个 node:test 用例，其中 90 个通过、1 个 real-browser smoke 按默认配置跳过；
+  npm package 内容检查通过，包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；
+  token 残留检查无输出。本次为 docs-only 覆盖审计补记，未重新执行真实浏览器 E2E。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

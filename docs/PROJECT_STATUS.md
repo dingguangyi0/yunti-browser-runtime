@@ -6,7 +6,8 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`. Current implementation focus is P6.2 structured
 action results; standalone `yunti_select` and aggregate `yunti_fill_form` are
-complete, and the next compatibility-preserving slice should move into deeper
+complete, `yunti_select` now supports selector/value, uid/value, and uid/text,
+and the next compatibility-preserving slice should move into deeper
 fill/select/scroll semantics.
 
 ## Current State
@@ -412,6 +413,18 @@ fill/select/scroll semantics.
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
+- P6.2 action path coverage was re-audited after select uid/text support.
+  Structured action result fields now cover the main action surfaces, and
+  `yunti_select` has selector/value, uid/value, and uid/text operation paths.
+  The next work should move into deeper fill/select/scroll semantics while
+  preserving selector/value compatibility, CDP fallback, diagnostics, and
+  existing action result fields.
+- Latest P6.2 action path coverage audit validation: `git diff --check`
+  passed; `npm run release:check` passed with 91 node:test cases total, 90
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; the token residue grep returned no matches. Real-browser E2E
+  was not rerun for this docs-only audit patch.
 
 ## Decisions
 

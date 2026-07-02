@@ -77,7 +77,7 @@ function buildConfig(agent) {
       tokenConfigured: bridgeTokenConfigured,
       tokenInstruction: bridgeTokenConfigured
         ? "Token is configured in the current environment; copy the same secret into your agent and extension settings without committing it."
-        : "Set YUNTI_BROWSER_BRIDGE_TOKEN in your agent and save the same token in the extension popup when bridge auth is enabled.",
+        : "Local loopback bridge auth is disabled by default; set YUNTI_BROWSER_BRIDGE_TOKEN only when you want to require a local token.",
     },
     skill: {
       sourcePath: skillPath,

@@ -58,12 +58,14 @@ async function checkBridge() {
       `${bridgeUrl}/health?userId=${encodeURIComponent(routeUserId)}`
     )
     const authorized = health.json?.authorized !== false
+    const authRequired = health.json?.auth?.required !== false && Boolean(health.json?.auth?.required)
     const sessions = Array.isArray(health.json?.sessions) ? health.json.sessions : []
     const activeSessionId = health.json?.activeSessionId || null
     return {
       ok: health.status === 200 && authorized,
       reachable: health.status === 200,
       authorized,
+      authRequired,
       status: health.status,
       url: bridgeUrl,
       tokenConfigured: Boolean(bridgeToken),
@@ -81,6 +83,7 @@ async function checkBridge() {
       ok: false,
       reachable: false,
       authorized: false,
+      authRequired: Boolean(bridgeToken),
       url: bridgeUrl,
       tokenConfigured: Boolean(bridgeToken),
       tokenHeader: bridgeTokenHeader,
@@ -110,8 +113,8 @@ function buildNextSteps(checks) {
   if (!checks.bridge.reachable) {
     steps.push("Start the local bridge with npm run bridge.")
   }
-  if (checks.bridge.reachable && !checks.bridge.authorized) {
-    steps.push("Set YUNTI_BROWSER_BRIDGE_TOKEN to the bridge token printed by npm run bridge.")
+  if (checks.bridge.reachable && checks.bridge.authRequired && !checks.bridge.authorized) {
+    steps.push("Set YUNTI_BROWSER_BRIDGE_TOKEN to the token used by the running bridge.")
     steps.push("Save the same token in the extension popup.")
   }
   if (checks.bridge.ok && !checks.bridge.extensionConnected) {
@@ -131,7 +134,7 @@ function humanSummary(report) {
     `Yunti Browser Runtime doctor: ${report.ok ? "OK" : "needs attention"}`,
     `- Node: ${report.checks.node.version} (${report.checks.node.ok ? "ok" : "requires >=22"})`,
     `- Bridge: ${report.checks.bridge.reachable ? report.checks.bridge.url : "not reachable"}`,
-    `- Token: ${report.checks.bridge.authorized ? "valid" : "missing or invalid"}`,
+    `- Token: ${report.checks.bridge.authRequired ? report.checks.bridge.authorized ? "valid" : "missing or invalid" : "not required for local loopback"}`,
     `- Sessions: ${report.checks.bridge.visibleSessionCount} visible, active ${report.checks.bridge.activeSessionId || "none"}`,
     `- Extension: ${report.checks.bridge.extensionConnected ? "connected" : "not detected"}`,
     `- MCP server: ${report.checks.mcpServer.ok ? "found" : "missing"}`,

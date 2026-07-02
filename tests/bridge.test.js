@@ -8,11 +8,11 @@ import {
   TOOLS,
 } from "../mcp/server.js"
 
-async function withHttpBridge(fn) {
+async function withHttpBridge(fn, options = {}) {
   const bridge = await startBridgeServer({
     host: "127.0.0.1",
     port: 0,
-    bridgeToken: "test-token",
+    bridgeToken: options.bridgeToken ?? "test-token",
   })
   const address = bridge.server.address()
   const baseUrl = `http://127.0.0.1:${address.port}`
@@ -82,6 +82,28 @@ test("bridge HTTP routes require the configured token", async () => {
   })
 })
 
+test("local bridge defaults to no token requirement", async () => {
+  await withHttpBridge(async ({ baseUrl, bridge }) => {
+    assert.equal(bridge.authRequired, false)
+    assert.equal(bridge.bridgeToken, "")
+
+    const registered = await readJsonResponse(await fetch(`${baseUrl}/sessions/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ browserSessionId: "tab-1", userId: "u1" }),
+    }))
+    assert.equal(registered.status, 200)
+    assert.equal(registered.body.ok, true)
+
+    const health = await readJsonResponse(await fetch(`${baseUrl}/health?userId=u1`))
+    assert.equal(health.status, 200)
+    assert.equal(health.body.authorized, true)
+    assert.equal(health.body.auth.required, false)
+    assert.equal(health.body.sessionCount, 1)
+    assert.equal(health.body.sessions.length, 1)
+  }, { bridgeToken: "" })
+})
+
 test("bridge health is limited without token and complete with token", async () => {
   await withHttpBridge(async ({ baseUrl }) => {
     await fetch(`${baseUrl}/sessions/register`, {
@@ -105,6 +127,13 @@ test("bridge health is limited without token and complete with token", async () 
     assert.equal(complete.body.sessions.length, 1)
     assert.equal(complete.body.activeSessionId, "tab-1")
   })
+})
+
+test("bridge requires a token when binding to a non-loopback host", async () => {
+  await assert.rejects(
+    () => startBridgeServer({ host: "0.0.0.0", port: 0, bridgeToken: "" }),
+    /YUNTI_BROWSER_BRIDGE_TOKEN is required/
+  )
 })
 
 test("bridge CORS only echoes allowed origins", async () => {

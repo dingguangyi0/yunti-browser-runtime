@@ -27,8 +27,8 @@ Use a custom port when needed:
 YUNTI_BROWSER_BRIDGE_PORT=48999 npm run bridge
 ```
 
-bridge 会在启动时读取或生成本地访问 token，并把请求头名称和值打印到 stderr。
-推荐在 MCP、doctor 和扩展里使用同一个显式 token：
+默认本地 bridge 只监听 `127.0.0.1`，不需要配置 token。需要额外加固本机访问、
+或自定义部署时，可以显式启用 token：
 
 ```bash
 YUNTI_BROWSER_BRIDGE_TOKEN="$(openssl rand -hex 24)" npm run bridge
@@ -54,7 +54,7 @@ Development loading:
 2. Enable developer mode.
 3. Choose "Load unpacked".
 4. Select the project `extension/` directory.
-5. Click the extension icon and save the same bridge token printed by the bridge.
+5. Click the extension icon and confirm the bridge URL is `http://127.0.0.1:48887`.
 6. Open any `http` or `https` page and click the extension icon to confirm the
    page is connected.
 
@@ -117,9 +117,10 @@ npm run print-config -- --agent claude-code --human
 ```
 
 Add the printed `mcpServers.yunti-browser-runtime` block to Claude Code's MCP
-configuration. If using a bridge token, set `YUNTI_BROWSER_BRIDGE_TOKEN` in the
-same environment Claude Code uses to launch the MCP server, and save the same
-token in the extension popup.
+configuration. The default local loopback setup does not require a bridge token.
+If using a bridge token, set `YUNTI_BROWSER_BRIDGE_TOKEN` in the same environment
+Claude Code uses to launch the MCP server, and save the same token in the
+extension popup.
 
 #### Cursor
 
@@ -176,8 +177,8 @@ runs the unit test suite, and verifies the npm package contents with
 ## Common Recovery
 
 - If tools say no browser tab is connected, refresh the target page.
-- If doctor reports `authorized: false`, set `YUNTI_BROWSER_BRIDGE_TOKEN` and
-  save the same token in the extension popup.
+- If doctor reports `authorized: false` with `authRequired: true`, set
+  `YUNTI_BROWSER_BRIDGE_TOKEN` and save the same token in the extension popup.
 - If an old `browserSessionId` fails, call `yunti_list_browser_targets` again
   and use the latest returned session.
 - If a parameter error appears, call `yunti_get_tool_usage_hints` with the

@@ -2,8 +2,9 @@
 
 ## Current Phase
 
-First public npm release is complete. `yunti-browser-runtime@0.1.0` is published
-on the official npm registry and verified with `npm run release:verify-published`.
+Patch release `yunti-browser-runtime@0.1.1` is complete. The local loopback
+bridge no longer requires a token by default, and the published package is
+verified with `npm run release:verify-published`.
 
 ## Current State
 
@@ -19,15 +20,18 @@ on the official npm registry and verified with `npm run release:verify-published
 - A staged execution plan exists at `docs/EXECUTION_PLAN.md`.
 - Tool prefix is `yunti_*`.
 - MCP local mode defaults to `userId=local`.
-- Bridge HTTP routes now require `x-yunti-browser-token`; unauthenticated
-  `/health` only returns limited status.
+- Local loopback bridge HTTP routes do not require a token by default; setting
+  `YUNTI_BROWSER_BRIDGE_TOKEN` re-enables `x-yunti-browser-token` checks.
+- Binding the bridge to a non-loopback host requires
+  `YUNTI_BROWSER_BRIDGE_TOKEN`.
 - Bridge CORS now echoes only local debug origins and browser extension origins
   by default, with `YUNTI_BROWSER_BRIDGE_ALLOW_ORIGINS` as an override.
-- Extension popup can save the local bridge URL, token, and page match patterns.
+- Extension popup can save the local bridge URL, optional token, and page match
+  patterns.
 - Browser sessions now track `lastSeenAt`, `lastActivatedAt`, `expiresAt`, and
   `staleReason`; extension polling refreshes heartbeat and expired sessions are
   cleaned up with recovery guidance.
-- `npm run doctor` now checks Node version, bridge reachability, token validity,
+- `npm run doctor` now checks Node version, bridge reachability, auth mode,
   registered sessions, active session, extension presence, MCP server path, and
   skill path; it emits JSON plus a human-readable summary.
 - `npm run print-config` prints MCP configuration for Codex, Claude Code,
@@ -38,7 +42,7 @@ on the official npm registry and verified with `npm run release:verify-published
 - `npm run release:dry-run` and `npm run release:publish` pin the official npm
   registry at `https://registry.npmjs.org/`, avoiding accidental publication to
   a locally configured mirror registry.
-- `yunti-browser-runtime@0.1.0` is published on the official npm registry.
+- `yunti-browser-runtime@0.1.1` is published on the official npm registry.
 - `npm run test:e2e` provides an opt-in real-browser Playwright smoke test for
   extension loading, page registration, MCP target listing, snapshot, click/fill,
   and CDP `Runtime.evaluate`.
@@ -98,7 +102,7 @@ on the official npm registry and verified with `npm run release:verify-published
 
 ## Open Work
 
-- Follow `docs/EXECUTION_PLAN.md` when defining the next post-release phase.
+- Follow `docs/EXECUTION_PLAN.md` when defining the next post-0.1.1 phase.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository
@@ -237,6 +241,13 @@ on the official npm registry and verified with `npm run release:verify-published
 - A publish-capable npm token written to the project-local `.npmrc` authenticated
   successfully as `xuanzhu`; `npm run release:publish` then succeeded, followed
   by successful `npm run release:verify-published`.
+- P5.1 local default auth simplification is complete: default `127.0.0.1`
+  bridge usage no longer needs a token; explicit `YUNTI_BROWSER_BRIDGE_TOKEN`
+  still enforces token checks; non-loopback binding without a token fails fast.
+- Latest P5.1 validation: `npm test` passed 61 tests with 60 passing and 1
+  real-browser smoke skipped by configuration; `npm run check` and
+  `npm run release:check` passed; `npm run release:publish` published
+  `yunti-browser-runtime@0.1.1`; `npm run release:verify-published` returned 0.
 
 ## Known Risks
 

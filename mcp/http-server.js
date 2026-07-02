@@ -1,5 +1,4 @@
 import http from "node:http"
-import { randomUUID } from "node:crypto"
 import {
   BridgeHub,
   DEFAULT_SESSION_TTL_MS,
@@ -88,6 +87,11 @@ function isAllowedOrigin(origin, allowOrigins) {
   return allowOrigins.some((pattern) => originMatchesPattern(origin, pattern))
 }
 
+function isLoopbackHost(host) {
+  const value = String(host || "").trim().toLowerCase()
+  return value === "127.0.0.1" || value === "localhost" || value === "::1" || value === "[::1]"
+}
+
 function bridgeCorsHeaders(req, allowOrigins) {
   const origin = String(req.headers.origin || "")
   const headers = {
@@ -117,20 +121,33 @@ function bridgeRequestToken(req) {
   return match ? normalizeBridgeToken(match[1]) : ""
 }
 
-function isAuthorizedBridgeRequest(req, bridgeToken) {
+function isAuthorizedBridgeRequest(req, bridgeToken, authRequired = true) {
+  if (!authRequired) return true
   const token = normalizeBridgeToken(bridgeToken)
   return Boolean(token && bridgeRequestToken(req) === token)
 }
 
-function limitedHealth() {
+function authInfo(authRequired) {
+  return {
+    required: Boolean(authRequired),
+    header: BRIDGE_TOKEN_HEADER,
+  }
+}
+
+function healthWithAuth(value, authRequired) {
+  return {
+    ...value,
+    authorized: true,
+    auth: authInfo(authRequired),
+  }
+}
+
+function limitedHealth(authRequired) {
   return {
     ok: true,
     name: "yunti-browser-runtime-bridge",
     authorized: false,
-    auth: {
-      required: true,
-      header: BRIDGE_TOKEN_HEADER,
-    },
+    auth: authInfo(authRequired),
   }
 }
 
@@ -173,7 +190,13 @@ export async function startBridgeServer({
   const configuredBridgeToken = normalizeBridgeToken(
     bridgeToken ?? process.env.YUNTI_BROWSER_BRIDGE_TOKEN
   )
-  const activeBridgeToken = configuredBridgeToken || randomUUID()
+  const authRequired = Boolean(configuredBridgeToken)
+  if (!authRequired && !isLoopbackHost(host)) {
+    throw new Error(
+      "YUNTI_BROWSER_BRIDGE_TOKEN is required when binding the bridge to a non-loopback host"
+    )
+  }
+  const activeBridgeToken = configuredBridgeToken
   const hub = new BridgeHub({ sessionTtlMs })
   const cleanupTimer = setInterval(() => {
     hub.cleanupExpiredSessions()
@@ -182,7 +205,7 @@ export async function startBridgeServer({
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url || "/", `http://${host}:${port}`)
-      const authorized = isAuthorizedBridgeRequest(req, activeBridgeToken)
+      const authorized = isAuthorizedBridgeRequest(req, activeBridgeToken, authRequired)
 
       if (req.method === "OPTIONS") {
         const origin = String(req.headers.origin || "")
@@ -195,7 +218,9 @@ export async function startBridgeServer({
           req,
           res,
           200,
-          authorized ? hub.health({ userId: url.searchParams.get("userId") }) : limitedHealth(),
+          authorized
+            ? healthWithAuth(hub.health({ userId: url.searchParams.get("userId") }), authRequired)
+            : limitedHealth(authRequired),
           { allowOrigins }
         )
         return
@@ -209,7 +234,7 @@ export async function startBridgeServer({
           {
             ok: false,
             error: `missing or invalid ${BRIDGE_TOKEN_HEADER}`,
-            auth: { required: true, header: BRIDGE_TOKEN_HEADER },
+            auth: authInfo(authRequired),
           },
           { allowOrigins }
         )
@@ -320,7 +345,7 @@ export async function startBridgeServer({
   if (mode === "proxy") {
     clearInterval(cleanupTimer)
     server.close()
-    return { mode: "proxy", host, port, bridgeToken: configuredBridgeToken, allowOrigins, hub: null, server: null }
+    return { mode: "proxy", host, port, bridgeToken: configuredBridgeToken, authRequired, allowOrigins, hub: null, server: null }
   }
-  return { mode: "owner", host, port, bridgeToken: activeBridgeToken, allowOrigins, hub, server }
+  return { mode: "owner", host, port, bridgeToken: activeBridgeToken, authRequired, allowOrigins, hub, server }
 }

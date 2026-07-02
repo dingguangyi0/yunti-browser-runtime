@@ -59,7 +59,8 @@ yunti-browser-runtime package-extension
 http://127.0.0.1:48887
 ```
 
-bridge 会在启动时生成或读取本地访问 token，并打印到 stderr。也可以显式配置：
+默认本地 bridge 只监听 `127.0.0.1`，不需要配置 token。需要额外加固本机访问时，
+可以显式启用 token：
 
 ```bash
 YUNTI_BROWSER_BRIDGE_TOKEN="$(openssl rand -hex 24)" npm run bridge
@@ -87,7 +88,7 @@ npm run doctor:json
 3. 点击“加载已解压的扩展程序”。
 4. 选择本项目的 `extension/` 目录。
 5. 打开任意 `http` 或 `https` 页面。
-6. 点击扩展图标，填写 bridge token，保存设置。
+6. 点击扩展图标，确认 bridge 地址为 `http://127.0.0.1:48887`，保存设置。
 7. 刷新目标页面，确认页面已连接。
 
 扩展只负责把页面注册到本地 bridge，并执行 Agent 发来的浏览器动作。
@@ -239,7 +240,10 @@ YUNTI_E2E=1 npm run test:e2e
 
 ### bridge token 是什么？
 
-bridge token 是本地 HTTP bridge 的访问凭证。MCP server、extension 和 doctor 使用同一个 token，避免普通网页误调用本地接口。
+默认本地安装不需要 bridge token。bridge 只监听 `127.0.0.1`，扩展和 MCP server
+可以直接连接，减少首次使用心智。需要加固共享机器或自定义部署时，可设置
+`YUNTI_BROWSER_BRIDGE_TOKEN`，这时 MCP server、extension 和 doctor 必须使用同一个
+token。
 
 ### 会读取 cookie 或密码吗？
 
@@ -251,6 +255,7 @@ bridge token 是本地 HTTP bridge 的访问凭证。MCP server、extension 和 
 
 ## 发布状态与后续事项
 
-- `yunti-browser-runtime@0.1.0` 已发布到官方 npm registry。
+- `yunti-browser-runtime@0.1.1` 已发布到官方 npm registry。
+- `0.1.1` 将本地默认使用路径改为免 bridge token。
 - 发布后验证命令：`npm run release:verify-published`。
 - 如要上架浏览器扩展商店，需要再次审查 broad host permissions。

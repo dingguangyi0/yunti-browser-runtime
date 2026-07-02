@@ -5,7 +5,9 @@
 The first release is local single-user software:
 
 - bridge binds to `127.0.0.1` by default;
-- bridge routes require `x-yunti-browser-token` except limited `/health`;
+- local loopback bridge routes do not require a token by default;
+- setting `YUNTI_BROWSER_BRIDGE_TOKEN` enables `x-yunti-browser-token` checks
+  for bridge routes, and binding to a non-loopback host requires a token;
 - CORS only echoes local debug origins and browser-extension origins by default;
 - extension talks to the local bridge;
 - MCP tools default to `userId=local`;
@@ -24,7 +26,7 @@ The extension uses browser permissions required for automation:
 
 - `tabs` for tab inventory and activation;
 - `debugger` for CDP commands;
-- `storage` for local bridge URL, token, user, and page-match settings;
+- `storage` for local bridge URL, optional token, user, and page-match settings;
 - `webRequest` for sanitized network observations;
 - `activeTab` for visible-tab capture fallback paths.
 
@@ -52,5 +54,5 @@ Users should only load the extension from a trusted local checkout.
 - Remote multi-user isolation layer.
 - Per-tool allow/deny policy.
 
-Remote deployment must be designed separately and should not reuse the local
-single-user defaults without an authentication and ownership model.
+Remote deployment must be designed separately and must not use the local
+no-token loopback default without an authentication and ownership model.

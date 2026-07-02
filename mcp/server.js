@@ -215,12 +215,17 @@ export async function runStdio() {
       `[yunti-browser-runtime] bridge ${bridge.mode} on http://${bridge.host}:${bridge.port}`
     )
     if (bridge.mode === "owner") {
-      console.error(
-        `[yunti-browser-runtime] bridge token header ${BRIDGE_TOKEN_HEADER}: ${bridge.bridgeToken}`
-      )
+      if (bridge.authRequired) {
+        console.error(
+          `[yunti-browser-runtime] bridge token header ${BRIDGE_TOKEN_HEADER}: ${bridge.bridgeToken}`
+        )
+      } else {
+        console.error("[yunti-browser-runtime] bridge auth disabled for local loopback")
+        console.error("[yunti-browser-runtime] set YUNTI_BROWSER_BRIDGE_TOKEN to require a local token")
+      }
     } else if (!bridge.bridgeToken) {
       console.error(
-        `[yunti-browser-runtime] proxy mode requires YUNTI_BROWSER_BRIDGE_TOKEN to match the running bridge`
+        `[yunti-browser-runtime] proxy mode will connect without a bridge token; set YUNTI_BROWSER_BRIDGE_TOKEN if the running bridge requires one`
       )
     }
   }
@@ -249,12 +254,17 @@ export async function runBridgeOnly() {
     `[yunti-browser-runtime] bridge ${bridge.mode} on http://${bridge.host}:${bridge.port}`
   )
   if (bridge.mode === "owner") {
-    console.error(
-      `[yunti-browser-runtime] bridge token header ${BRIDGE_TOKEN_HEADER}: ${bridge.bridgeToken}`
-    )
+    if (bridge.authRequired) {
+      console.error(
+        `[yunti-browser-runtime] bridge token header ${BRIDGE_TOKEN_HEADER}: ${bridge.bridgeToken}`
+      )
+    } else {
+      console.error("[yunti-browser-runtime] bridge auth disabled for local loopback")
+      console.error("[yunti-browser-runtime] set YUNTI_BROWSER_BRIDGE_TOKEN to require a local token")
+    }
   } else if (!bridge.bridgeToken) {
     console.error(
-      `[yunti-browser-runtime] proxy mode requires YUNTI_BROWSER_BRIDGE_TOKEN to match the running bridge`
+      `[yunti-browser-runtime] proxy mode will connect without a bridge token; set YUNTI_BROWSER_BRIDGE_TOKEN if the running bridge requires one`
     )
   }
   await new Promise(() => {})

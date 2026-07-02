@@ -7,7 +7,7 @@ publishing `yunti-browser-runtime`.
 
 No active npm publish blockers as of 2026-07-03.
 
-`yunti-browser-runtime@0.1.0` is published on the official npm registry and
+`yunti-browser-runtime@0.1.1` is published on the official npm registry and
 verified with `npm run release:verify-published`.
 
 ## Resolved Blocker: npm 2FA Publish Token

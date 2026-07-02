@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { BRIDGE_TOKEN_HEADER, handleJsonRpc, startBridgeServer } from "../mcp/server.js"
+import { handleJsonRpc, startBridgeServer } from "../mcp/server.js"
 
 const runE2e = process.env.YUNTI_E2E === "1"
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)))
@@ -16,11 +16,9 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
   if (!playwright) return
 
   const artifactDir = await mkdtemp(join(tmpdir(), "yunti-browser-e2e-"))
-  const bridgeToken = "e2e-token"
   const bridge = await startBridgeServer({
     host: "127.0.0.1",
     port: 0,
-    bridgeToken,
     sessionTtlMs: 120_000,
   })
   const bridgePort = bridge.server.address().port
@@ -41,20 +39,20 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
 
     const worker = await getExtensionWorker(context)
     await worker.evaluate(
-      ({ bridgeUrl: runtimeBridgeUrl, bridgeToken: runtimeBridgeToken }) =>
+      ({ bridgeUrl: runtimeBridgeUrl }) =>
         chrome.storage.local.set({
           bridgeUrl: runtimeBridgeUrl,
-          bridgeToken: runtimeBridgeToken,
+          bridgeToken: "",
           platformMatches: ["*"],
           localUserId: "local",
           localUserName: "local",
         }),
-      { bridgeUrl, bridgeToken }
+      { bridgeUrl }
     )
 
     page = await context.newPage()
     await page.goto(pageServer.url)
-    const browserSessionId = await waitForBrowserSession(bridgeUrl, bridgeToken)
+    const browserSessionId = await waitForBrowserSession(bridgeUrl)
 
     const targets = await callTool(bridge, "yunti_list_browser_targets", { browserSessionId })
     assert.ok(targets.total >= 1)
@@ -143,12 +141,10 @@ async function startTestPageServer() {
   }
 }
 
-async function waitForBrowserSession(bridgeUrl, bridgeToken) {
+async function waitForBrowserSession(bridgeUrl) {
   const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
-    const response = await fetch(`${bridgeUrl}/health?userId=local`, {
-      headers: { [BRIDGE_TOKEN_HEADER]: bridgeToken },
-    })
+    const response = await fetch(`${bridgeUrl}/health?userId=local`)
     const health = await response.json()
     const active = health.sessions?.find((session) => session.active) || health.sessions?.[0]
     if (active?.browserSessionId) return active.browserSessionId

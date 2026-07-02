@@ -55,6 +55,7 @@
 | P4.17 | 已完成 | npm 登录预检门禁 |
 | P4.18 | 已完成 | npm 发布后验证命令 |
 | P4.19 | 已完成 | npm 正式发布执行 |
+| P5.1 | 已完成 | 本地默认免 bridge token |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1251,6 +1252,51 @@ metadata 与当前 `package.json` 一致。
 - `npm view yunti-browser-runtime@0.1.0 ... --registry=https://registry.npmjs.org/`
   返回已发布版本和正确 metadata。
 
+## P5.1 本地默认免 bridge token
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- 默认 `127.0.0.1` 本地 bridge 不再自动生成随机 token，也不要求 extension、doctor
+  或 MCP proxy 携带 `x-yunti-browser-token`。
+- 用户显式设置 `YUNTI_BROWSER_BRIDGE_TOKEN` 时，bridge 继续强制校验
+  `x-yunti-browser-token` 或 `Authorization: Bearer <token>`。
+- bridge 绑定到非 loopback host 时必须设置 `YUNTI_BROWSER_BRIDGE_TOKEN`，避免把
+  本地免 token 默认值误用于远程或局域网部署。
+- `npm run doctor` 默认显示 token not required；只有 bridge 明确要求 token 且请求
+  未授权时才提示设置 token。
+- `npm run print-config` 默认不再要求用户配置 token，仅保留需要加固时的可选说明。
+- 真实浏览器 smoke test 改为覆盖默认免 token 路径。
+- package 和 extension 版本同步提升到 `0.1.1`。
+
+### 目标
+
+降低本地安装和首次使用心智：用户只需要启动 bridge、加载扩展、确认 bridge URL，
+不需要复制或理解 bridge token。安全边界仍保持本地 loopback 默认，显式 token 用于
+共享机器、非本地绑定或额外加固场景。
+
+### 验收标准
+
+- 默认 `npm run bridge` 启动的 `127.0.0.1` bridge 不要求 token。
+- 未配置 token 时，extension 可以注册页面，doctor 可以读取完整 health。
+- 配置 `YUNTI_BROWSER_BRIDGE_TOKEN` 后，未携带 token 的受保护 HTTP route 仍返回 401。
+- `YUNTI_BROWSER_BRIDGE_HOST` 绑定非 loopback 地址且未配置 token 时启动失败。
+- README、INSTALL、SECURITY、PROJECT_STATUS 同步新的默认使用路径。
+- `npm run release:check` 通过。
+- `npm run release:publish` 发布 `yunti-browser-runtime@0.1.1`，并通过
+  `npm run release:verify-published` 验证。
+
+### 验收记录
+
+- `npm test` 通过：61 项测试，60 项通过，1 项真实浏览器 smoke 按配置跳过。
+- 新增测试覆盖本地默认免 token、显式 token 仍强制校验、非 loopback 无 token
+  启动失败。
+- `npm run check` 通过。
+- `npm run release:check` 通过。
+- `npm run release:publish` 成功发布 `yunti-browser-runtime@0.1.1`。
+- `npm run release:verify-published` 返回 0。
+
 ## 每阶段完成后的固定检查
 
 ```bash
@@ -1272,8 +1318,10 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P0.1-P4.19 已完成，`yunti-browser-runtime@0.1.0` 已发布到官方 npm registry。
+P0.1-P5.1 已完成，`yunti-browser-runtime@0.1.1` 已发布到官方 npm registry。
 
 - 发布后验证已通过：`npm run release:verify-published`。
+- 本地默认使用不再需要 bridge token；需要加固时可显式设置
+  `YUNTI_BROWSER_BRIDGE_TOKEN`。
 - 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
 - 后续版本开发前，先在本文档新增下一阶段目标、范围和验收标准。

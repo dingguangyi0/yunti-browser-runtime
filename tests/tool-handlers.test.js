@@ -6,6 +6,7 @@ function createDispatcherHarness(options = {}) {
   const posted = []
   const sentMessages = []
   const cdpCommands = []
+  const contentToolResponses = options.contentToolResponses || {}
   const originalChrome = globalThis.chrome
   const observations = options.observations || [
     {
@@ -33,6 +34,10 @@ function createDispatcherHarness(options = {}) {
           const observation = observations[Math.min(observeIndex, observations.length - 1)]
           observeIndex += 1
           return observation
+        }
+        if (Object.prototype.hasOwnProperty.call(contentToolResponses, message.tool)) {
+          const response = contentToolResponses[message.tool]
+          return typeof response === "function" ? response(message) : response
         }
         throw new Error(`unexpected content message: ${message.tool}`)
       },
@@ -109,6 +114,106 @@ test("observe uid map feeds existing uid-based click path", async () => {
       harness.sentMessages.filter((item) => item.message.tool === "yunti_observe_page").length,
       1
     )
+  } finally {
+    harness.restore()
+  }
+})
+
+test("dispatcher preserves current action result shapes", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-actions",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-click",
+            role: "button",
+            name: "Submit",
+            rect: { x: 10, y: 20, width: 100, height: 40 },
+          },
+          {
+            uid: "yunti-input",
+            role: "textbox",
+            name: "Search",
+            rect: { x: 30, y: 90, width: 160, height: 30 },
+          },
+        ],
+      },
+    ],
+    contentToolResponses: {
+      yunti_scroll: {
+        scrolled: true,
+        deltaX: 0,
+        deltaY: 600,
+        target: "document",
+        before: { left: 0, top: 0 },
+        after: { left: 0, top: 600 },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-click",
+      tool: "yunti_click",
+      arguments: { uid: "yunti-click" },
+    })
+    assert.deepEqual(harness.posted.at(-1).result, {
+      clicked: true,
+      uid: "yunti-click",
+      x: 60,
+      y: 40,
+      browserSessionId: "tab-1",
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-hover",
+      tool: "yunti_hover",
+      arguments: { uid: "yunti-click" },
+    })
+    assert.deepEqual(harness.posted.at(-1).result, {
+      hovered: true,
+      uid: "yunti-click",
+      x: 60,
+      y: 40,
+      browserSessionId: "tab-1",
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill",
+      tool: "yunti_fill",
+      arguments: { uid: "yunti-input", value: "hi" },
+    })
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: true,
+      uid: "yunti-input",
+      method: "keyboard",
+      value: "hi",
+      browserSessionId: "tab-1",
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll",
+      tool: "yunti_scroll",
+      arguments: { deltaY: 600 },
+    })
+    assert.deepEqual(harness.posted.at(-1).result, {
+      scrolled: true,
+      deltaX: 0,
+      deltaY: 600,
+      target: "document",
+      before: { left: 0, top: 0 },
+      after: { left: 0, top: 600 },
+    })
   } finally {
     harness.restore()
   }

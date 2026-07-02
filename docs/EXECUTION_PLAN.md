@@ -1698,6 +1698,14 @@ P6.1 真实浏览器闭环验证 runbook：
   `npm run release:check` 通过，覆盖 72 个 node:test 用例，其中 71 个通过、1 个
   real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少
   Playwright/Chromium 被跳过；token 残留检查无输出。
+- `tests/tool-handlers.test.js` 已新增 dispatcher action result shape 测试，锁定当前
+  uid click、uid hover、uid fill 和 content-script scroll passthrough 的兼容返回字段，
+  作为后续增量加入结构化 `action` / `target` / `ok` / `nextStepHint` 字段前的回归保护。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 4 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 73 个 node:test 用例，其中 72 个
+  通过、1 个 real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前
+  环境因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

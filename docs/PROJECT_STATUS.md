@@ -122,6 +122,15 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   default, `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is
   not installed in the current environment, and the token residue grep returned
   no matches.
+- Dispatcher-level action result shape tests now lock the current compatible
+  uid click, uid hover, uid fill, and content-script scroll passthrough result
+  fields before P6.2 adds structured action result fields.
+- Latest P6.2 action result shape validation: `git diff --check` passed,
+  `node --test tests/tool-handlers.test.js` passed 4 tests,
+  `npm run release:check` passed with 72 passing node:test cases and 1 skipped
+  real-browser smoke by default, `YUNTI_E2E=1 npm run test:e2e` skipped because
+  Playwright/Chromium is not installed in the current environment, and the token
+  residue grep returned no matches.
 
 ## Decisions
 
@@ -175,9 +184,9 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   broadening into P6.2 action semantics.
 - Continue P6.2 in small compatibility-preserving slices: next candidates are
-  tests for action result shape, then fill/select/scroll semantics after the
-  P6.1 closure gap is either verified or explicitly tracked as an environment
-  limitation.
+  adding structured action result fields behind the existing compatibility
+  fields, then fill/select/scroll semantics after the P6.1 closure gap is either
+  verified or explicitly tracked as an environment limitation.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

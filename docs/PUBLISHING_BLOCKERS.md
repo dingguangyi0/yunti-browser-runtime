@@ -16,6 +16,13 @@ A temporary npm token retry also passed the local release gate and reached
 official npm publish, but npm returned the same `E403`. That token does not
 satisfy the publish-time bypass 2FA requirement.
 
+A project-root `.npmrc` retry with the actual token also authenticated
+successfully as `xuanzhu`, then failed at `npm publish` with the same `E403`.
+The local `.npmrc` is ignored by git and must not be committed.
+
+A second token written to the project-root `.npmrc` also authenticated
+successfully as `xuanzhu`, then failed at `npm publish` with the same `E403`.
+
 Resolution:
 
 ```bash

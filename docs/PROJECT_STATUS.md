@@ -233,6 +233,11 @@ authentication OTP.
 - A temporary npm token publish retry also reached official npm publish after
   passing the full local release gate, but npm returned the same `E403`; the
   token does not satisfy npm's publish-time bypass 2FA requirement.
+- A project-local `.npmrc` retry with the actual token also authenticated
+  successfully as `xuanzhu`, then failed at `npm publish` with the same `E403`;
+  `.npmrc` is ignored by git to avoid committing local npm credentials.
+- A second npm token written to the project-local `.npmrc` also authenticated
+  successfully as `xuanzhu`, then failed at `npm publish` with the same `E403`.
 - Next required release step: rerun
   `npm run release:publish -- --otp=<6-digit-code>` with a current npm OTP, or
   configure an npm granular access token that can publish with bypass 2FA; after

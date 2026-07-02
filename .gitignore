@@ -6,3 +6,4 @@ coverage/
 extension.zip
 .env
 .env.*
+.npmrc

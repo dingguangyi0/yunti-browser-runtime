@@ -1212,6 +1212,11 @@ metadata 与当前 `package.json` 一致。
   bypass 2FA 的 granular access token。
 - 已使用临时 npm token 重试 `npm run release:publish`；本地发布门禁再次通过，但
   npm registry 仍返回相同 `E403`，说明该 token 不能绕过发布 2FA 要求。
+- 已按项目根目录 `.npmrc` 方式写入实际 token 并确认 `.npmrc` 被 `.gitignore`
+  忽略；`npm whoami --registry=https://registry.npmjs.org/` 返回 `xuanzhu`，
+  但重新执行 `npm run release:publish` 仍在 `npm publish` 阶段返回相同 `E403`。
+- 已用新的 npm token 覆盖项目级 `.npmrc` 后再次确认 `npm whoami` 返回 `xuanzhu`；
+  `npm run release:publish` 仍通过本地门禁并在 `npm publish` 阶段返回相同 `E403`。
 - 因 npm 2FA 阻塞，`yunti-browser-runtime@0.1.0` 尚未发布成功。
 
 ### 目标
@@ -1232,8 +1237,8 @@ metadata 与当前 `package.json` 一致。
 ### 当前阻塞
 
 等待 npm 2FA OTP 或可绕过 2FA 的发布 token。已确认普通 token 或未开启 bypass
-2FA 的 token 无法完成本次发布。拿到 OTP 后只需要重跑正式发布命令，不需要继续增加
-新的发布门禁。
+2FA 的 token 无法完成本次发布；项目级 `.npmrc` 方式和两次 token 认证都已复验。
+拿到 OTP 后只需要重跑正式发布命令，不需要继续增加新的发布门禁。
 
 ## 每阶段完成后的固定检查
 
@@ -1263,6 +1268,10 @@ P4.3-P4.18 已完成，P4.19 正在执行：
 - `npm run release:publish` 已通过本地发布门禁，但正式 `npm publish` 被 npm 2FA
   要求拦截。
 - 已尝试临时 npm token 发布，仍被 npm 2FA 策略以相同 `E403` 拦截。
+- 已创建项目级 `.npmrc` 并使用实际 token 复验，`npm whoami` 成功但 publish 仍返回
+  相同 `E403`。
+- 已用新的 npm token 覆盖项目级 `.npmrc` 复验，认证仍成功但 publish 仍返回相同
+  `E403`。
 - 下一步使用当前 npm OTP 执行 `npm run release:publish -- --otp=<6-digit-code>`，
   或改用具备 publish 权限且允许 bypass 2FA 的 granular access token。
 - 发布后执行 `npm run release:verify-published` 确认 npm registry 版本和 metadata。

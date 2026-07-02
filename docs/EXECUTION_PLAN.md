@@ -2023,6 +2023,16 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   用例，其中 91 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
   包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
   test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
+- `yunti_scroll` 已开始支持 fresh scrollable container uid：`yunti_observe_page` 返回的
+  `scrollableContainers[]` 会进入当前 browserSessionId 最新 uid map；调用 `yunti_scroll`
+  传 `uid` 时会解析容器中心点并复用既有 content-script coordinate/container scroll 路径。
+  本切片保留原 `target` 兼容字段，新增 `uid`、`method: "uid"` 和 `scrollTarget`。
+- 最新 targeted 验证：`node --test tests/tool-handlers.test.js` 通过 23 项。
+- 最新 full 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js
+  tests/bridge.test.js` 通过 88 项；`npm run release:check` 通过，覆盖 93 个 node:test
+  用例，其中 92 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
+  包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
+  test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

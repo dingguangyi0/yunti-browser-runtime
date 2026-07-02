@@ -406,6 +406,80 @@ test("dispatcher preserves current action result shapes", async () => {
   }
 })
 
+test("uid scroll uses observed scrollable container center and preserves result fields", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-scroll",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [],
+        scrollableContainers: [
+          {
+            uid: "scroll-1",
+            tag: "div",
+            name: "Results",
+            rect: { x: 10, y: 90, width: 360, height: 280 },
+            scrollTop: 120,
+            scrollHeight: 920,
+            clientHeight: 280,
+            canScrollVertical: true,
+          },
+        ],
+      },
+    ],
+    contentToolResponses: {
+      yunti_scroll: (message) => {
+        assert.equal(Math.round(message.arguments.x), 190)
+        assert.equal(Math.round(message.arguments.y), 230)
+        assert.equal(message.arguments.uid, "scroll-1")
+        return {
+          scrolled: true,
+          deltaX: 0,
+          deltaY: 240,
+          target: "div#results",
+          before: { left: 0, top: 120 },
+          after: { left: 0, top: 360 },
+        }
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-container",
+      tool: "yunti_scroll",
+      arguments: { uid: "scroll-1", deltaY: 240 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      scrolled: true,
+      deltaX: 0,
+      deltaY: 240,
+      target: "div#results",
+      before: { left: 0, top: 120 },
+      after: { left: 0, top: 360 },
+      browserSessionId: "tab-1",
+      action: "scroll",
+      uid: "scroll-1",
+      method: "uid",
+      scrollTarget: { uid: "scroll-1", method: "uid" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid fill select path preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

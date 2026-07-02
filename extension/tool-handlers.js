@@ -392,7 +392,10 @@ export function createToolDispatcher({
       arguments: args,
     })
     if (Array.isArray(observation?.elements)) {
-      storePageUidMap(session, "observe", observation.elements, {
+      storePageUidMap(session, "observe", [
+        ...observation.elements,
+        ...(Array.isArray(observation.scrollableContainers) ? observation.scrollableContainers : []),
+      ], {
         observationId: observation.observationId,
         uidMapVersion: observation.uidMapVersion,
       })
@@ -748,10 +751,16 @@ export function createToolDispatcher({
   }
 
   async function scrollPage(tabId, session, args = {}) {
+    const uid = String(args.uid || "").trim()
+    let scrollArgs = args
+    if (uid) {
+      const { x, y } = await resolveUidCenter(tabId, session, uid)
+      scrollArgs = { ...args, x, y }
+    }
     const result = await chrome.tabs.sendMessage(tabId, {
       type: "yunti_execute_tool",
       tool: "yunti_scroll",
-      arguments: args,
+      arguments: scrollArgs,
     })
 
     if (!result || typeof result !== "object" || result.scrolled !== true) {
@@ -762,9 +771,13 @@ export function createToolDispatcher({
       ...result,
       browserSessionId: session.browserSessionId,
       action: "scroll",
+      ...(uid ? { uid, method: "uid" } : {}),
+      ...(uid ? { scrollTarget: { uid, method: "uid" } } : {}),
       ok: true,
       recoverable: false,
-      nextStepHint: "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
+      nextStepHint: uid
+        ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
+        : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
     }
   }
 

@@ -84,6 +84,13 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Treat contenteditable fill results as dispatch evidence, then verify with observe, snapshot, evaluate `textContent`, or a page-specific assertion when exact editor state matters.
 - Selector-based fill remains compatible and may return content-script-shaped fields such as `element` or `valueLength`.
 
+## Scroll Guidance
+
+- Prefer a fresh `scrollableContainers[]` uid from `yunti_observe_page` when scrolling nested app panels or sidebars.
+- Uid-targeted scroll resolves the observed container center and reuses the existing coordinate/container scroll path, so coordinate recovery remains compatible.
+- Uid scroll preserves the existing `target` compatibility field and adds `uid`, `method: "uid"`, and `scrollTarget` for structured interpretation.
+- After scrolling, observe again and compare document or container `before` / `after` positions before assuming the needed element is visible.
+
 ## Select Guidance
 
 - Current `yunti_select` runtime behavior supports selector/value, uid/value, and uid/visible text.

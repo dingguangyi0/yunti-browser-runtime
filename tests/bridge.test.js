@@ -651,9 +651,25 @@ test("mcp usage hints include action recovery guidance", async () => {
   assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /fresh editable uid/)
   assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /contenteditable/)
 
-  const workflowResponse = await handleJsonRpc({
+  const scrollResponse = await handleJsonRpc({
     jsonrpc: "2.0",
     id: 3,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_scroll" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(scrollResponse.result.isError, undefined)
+  const scrollPayload = JSON.parse(scrollResponse.result.content[0].text)
+  assert.match(scrollPayload.tools.yunti_scroll.notes.join("\n"), /scrollable container uid/)
+  assert.match(scrollPayload.tools.yunti_scroll.notes.join("\n"), /scrollTarget/)
+  assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /fresh scrollable container uid/)
+
+  const workflowResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 4,
     method: "tools/call",
     params: {
       name: "yunti_get_tool_usage_hints",

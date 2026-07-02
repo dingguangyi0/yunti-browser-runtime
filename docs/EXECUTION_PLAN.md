@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 多路径结构化切片，下一步补齐剩余 action paths | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 standalone select 结构化切片，下一步补 aggregate fill_form | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -74,10 +74,11 @@
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖主要单动作路径：uid click/hover/fill
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
-  upload uid/selector path、coordinate drag。
-- P6.2 剩余 action result 缺口：standalone `yunti_select` content-script passthrough 和
-  aggregate `yunti_fill_form` 仍是 compatibility-shaped；下一步先补这两个小切片，再进入更深
-  的 fill/select/scroll 语义增强，同时保留所有既有兼容字段与 CDP fallback。
+  upload uid/selector path、coordinate drag、standalone `yunti_select` content-script
+  passthrough。
+- P6.2 剩余 action result 缺口：aggregate `yunti_fill_form` 仍是 compatibility-shaped；
+  下一步先补这个小切片，再进入更深的 fill/select/scroll 语义增强，同时保留所有既有兼容字段
+  与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1930,6 +1931,21 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
 内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；本切片只更新
 文档和 skill，不涉及真实浏览器行为，未额外运行 `YUNTI_E2E=1 npm run test:e2e`；token
 残留检查无输出。
+
+- `extension/tool-handlers.js` 已为 standalone `yunti_select` content-script passthrough
+  结果增量追加结构化字段：`action: "select"`、`target`、`ok`、`recoverable`、
+  `nextStepHint` 和 `browserSessionId`，同时保留 `selected`、`element`、`value`
+  兼容字段；本切片不改 content-script `selectElement` 的 value 设置或 input/change 事件
+  派发语义。
+- `tests/tool-handlers.test.js` 已新增 selector select 断言，确保结构化字段不会替代或破坏
+  既有 standalone select 返回。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 18 项。
+- 最新 full 验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 87 个
+  node:test 用例，其中 86 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
+  内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
+  残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

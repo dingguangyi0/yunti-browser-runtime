@@ -81,6 +81,8 @@ export function createToolDispatcher({
         result = await hoverByUid(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_fill") {
         result = await fillByUid(tabId, session, event.arguments || {})
+      } else if (event.tool === "yunti_select") {
+        result = await selectElement(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_fill_form") {
         result = await fillForm(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_wait_for") {
@@ -749,6 +751,30 @@ export function createToolDispatcher({
       ok: true,
       recoverable: false,
       nextStepHint: "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
+    }
+  }
+
+  async function selectElement(tabId, session, args = {}) {
+    const selector = String(args.selector || "").trim()
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_select",
+      arguments: args,
+    })
+
+    if (!result || typeof result !== "object" || result.selected !== true) {
+      return result
+    }
+
+    return {
+      ...result,
+      selector,
+      browserSessionId: session.browserSessionId,
+      action: "select",
+      target: { selector, method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Select dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
     }
   }
 

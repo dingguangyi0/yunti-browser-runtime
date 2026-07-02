@@ -510,6 +510,42 @@ test("selector fill preserves content result with structured result", async () =
   }
 })
 
+test("selector select preserves content result with structured result", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_select: {
+        selected: true,
+        element: "select#plan",
+        value: "pro",
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-selector",
+      tool: "yunti_select",
+      arguments: { selector: "#plan", value: "pro" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: true,
+      element: "select#plan",
+      value: "pro",
+      selector: "#plan",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { selector: "#plan", method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Select dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid type text preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

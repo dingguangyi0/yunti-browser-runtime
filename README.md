@@ -249,8 +249,8 @@ bridge token 是本地 HTTP bridge 的访问凭证。MCP server、extension 和 
 
 调用 `yunti_list_browser_targets` 获取最新浏览器路由，再用返回的 `browserSessionId` 继续操作。
 
-## 当前未完成项
+## 发布状态与后续事项
 
-- 如确认要发布 `0.1.0`，运行 `npm run release:publish`。
-- 当前 `npm view yunti-browser-runtime` 返回 E404；如 `0.1.0` 是首次发布，这是预期状态。
-- 发布前如要上架浏览器扩展商店，需要再次审查 broad host permissions。
+- `yunti-browser-runtime@0.1.0` 已发布到官方 npm registry。
+- 发布后验证命令：`npm run release:verify-published`。
+- 如要上架浏览器扩展商店，需要再次审查 broad host permissions。

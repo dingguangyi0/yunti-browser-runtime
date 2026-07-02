@@ -3,13 +3,20 @@
 This document tracks release blockers that require external confirmation before
 publishing `yunti-browser-runtime`.
 
-## Active Blocker: npm 2FA Publish OTP
+## Current Status
 
-Status: active as of 2026-07-03.
+No active npm publish blockers as of 2026-07-03.
+
+`yunti-browser-runtime@0.1.0` is published on the official npm registry and
+verified with `npm run release:verify-published`.
+
+## Resolved Blocker: npm 2FA Publish Token
+
+Status: resolved on 2026-07-03.
 
 `npm run release:publish` now passes local release gates and npm login preflight,
 then reaches `npm publish --registry=https://registry.npmjs.org/`. The registry
-rejects the publish with `E403` because the logged-in account requires
+initially rejected the publish with `E403` because the logged-in account requires
 two-factor authentication for package publishing.
 
 A temporary npm token retry also passed the local release gate and reached
@@ -23,21 +30,17 @@ The local `.npmrc` is ignored by git and must not be committed.
 A second token written to the project-root `.npmrc` also authenticated
 successfully as `xuanzhu`, then failed at `npm publish` with the same `E403`.
 
-Resolution:
+A publish-capable npm token written to the project-root `.npmrc` authenticated
+successfully as `xuanzhu`, and `npm run release:publish` then succeeded for
+`yunti-browser-runtime@0.1.0`.
 
-```bash
-npm run release:publish -- --otp=<6-digit-code>
-```
-
-Use a fresh npm one-time password from the account authenticator. As an
-alternative, configure a granular npm access token with package publish
-permission and bypass 2FA enabled, then rerun `npm run release:publish`.
-
-After publish succeeds, run:
+Verification:
 
 ```bash
 npm run release:verify-published
 ```
+
+The verification command returns 0 and confirms the published package metadata.
 
 ## Resolved Blocker: P4.3 Package URLs
 

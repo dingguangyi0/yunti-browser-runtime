@@ -54,7 +54,7 @@
 | P4.16 | 已完成 | 正式发布脚本内置门禁 |
 | P4.17 | 已完成 | npm 登录预检门禁 |
 | P4.18 | 已完成 | npm 发布后验证命令 |
-| P4.19 | 进行中 | npm 正式发布执行 |
+| P4.19 | 已完成 | npm 正式发布执行 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1151,8 +1151,9 @@ release gate、npm package 内容检查和 extension zip 内容检查。
 
 ### 验收记录
 
-- `npm run release:whoami` 当前返回 `ENEEDAUTH`，说明本机尚未登录
-  `https://registry.npmjs.org/`。
+- 发布前，`npm run release:whoami` 曾在未登录状态返回 `ENEEDAUTH`，验证缺少 npm
+  登录时会提前失败。
+- 登录后，`npm run release:whoami` 返回 `xuanzhu`，并在正式发布前通过预检。
 - `release:publish` 已内置登录预检；登录前不会进入正式 npm publish。
 
 ## P4.18 npm 发布后验证命令
@@ -1186,9 +1187,10 @@ metadata 与当前 `package.json` 一致。
 
 ### 验收记录
 
-- `npm run release:verify-published` 当前返回非零退出码，报告
-  `yunti-browser-runtime@0.1.0` 尚未发布到 `https://registry.npmjs.org/`；
-  失败路径输出结构化 JSON，且不包含 npm 本机 debug log 路径。
+- 发布前，`npm run release:verify-published` 曾返回非零退出码并输出结构化未发布报告，
+  且失败路径不包含 npm 本机 debug log 路径。
+- 发布后，`npm run release:verify-published` 返回 0，确认
+  `yunti-browser-runtime@0.1.0` 已发布到 `https://registry.npmjs.org/`。
 - `node --check scripts/check-published-package.js` 通过。
 - `npm run release:check` 通过：`npm run check` 已覆盖
   `scripts/check-published-package.js`，npm package contents check 确认 tarball
@@ -1198,7 +1200,7 @@ metadata 与当前 `package.json` 一致。
 
 ## P4.19 npm 正式发布执行
 
-状态：进行中（2026-07-03，阻塞于 npm 2FA OTP 或具备 bypass 2FA 的发布 token）
+状态：已完成（2026-07-03）
 
 执行摘要：
 
@@ -1206,8 +1208,8 @@ metadata 与当前 `package.json` 一致。
 - 已按用户确认执行 `npm run release:publish`。
 - `release:publish` 已通过内置 `release:prepublish`、`release:whoami` 和全部本地
   发布门禁；本次测试覆盖 59 项，58 项通过，1 项真实浏览器 smoke 按配置跳过。
-- 本次正式发布已进入 `npm publish --registry=https://registry.npmjs.org/`，tarball
-  包含 40 个文件。
+- 正式发布进入 `npm publish --registry=https://registry.npmjs.org/`，tarball 包含
+  40 个文件。
 - npm registry 返回 `E403`：当前账号发布包需要双因素认证 OTP，或使用开启
   bypass 2FA 的 granular access token。
 - 已使用临时 npm token 重试 `npm run release:publish`；本地发布门禁再次通过，但
@@ -1217,7 +1219,11 @@ metadata 与当前 `package.json` 一致。
   但重新执行 `npm run release:publish` 仍在 `npm publish` 阶段返回相同 `E403`。
 - 已用新的 npm token 覆盖项目级 `.npmrc` 后再次确认 `npm whoami` 返回 `xuanzhu`；
   `npm run release:publish` 仍通过本地门禁并在 `npm publish` 阶段返回相同 `E403`。
-- 因 npm 2FA 阻塞，`yunti-browser-runtime@0.1.0` 尚未发布成功。
+- 已用具备发布权限的 npm token 覆盖项目级 `.npmrc` 后再次执行
+  `npm run release:publish`，正式发布成功：`yunti-browser-runtime@0.1.0` 已发布到
+  `https://registry.npmjs.org/`。
+- `npm run release:verify-published` 通过，确认 registry 上的 name、version、
+  repository、homepage、bugs 和 tarball URL 与本地 `package.json` 匹配。
 
 ### 目标
 
@@ -1234,11 +1240,16 @@ metadata 与当前 `package.json` 一致。
   repository、homepage、bugs 和 tarball URL 与本地 `package.json` 匹配。
 - 发布结果同步到 `docs/PROJECT_STATUS.md`。
 
-### 当前阻塞
+### 验收记录
 
-等待 npm 2FA OTP 或可绕过 2FA 的发布 token。已确认普通 token 或未开启 bypass
-2FA 的 token 无法完成本次发布；项目级 `.npmrc` 方式和两次 token 认证都已复验。
-拿到 OTP 后只需要重跑正式发布命令，不需要继续增加新的发布门禁。
+- `npm run release:publish` 成功发布 `yunti-browser-runtime@0.1.0`。
+- 发布前门禁通过：metadata URL 检查、公开文档残留检查、Markdown 链接检查、版本一致性、
+  CLI smoke、print-config smoke、doctor smoke、`npm run check`、`npm test`、npm
+  package contents check 和 extension zip contents check。
+- `npm test` 覆盖 59 项测试：58 项通过，1 项真实浏览器 smoke 按配置跳过。
+- `npm run release:verify-published` 返回 0。
+- `npm view yunti-browser-runtime@0.1.0 ... --registry=https://registry.npmjs.org/`
+  返回已发布版本和正确 metadata。
 
 ## 每阶段完成后的固定检查
 
@@ -1261,18 +1272,8 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P4.3-P4.18 已完成，P4.19 正在执行：
+P0.1-P4.19 已完成，`yunti-browser-runtime@0.1.0` 已发布到官方 npm registry。
 
-- `npm run release:dry-run` 已通过内置发布前门禁和官方 npm registry 预览。
-- `npm run release:whoami` 已确认登录账号为 `xuanzhu`。
-- `npm run release:publish` 已通过本地发布门禁，但正式 `npm publish` 被 npm 2FA
-  要求拦截。
-- 已尝试临时 npm token 发布，仍被 npm 2FA 策略以相同 `E403` 拦截。
-- 已创建项目级 `.npmrc` 并使用实际 token 复验，`npm whoami` 成功但 publish 仍返回
-  相同 `E403`。
-- 已用新的 npm token 覆盖项目级 `.npmrc` 复验，认证仍成功但 publish 仍返回相同
-  `E403`。
-- 下一步使用当前 npm OTP 执行 `npm run release:publish -- --otp=<6-digit-code>`，
-  或改用具备 publish 权限且允许 bypass 2FA 的 granular access token。
-- 发布后执行 `npm run release:verify-published` 确认 npm registry 版本和 metadata。
-- 浏览器扩展如需上架商店，发布前还需重新审查 broad host permissions。
+- 发布后验证已通过：`npm run release:verify-published`。
+- 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
+- 后续版本开发前，先在本文档新增下一阶段目标、范围和验收标准。

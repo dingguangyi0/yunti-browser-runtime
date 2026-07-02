@@ -2,9 +2,8 @@
 
 ## Current Phase
 
-Release readiness: local MVP is prepared for first public release. P4.19 formal
-npm publish is in progress and currently blocked only by npm two-factor
-authentication OTP.
+First public npm release is complete. `yunti-browser-runtime@0.1.0` is published
+on the official npm registry and verified with `npm run release:verify-published`.
 
 ## Current State
 
@@ -39,6 +38,7 @@ authentication OTP.
 - `npm run release:dry-run` and `npm run release:publish` pin the official npm
   registry at `https://registry.npmjs.org/`, avoiding accidental publication to
   a locally configured mirror registry.
+- `yunti-browser-runtime@0.1.0` is published on the official npm registry.
 - `npm run test:e2e` provides an opt-in real-browser Playwright smoke test for
   extension loading, page registration, MCP target listing, snapshot, click/fill,
   and CDP `Runtime.evaluate`.
@@ -98,16 +98,15 @@ authentication OTP.
 
 ## Open Work
 
-- Follow `docs/EXECUTION_PLAN.md` for the active P4.19 npm publish step.
+- Follow `docs/EXECUTION_PLAN.md` when defining the next post-release phase.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository
   `https://github.com/dingguangyi0/yunti-browser-runtime`; package metadata
   points to that repository/homepage/issues URL set and all three URLs return
   HTTP 200.
-- `npm view yunti-browser-runtime` currently returns E404, which is acceptable
-  only if `0.1.0` is intended to be the first npm release under this package
-  name.
+- `npm view yunti-browser-runtime@0.1.0` returns the published `0.1.0` package
+  metadata from `https://registry.npmjs.org/`.
 - Latest release gate checks passed after documenting P4.3: public-doc residue
   check, `npm run check`, `npm test`, and `npm pack --dry-run`.
 - P4.4 release gate scripting is complete: `npm run release:check` now runs
@@ -217,19 +216,16 @@ authentication OTP.
 - P4.18 post-publish verification command is complete:
   `release:verify-published` checks the published npm package name, version,
   repository, homepage, bugs URL, and tarball URL against local `package.json`.
-- Latest P4.18 validation: `release:verify-published` currently fails with a
-  structured unpublished-package report for `yunti-browser-runtime@0.1.0`,
-  `node --check scripts/check-published-package.js` passes, and
-  `release:dry-run` passes with a 40-file npm tarball that includes the new
-  verifier.
-- P4.19 formal npm publish execution is in progress: `npm run release:publish`
+- Latest P4.18 validation: after publish, `npm run release:verify-published`
+  returns 0 and confirms the published name, version, repository, homepage,
+  bugs URL, and tarball URL.
+- P4.19 formal npm publish execution is complete: `npm run release:publish`
   passed metadata checks, release gates, `npm run release:whoami`, `npm run
-  check`, `npm test`, npm package contents validation, and extension zip
-  validation before reaching `npm publish`.
-- Latest P4.19 validation: official npm publish reached
-  `https://registry.npmjs.org/` with a 40-file tarball, then failed with npm
-  `E403` because the account requires two-factor authentication OTP or a
-  granular access token with bypass 2FA enabled.
+  check`, `npm test`, npm package contents validation, extension zip validation,
+  and official npm publish.
+- Latest P4.19 validation: official npm publish succeeded for
+  `yunti-browser-runtime@0.1.0`; the published tarball URL is
+  `https://registry.npmjs.org/yunti-browser-runtime/-/yunti-browser-runtime-0.1.0.tgz`.
 - A temporary npm token publish retry also reached official npm publish after
   passing the full local release gate, but npm returned the same `E403`; the
   token does not satisfy npm's publish-time bypass 2FA requirement.
@@ -238,10 +234,9 @@ authentication OTP.
   `.npmrc` is ignored by git to avoid committing local npm credentials.
 - A second npm token written to the project-local `.npmrc` also authenticated
   successfully as `xuanzhu`, then failed at `npm publish` with the same `E403`.
-- Next required release step: rerun
-  `npm run release:publish -- --otp=<6-digit-code>` with a current npm OTP, or
-  configure an npm granular access token that can publish with bypass 2FA; after
-  publish succeeds, run `npm run release:verify-published`.
+- A publish-capable npm token written to the project-local `.npmrc` authenticated
+  successfully as `xuanzhu`; `npm run release:publish` then succeeded, followed
+  by successful `npm run release:verify-published`.
 
 ## Known Risks
 
@@ -251,9 +246,8 @@ authentication OTP.
   long-tail tools can still receive the same treatment before a later release.
 - Extension broad host permissions are now documented, but should still be
   re-reviewed before any store-distributed release.
-- Package repository/homepage/bugs metadata is publicly reachable, and the
-  final npm publish is now waiting on npm 2FA OTP or a publish-capable granular
-  access token.
+- Package repository/homepage/bugs metadata is publicly reachable and published
+  npm metadata now matches local `package.json`.
 - Tool names and descriptions must stay clear enough for agents to choose the
   right route without relying on hidden model knowledge.
 

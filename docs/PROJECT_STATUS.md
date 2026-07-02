@@ -280,6 +280,22 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is not
   installed in the current environment, and the token residue grep returned no
   matches.
+- `yunti_press_key` now returns additive structured action result fields
+  (`action`, `target`, `ok`, `recoverable`, `nextStepHint`, and
+  `browserSessionId`) for both uid-based CDP keyboard dispatch and
+  content-script passthrough key press, while preserving uid path compatibility
+  fields (`pressed`, `uid`, and `key`) and content-script compatibility fields
+  (`pressed`, `key`, `element`, and `valueChanged`). Key dispatch semantics are
+  intentionally unchanged in this slice.
+- Latest P6.2 press-key structured result targeted validation: `git diff
+  --check` passed and `node --test tests/tool-handlers.test.js` passed 14 tests.
+- Latest P6.2 press-key structured result full validation: `git diff --check`
+  passed, `npm run release:check` passed with 82 passing node:test cases and 1
+  skipped real-browser smoke by default, npm package contents validation passed
+  with 42 files, extension zip contents validation passed with 13 files,
+  `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is not
+  installed in the current environment, and the token residue grep returned no
+  matches.
 
 ## Decisions
 
@@ -333,8 +349,8 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   broadening into P6.2 action semantics.
 - Continue P6.2 in small compatibility-preserving slices: next candidates are
-  remaining action paths such as press key, drag, or upload result shapes before
-  deeper fill/select/scroll semantics.
+  remaining action paths such as drag or upload result shapes before deeper
+  fill/select/scroll semantics.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

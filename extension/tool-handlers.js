@@ -1273,11 +1273,35 @@ export function createToolDispatcher({
   async function pressKeyByUid(tabId, session, args = {}) {
     const uid = String(args.uid || "").trim()
     if (!uid) {
-      return chrome.tabs.sendMessage(tabId, {
+      const selector = String(args.selector || "").trim()
+      const hasX = Number.isFinite(Number(args.x))
+      const hasY = Number.isFinite(Number(args.y))
+      const result = await chrome.tabs.sendMessage(tabId, {
         type: "yunti_execute_tool",
         tool: "yunti_press_key",
         arguments: args,
       })
+
+      if (!result || typeof result !== "object" || result.pressed !== true) {
+        return result
+      }
+
+      const target =
+        selector
+          ? { selector, method: "selector" }
+          : hasX && hasY
+            ? { method: "coordinate", x: Math.round(Number(args.x)), y: Math.round(Number(args.y)) }
+            : { method: "focused" }
+
+      return {
+        ...result,
+        browserSessionId: session.browserSessionId,
+        action: "press_key",
+        target,
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Key press dispatched. Observe again, read page state, or evaluate the active field value to verify the intended effect.",
+      }
     }
   
     const key = String(args.key || "").trim()
@@ -1306,7 +1330,17 @@ export function createToolDispatcher({
       nativeVirtualKeyCode: keyDef.keyCode,
     })
   
-    return { pressed: true, uid, key, browserSessionId: session.browserSessionId }
+    return {
+      pressed: true,
+      uid,
+      key,
+      browserSessionId: session.browserSessionId,
+      action: "press_key",
+      target: { uid, method: "cdp.keyboard" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Key press dispatched. Observe again, read page state, or evaluate the field value to verify the intended effect.",
+    }
   }
   
   const KEY_MAP = {

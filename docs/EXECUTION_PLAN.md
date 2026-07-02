@@ -73,9 +73,9 @@
   `observe -> click uid -> observe/verify` 真实浏览器闭环。
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
-  scroll passthrough、type_text uid/selector fallback。
-- P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 press_key、drag 或
-  upload，同时保留所有既有兼容字段与 CDP fallback。
+  scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback。
+- P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 drag 或 upload，同时保留
+  所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1847,6 +1847,20 @@ P6.1 真实浏览器闭环验证 runbook：
 - 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
   通过 12 项。
 - 最新完整验证：`npm run release:check` 通过，覆盖 81 个 node:test 用例，其中 80 个
+  通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
+  npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
+  因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 `yunti_press_key` uid path 和 content-script
+  passthrough 结果增量追加结构化字段：`action: "press_key"`、`target`、`ok`、
+  `recoverable`、`nextStepHint` 和 `browserSessionId`，同时保留 uid path 的 `pressed`、
+  `uid`、`key` 兼容字段，以及 content-script 返回的 `pressed`、`key`、`element`、
+  `valueChanged` 兼容字段；本切片不改 CDP keyDown/keyUp 派发、selector/coordinate/focused
+  fallback 或 content-script key event 语义。
+- `tests/tool-handlers.test.js` 已新增 uid press_key 和 selector press_key 断言，确保结构化字段
+  不会替代或破坏既有 press_key 返回。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 14 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 83 个 node:test 用例，其中 82 个
   通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
   npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
   因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。

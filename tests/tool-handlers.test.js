@@ -597,6 +597,92 @@ test("selector type text preserves content result with structured result", async
   }
 })
 
+test("uid press key preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-press",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-input",
+            role: "textbox",
+            name: "Search",
+            rect: { x: 30, y: 90, width: 160, height: 30 },
+          },
+        ],
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-press-uid",
+      tool: "yunti_press_key",
+      arguments: { uid: "yunti-input", key: "Enter" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      pressed: true,
+      uid: "yunti-input",
+      key: "Enter",
+      browserSessionId: "tab-1",
+      action: "press_key",
+      target: { uid: "yunti-input", method: "cdp.keyboard" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Key press dispatched. Observe again, read page state, or evaluate the field value to verify the intended effect.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("selector press key preserves content result with structured result", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_press_key: {
+        pressed: true,
+        key: "Backspace",
+        element: "input#search",
+        valueChanged: true,
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-press-selector",
+      tool: "yunti_press_key",
+      arguments: { selector: "#search", key: "Backspace" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      pressed: true,
+      key: "Backspace",
+      element: "input#search",
+      valueChanged: true,
+      browserSessionId: "tab-1",
+      action: "press_key",
+      target: { selector: "#search", method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Key press dispatched. Observe again, read page state, or evaluate the active field value to verify the intended effect.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("missing uid now points agents back to observe or snapshot", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

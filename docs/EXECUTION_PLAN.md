@@ -1435,7 +1435,7 @@ Yunti 自己的特色。后续实现应直接从仓库文档恢复目标、非�
 
 ## P6.1 Agent 友好的页面观察
 
-状态：文档准备中
+状态：实现中（首个 schema / hints / bridge routing 合约切片已落地）
 
 目标：
 
@@ -1544,10 +1544,23 @@ uid 生命周期：
 
 - 文档确认 `yunti_observe_page` 的输出契约、uid 关系、默认脱敏和第一条 smoke 路径。
 - Page Agent 参考审计已沉淀为 Yunti 术语，不再依赖上下文记忆。
-- 后续代码实现再进入 schema、content script collection、dispatcher routing、测试和
-  skill/docs 更新。
+- 首个实现切片只添加 MCP schema、`yunti_get_tool_usage_hints` observe-first 指引和
+  bridge routing 合约测试；不实现 content script DOM collector，不重写 action layer。
+- 后续代码实现再进入 content script collection、uid map 与 action 兼容、最小
+  `observe -> click uid -> observe` 闭环、测试和 skill/docs 更新。
 - P6.1 完成必须包括 schema 单测、bridge routing 单测、content fixture 单测、真实浏览器
   smoke、skill 更新和 `yunti_get_tool_usage_hints` 更新。
+
+最新切片记录（2026-07-03）：
+
+- `mcp/tools.js` 已新增 `yunti_observe_page` 输入 schema，覆盖 `mode`、`maxElements`、
+  `maxTextLength`、`includeHidden`、`includeTextTree`、`includeRects` 和 `redaction`。
+- `yunti_get_tool_usage_hints` 已新增 `yunti_observe_page` guidance，并把
+  click/hover/fill 的 uid 说明更新为 observe/snapshot fresh uid。
+- `tests/bridge.test.js` 已覆盖工具 surface、observe usage hints schema，以及
+  `yunti_observe_page` 从 bridge 转发到 extension 的路由合约。
+- 本切片仍未实现 extension 侧 DOM observation collector；真实浏览器 smoke 留到
+  content script observe MVP 合并后执行。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

@@ -52,6 +52,57 @@ export const TOOLS = [
     },
   },
   {
+    name: "yunti_observe_page",
+    description:
+      "Observe the current browser page for agentic operation. Returns an observationId, page/viewport/scroll metadata, a compact interactive text tree, structured elements with fresh uids, scrollable container metadata, redaction metadata, and next-step hints. Prefer this for observe -> act by uid -> verify workflows once available. Sensitive credential-like values are redacted by default.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        browserSessionId: {
+          type: "string",
+          description:
+            "Optional target Yunti browser session. Use the returned browserSessionId for follow-up actions on the same tab.",
+        },
+        mode: {
+          type: "string",
+          enum: ["viewport", "fullPage"],
+          description:
+            "Observation scope. Defaults to viewport; fullPage is bounded by maxElements and maxTextLength.",
+        },
+        maxElements: {
+          type: "integer",
+          minimum: 1,
+          maximum: 500,
+          description: "Maximum interactive elements to return. Defaults to a bounded runtime value.",
+        },
+        maxTextLength: {
+          type: "integer",
+          minimum: 0,
+          maximum: 60000,
+          description: "Maximum textTree/visible text characters to return.",
+        },
+        includeHidden: {
+          type: "boolean",
+          description: "Include hidden or invisible elements. Defaults to false.",
+        },
+        includeTextTree: {
+          type: "boolean",
+          description: "Include the compact agent-facing interactive text tree. Defaults to true.",
+        },
+        includeRects: {
+          type: "boolean",
+          description: "Include viewport-relative element rectangles. Defaults to true.",
+        },
+        redaction: {
+          type: "string",
+          enum: ["balanced", "strict", "off"],
+          description:
+            "DOM observation redaction mode. Defaults to balanced. Use off only for explicit local debugging; it is not recommended for agent workflows.",
+        },
+      },
+    },
+  },
+  {
     name: "yunti_get_selected_context",
     description:
       "Read the current selection and nearest DOM context from the active browser page.",
@@ -390,13 +441,13 @@ export const TOOLS = [
   {
     name: "yunti_type_text",
     description:
-      "Type or set text in the focused element, a selector target, a uid target (from yunti_take_snapshot), or a coordinate target on the current browser page.",
+      "Type or set text in the focused element, a selector target, a uid target (from yunti_observe_page or yunti_take_snapshot), or a coordinate target on the current browser page.",
     inputSchema: {
       type: "object",
       required: ["text"],
       properties: {
         browserSessionId: { type: "string" },
-        uid: { type: "string", description: "Stable uid from yunti_take_snapshot." },
+        uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot." },
         text: { type: "string" },
         selector: { type: "string" },
         x: { type: "number" },
@@ -408,13 +459,13 @@ export const TOOLS = [
   {
     name: "yunti_press_key",
     description:
-      "Send a keyboard key event to the focused element, a uid target (from yunti_take_snapshot), a selector target, or a coordinate target on the current browser page.",
+      "Send a keyboard key event to the focused element, a uid target (from yunti_observe_page or yunti_take_snapshot), a selector target, or a coordinate target on the current browser page.",
     inputSchema: {
       type: "object",
       required: ["key"],
       properties: {
         browserSessionId: { type: "string" },
-        uid: { type: "string", description: "Stable uid from yunti_take_snapshot." },
+        uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot." },
         key: { type: "string", description: "Examples: Enter, Escape, Tab, ArrowDown, Backspace." },
         selector: { type: "string" },
         x: { type: "number" },
@@ -457,13 +508,13 @@ export const TOOLS = [
   {
     name: "yunti_upload_file",
     description:
-      "Set files on a file input element by uid (from yunti_take_snapshot) or selector. Uses CDP DOM.setFileInputFiles. Paths must be accessible to the browser.",
+      "Set files on a file input element by uid (from yunti_observe_page or yunti_take_snapshot) or selector. Uses CDP DOM.setFileInputFiles. Paths must be accessible to the browser.",
     inputSchema: {
       type: "object",
       required: ["filePaths"],
       properties: {
         browserSessionId: { type: "string" },
-        uid: { type: "string", description: "Stable uid from yunti_take_snapshot for the file input." },
+        uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot for the file input." },
         selector: { type: "string", description: "CSS selector for the file input element." },
         filePaths: { type: "array", items: { type: "string" }, description: "Absolute file paths to upload." },
       },
@@ -484,12 +535,12 @@ export const TOOLS = [
   {
     name: "yunti_click",
     description:
-      "Click an element on the current browser page using a uid from yunti_take_snapshot, a CSS selector, or viewport coordinates. Prefer uid for reliability. For coordinate-only clicks, yunti_click_at is the clearer dedicated tool. Dangerous labels require user confirmation.",
+      "Click an element on the current browser page using a uid from yunti_observe_page or yunti_take_snapshot, a CSS selector, or viewport coordinates. Prefer a fresh uid for reliability. For coordinate-only clicks, yunti_click_at is the clearer dedicated tool. Dangerous labels require user confirmation.",
     inputSchema: {
       type: "object",
       properties: {
         browserSessionId: { type: "string" },
-        uid: { type: "string", description: "Stable uid from yunti_take_snapshot (e.g. yunti-1). Takes precedence over selector." },
+        uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot (e.g. yunti-1). Takes precedence over selector." },
         selector: { type: "string", description: "CSS selector. Used when uid is not provided." },
         x: { type: "number", description: "Viewport x coordinate fallback. Use together with y; yunti_click_at is preferred for coordinate-only clicks." },
         y: { type: "number", description: "Viewport y coordinate fallback. Use together with x; yunti_click_at is preferred for coordinate-only clicks." },
@@ -500,12 +551,12 @@ export const TOOLS = [
   {
     name: "yunti_hover",
     description:
-      "Hover over an element on the current browser page using a uid from yunti_take_snapshot, a CSS selector, or viewport coordinates. Useful for triggering tooltips, dropdowns, and hover menus.",
+      "Hover over an element on the current browser page using a uid from yunti_observe_page or yunti_take_snapshot, a CSS selector, or viewport coordinates. Useful for triggering tooltips, dropdowns, and hover menus.",
     inputSchema: {
       type: "object",
       properties: {
         browserSessionId: { type: "string" },
-        uid: { type: "string", description: "Stable uid from yunti_take_snapshot (e.g. yunti-1). Takes precedence over selector." },
+        uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot (e.g. yunti-1). Takes precedence over selector." },
         selector: { type: "string", description: "CSS selector fallback. The element center is resolved and hovered through CDP." },
         x: { type: "number", description: "Viewport x coordinate fallback. Use together with y." },
         y: { type: "number", description: "Viewport y coordinate fallback. Use together with x." },
@@ -515,13 +566,13 @@ export const TOOLS = [
   {
     name: "yunti_fill",
     description:
-      "Fill an input, textarea, select, or contenteditable element using a uid from yunti_take_snapshot or a CSS selector. Prefer uid for reliability.",
+      "Fill an input, textarea, select, or contenteditable element using a uid from yunti_observe_page or yunti_take_snapshot, or a CSS selector. Prefer a fresh uid for reliability.",
     inputSchema: {
       type: "object",
       required: ["value"],
       properties: {
         browserSessionId: { type: "string" },
-        uid: { type: "string", description: "Stable uid from yunti_take_snapshot (e.g. yunti-3). Takes precedence over selector." },
+        uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot (e.g. yunti-3). Takes precedence over selector." },
         selector: { type: "string", description: "CSS selector. Used when uid is not provided." },
         value: { type: "string" },
       },
@@ -584,7 +635,7 @@ export const TOOLS = [
   {
     name: "yunti_fill_form",
     description:
-      "Fill multiple form fields at once. Each field specifies a uid (from yunti_take_snapshot) or a selector, and its value. More efficient than calling yunti_fill repeatedly.",
+      "Fill multiple form fields at once. Each field specifies a uid (from yunti_observe_page or yunti_take_snapshot) or a selector, and its value. More efficient than calling yunti_fill repeatedly.",
     inputSchema: {
       type: "object",
       required: ["fields"],
@@ -596,7 +647,7 @@ export const TOOLS = [
             type: "object",
             required: ["value"],
             properties: {
-              uid: { type: "string", description: "Stable uid from yunti_take_snapshot." },
+              uid: { type: "string", description: "Fresh uid from yunti_observe_page or yunti_take_snapshot." },
               selector: { type: "string", description: "CSS selector fallback." },
               value: { type: "string", description: "Value to fill." },
             },
@@ -897,6 +948,30 @@ export function toolUsageHints(args = {}) {
         "If an old browserSessionId fails, call yunti_list_browser_targets to refresh the live route inventory.",
       ],
     },
+    yunti_observe_page: {
+      purpose: "Observe the current page for observe -> act by uid -> verify workflows.",
+      required: [],
+      recommended: ["browserSessionId", "mode", "redaction"],
+      examples: [
+        {
+          browserSessionId: "yunti-...",
+          mode: "viewport",
+          includeTextTree: true,
+          redaction: "balanced",
+        },
+      ],
+      notes: [
+        "Use this as the default page-operation refresh step once available.",
+        "Returned uids are fresh for the latest observation in the current browserSessionId; observe again after navigation, DOM changes, or stale uid errors.",
+        "Default balanced redaction hides credential-like values. Screenshots are separate and may still contain visible sensitive content.",
+        "Use yunti_get_page_snapshot for lightweight route/title/text overview and yunti_take_snapshot for compatibility with older uid workflows.",
+      ],
+      commonMistakes: [
+        "Do not treat observation uids as permanent selectors across refreshes or tabs.",
+        "Do not use redaction=off unless the user explicitly wants local debugging.",
+        "Do not blindly retry an action after no page change; observe, wait, scroll, or switch tabs based on hints.",
+      ],
+    },
     yunti_list_browser_targets: {
       purpose: "Canonical live Chrome/Edge tab and target inventory.",
       required: [],
@@ -994,32 +1069,32 @@ export function toolUsageHints(args = {}) {
       commonMistakes: ["Use id, not title."],
     },
     yunti_click: {
-      purpose: "Click by snapshot uid, CSS selector, or viewport coordinates.",
+      purpose: "Click by observe/snapshot uid, CSS selector, or viewport coordinates.",
       required: [],
       recommended: ["browserSessionId", "uid"],
       notes: [
-        "Prefer uid from yunti_take_snapshot for reliability.",
+        "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Use selector when uid is unavailable.",
         "Coordinate mode requires both x and y; yunti_click_at is clearer for coordinate-only clicks.",
       ],
     },
     yunti_hover: {
-      purpose: "Hover by snapshot uid, CSS selector, or viewport coordinates.",
+      purpose: "Hover by observe/snapshot uid, CSS selector, or viewport coordinates.",
       required: [],
       recommended: ["browserSessionId", "uid"],
       notes: [
-        "Prefer uid from yunti_take_snapshot for reliability.",
+        "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Selector mode resolves the element center and dispatches CDP mouse move.",
         "Coordinate mode requires both x and y.",
       ],
     },
     yunti_fill: {
-      purpose: "Fill an input-like element by snapshot uid or CSS selector.",
+      purpose: "Fill an input-like element by observe/snapshot uid or CSS selector.",
       required: ["value"],
       recommended: ["browserSessionId", "uid", "value"],
       notes: [
         "value is required and may be an empty string when intentionally clearing a field.",
-        "Prefer uid from yunti_take_snapshot for reliability.",
+        "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Use selector when uid is unavailable.",
         "Coordinate-only fill is not supported; use uid or selector.",
       ],
@@ -1030,7 +1105,7 @@ export function toolUsageHints(args = {}) {
     },
   }
   const topicMap = {
-    browser: ["yunti_get_page_snapshot", "yunti_list_browser_targets", "yunti_list_pages"],
+    browser: ["yunti_observe_page", "yunti_get_page_snapshot", "yunti_list_browser_targets", "yunti_list_pages"],
     cdp: ["yunti_cdp_send_command", "yunti_evaluate_script"],
     tabs: ["yunti_new_page", "yunti_close_page", "yunti_select_page", "yunti_list_browser_targets"],
     memory: ["yunti_get_learning_memory", "yunti_remember_learning", "yunti_forget_learning_memory"],
@@ -1058,6 +1133,7 @@ export function toolUsageHints(args = {}) {
       "browserSessionId is the current user's browser route; tabId and targetId are selectors, not permissions.",
       "yunti_list_browser_targets is the canonical live browser inventory.",
       "yunti_list_pages is a compatibility alias for the same live target inventory.",
+      "For page operations, prefer observe -> act by fresh uid -> observe/verify once yunti_observe_page is available.",
       "If an old browserSessionId is disconnected or stale, call yunti_list_browser_targets with the current userId to recover the latest browserSessionId and live targets.",
       "After yunti_new_page, use the returned browserSessionId for follow-up calls on the new tab.",
       "Sessions expire quickly when the extension stops polling; stale-session errors include the reason and recovery hint.",

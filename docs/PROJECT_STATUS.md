@@ -89,6 +89,10 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Product-specific fixed conversation, workspace, and side-panel entry points
   have been removed from the standalone extension.
 - The next major execution plan is captured in `docs/NEXT_MAJOR_PLAN.md`.
+- P6.1 first implementation slice has started: `yunti_observe_page` now has an
+  MCP tool schema, observe-first usage hints, updated uid wording for existing
+  page actions, and bridge routing contract tests. The extension DOM collector
+  is not implemented yet.
 
 ## Decisions
 
@@ -127,15 +131,17 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Yunti should preserve its own distinctive capabilities: fine-grained MCP
   tools, real Chrome/Edge state, CDP, screenshots, network/console diagnostics,
   tab control, local bridge routing, and zero-config local install.
+- P6.1 implementation starts with schema, tool hints, and bridge routing only;
+  content-script observation, uid map/action compatibility, and observe/action
+  E2E are separate follow-up slices.
 
 ## Open Work
 
 - Follow `docs/NEXT_MAJOR_PLAN.md` for the next major cycle.
-- Start P6.1 by confirming the `yunti_observe_page` output contract, uid
-  relationship, default redaction, and first `observe -> click uid -> observe`
-  smoke path before implementation.
-- Before P6.1 code, finalize the field-level contract, `yunti_get_tool_usage_hints`
-  wording, fixture matrix, and minimum DOM observation redaction baseline.
+- Continue P6.1 with the content-script `yunti_observe_page` MVP after the
+  schema/hints/routing slice is committed.
+- Add deterministic observe fixtures for basic elements, redaction, scrollable
+  containers, and dynamic/stale uid behavior before broadening action semantics.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

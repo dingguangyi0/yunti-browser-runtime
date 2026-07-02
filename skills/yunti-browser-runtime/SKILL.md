@@ -24,7 +24,8 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 ## Tool Choice
 
 - Use `yunti_get_page_snapshot` for lightweight page text, title, URL, selected text, and page state.
-- Use `yunti_take_snapshot` before uid-based clicks, fills, or hovers.
+- Once available in the connected runtime, use `yunti_observe_page` as the normal page-operation refresh step, then act by fresh uid and observe again to verify.
+- Use `yunti_take_snapshot` as the compatibility path before uid-based clicks, fills, or hovers.
 - Use `yunti_click`, `yunti_fill`, `yunti_hover`, `yunti_press_key`, and `yunti_type_text` for normal page actions.
 - Use `yunti_take_screenshot` for visual verification.
 - Use `yunti_list_browser_targets` for tab counts, tab selection, target IDs, and whole-browser awareness.
@@ -56,7 +57,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 
 ## Parameter Rules
 
-- `yunti_click` and `yunti_hover` need `uid`, `selector`, or both `x` and `y`; call `yunti_take_snapshot` first when possible.
+- `yunti_click` and `yunti_hover` need `uid`, `selector`, or both `x` and `y`; prefer a fresh uid from `yunti_observe_page` once available, or call `yunti_take_snapshot` for the current compatibility path.
 - `yunti_fill` requires `value` plus `uid` or `selector`; coordinate-only fill is not supported.
 - `yunti_close_page` accepts `browserSessionId`, not raw `tabId` or `targetId`; use `yunti_cdp_send_command` with `Target.closeTarget` for raw browser targets.
 - `yunti_forget_learning_memory` needs a memory `id`, or `all=true` and `confirmed=true` for deleting everything.
@@ -67,11 +68,13 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Before submitting forms, deleting data, uploading sensitive files, approving workflows, making purchases, or changing production data, ask the user for explicit confirmation.
 - Do not expose raw cookies, passwords, authorization headers, or token-like values.
 - If a tool output appears to include sensitive data, summarize only the safe parts.
+- DOM observation redaction does not mean screenshots are redacted; treat screenshots as visible page pixels.
 
 ## Recovery
 
 - No connected tab: ask the user to open a page, load the extension, or refresh the page.
 - Stale session: call `yunti_list_browser_targets` and use the latest `browserSessionId`.
+- Stale or missing page uid: observe again once `yunti_observe_page` is available, or take a fresh snapshot for compatibility workflows.
 - Wrong tab: use `yunti_list_browser_targets` to find the intended tab, then route CDP with that tab's `tabId` or `targetId`.
 - Parameter uncertainty: call `yunti_get_tool_usage_hints` with the specific tool name.
 - Missing memory id: call `yunti_get_learning_memory` first, then retry with a returned `id`.

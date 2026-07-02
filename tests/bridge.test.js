@@ -291,6 +291,7 @@ test("mcp tools/list exposes Yunti tools", async () => {
 test("yunti-browser-runtime keeps the complete core tool surface", async () => {
   const requiredTools = [
     "yunti_get_tool_usage_hints",
+    "yunti_observe_page",
     "yunti_get_page_snapshot",
     "yunti_get_selected_context",
     "yunti_fetch_with_cookie",
@@ -564,6 +565,29 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
   const cdpPayload = JSON.parse(cdpResponse.result.content[0].text)
   assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /params must be an object/)
   assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /Target.closeTarget/)
+})
+
+test("mcp usage hints include observe-first page operation guidance", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_observe_page" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  const schema = payload.tools.yunti_observe_page.schema
+
+  assert.ok(schema.properties.mode.enum.includes("viewport"))
+  assert.ok(schema.properties.redaction.enum.includes("balanced"))
+  assert.ok(schema.properties.redaction.enum.includes("strict"))
+  assert.ok(schema.properties.redaction.enum.includes("off"))
+  assert.match(payload.tools.yunti_observe_page.notes.join("\n"), /fresh for the latest observation/)
+  assert.match(payload.tools.yunti_observe_page.commonMistakes.join("\n"), /permanent selectors/)
 })
 
 test("bridge stores sanitized network observations", async () => {
@@ -892,6 +916,35 @@ test("yunti_take_snapshot dispatches to extension", async () => {
   }
   hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: snapshot })
   assert.deepEqual(await call, snapshot)
+})
+
+test("yunti_observe_page dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_observe_page", {
+    browserSessionId: "tab-1",
+    userId: "u1",
+    mode: "viewport",
+    redaction: "balanced",
+  }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_observe_page")
+  assert.equal(event.arguments.browserSessionId, undefined)
+  assert.equal(event.arguments.userId, undefined)
+  assert.equal(event.arguments.mode, "viewport")
+  assert.equal(event.arguments.redaction, "balanced")
+
+  const observation = {
+    observationId: "obs-1",
+    browserSessionId: "tab-1",
+    page: { url: "https://app.example.test/", title: "SCM" },
+    elements: [{ uid: "yunti-1", role: "button", name: "查询" }],
+    textTree: "[yunti-1]<button>查询</button>",
+    hints: [],
+  }
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: observation })
+  assert.deepEqual(await call, observation)
 })
 
 test("yunti_click dispatches uid-based click to extension", async () => {

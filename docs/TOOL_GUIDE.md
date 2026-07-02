@@ -5,9 +5,11 @@
 1. Call `yunti_get_tool_usage_hints` when unsure about parameters or routing.
 2. Call `yunti_list_browser_targets` to understand the live browser state.
 3. Keep the returned `browserSessionId` for follow-up page/CDP tools.
-4. If the session becomes stale, call `yunti_list_browser_targets` again and
+4. Once `yunti_observe_page` is available in the connected runtime, prefer
+   `observe -> act by fresh uid -> observe/verify` for page operations.
+5. If the session becomes stale, call `yunti_list_browser_targets` again and
    retry with the latest route.
-5. For multi-step page work, prefer one stable `browserSessionId` throughout the
+6. For multi-step page work, prefer one stable `browserSessionId` throughout the
    task.
 
 Sessions expire when the extension stops polling the local bridge. Stale-session
@@ -17,6 +19,8 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 
 - `yunti_list_browser_targets`: canonical live inventory for tabs and targets.
 - `yunti_list_pages`: compatibility alias for the same live inventory.
+- `yunti_observe_page`: P6.1 observe-first page operation contract with fresh
+  uids, compact text tree, scroll metadata, and DOM redaction metadata.
 - `yunti_get_page_snapshot`: lightweight page state and visible context.
 - `yunti_take_snapshot`: element-oriented snapshot for uid-based actions.
 - `yunti_click`, `yunti_fill`, `yunti_hover`: common DOM actions.
@@ -52,7 +56,8 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 ## Parameter Rules
 
 - `yunti_click` and `yunti_hover` require a `uid`, a `selector`, or both `x`
-  and `y`; use `yunti_take_snapshot` to get stable uids.
+  and `y`; prefer a fresh uid from `yunti_observe_page` once available, or use
+  `yunti_take_snapshot` for the current compatibility path.
 - `yunti_fill` requires `value` and either `uid` or `selector`; it does not
   support coordinate-only targeting.
 - `yunti_close_page` closes by `browserSessionId`; to close by raw `tabId` or
@@ -67,3 +72,5 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   explicit user confirmation in the agent workflow.
 - Tool outputs redact likely cookies, authorization headers, passwords, and
   token-like values.
+- DOM observation redaction does not imply screenshot redaction; screenshots
+  represent visible page pixels and may include sensitive content.

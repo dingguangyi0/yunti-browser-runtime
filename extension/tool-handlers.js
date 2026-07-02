@@ -1165,7 +1165,20 @@ export function createToolDispatcher({
       type: "mouseReleased", x: toX, y: toY, button, clickCount: 1,
     })
   
-    return { dragged: true, from: { x: Math.round(fromX), y: Math.round(fromY) }, to: { x: Math.round(toX), y: Math.round(toY) }, steps, browserSessionId: session.browserSessionId }
+    const from = { x: Math.round(fromX), y: Math.round(fromY) }
+    const to = { x: Math.round(toX), y: Math.round(toY) }
+    return {
+      dragged: true,
+      from,
+      to,
+      steps,
+      browserSessionId: session.browserSessionId,
+      action: "drag",
+      target: { method: "coordinate", from, to },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Drag dispatched. Observe again or read page state to verify the intended movement or drop result.",
+    }
   }
   
   async function uploadFile(tabId, session, args = {}) {

@@ -778,6 +778,44 @@ test("selector upload file preserves compatibility fields with structured result
   }
 })
 
+test("coordinate drag preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness()
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-drag",
+      tool: "yunti_drag",
+      arguments: { fromX: 10.2, fromY: 20.7, toX: 80.4, toY: 120.8, steps: 2 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      dragged: true,
+      from: { x: 10, y: 21 },
+      to: { x: 80, y: 121 },
+      steps: 2,
+      browserSessionId: "tab-1",
+      action: "drag",
+      target: {
+        method: "coordinate",
+        from: { x: 10, y: 21 },
+        to: { x: 80, y: 121 },
+      },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Drag dispatched. Observe again or read page state to verify the intended movement or drop result.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands
+        .filter((command) => command.method === "Input.dispatchMouseEvent")
+        .map((command) => command.params.type),
+      ["mousePressed", "mouseMoved", "mouseMoved", "mouseReleased"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("missing uid now points agents back to observe or snapshot", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

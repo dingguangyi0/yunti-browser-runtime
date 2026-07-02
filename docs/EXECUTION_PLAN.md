@@ -74,9 +74,9 @@
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
-  upload uid/selector path。
-- P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 drag，同时保留所有既有
-  兼容字段与 CDP fallback。
+  upload uid/selector path、coordinate drag。
+- P6.2 下一切片：整理 action result 覆盖清单，再进入更深的 fill/select/scroll 语义增强，
+  同时保留所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1875,6 +1875,18 @@ P6.1 真实浏览器闭环验证 runbook：
 - 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
   通过 16 项。
 - 最新完整验证：`npm run release:check` 通过，覆盖 85 个 node:test 用例，其中 84 个
+  通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
+  npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
+  因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 coordinate `yunti_drag` 结果增量追加结构化字段：
+  `action: "drag"`、`target`、`ok`、`recoverable`、`nextStepHint` 和
+  `browserSessionId`，同时保留 `dragged`、`from`、`to`、`steps` 兼容字段；本切片不改
+  CDP `Input.dispatchMouseEvent` 的 mousePressed / mouseMoved / mouseReleased 派发语义。
+- `tests/tool-handlers.test.js` 已新增 coordinate drag 断言，确保结构化字段不会替代或破坏
+  既有 drag 返回，并锁定 mouse event 序列。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 17 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 86 个 node:test 用例，其中 85 个
   通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
   npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
   因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。

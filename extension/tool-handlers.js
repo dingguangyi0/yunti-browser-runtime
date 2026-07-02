@@ -778,7 +778,7 @@ export function createToolDispatcher({
       : undefined
     const noMovement = moved === false
     const edgeHint = noMovement ? inferScrollEdgeHint(result.deltaX, result.deltaY) : undefined
-    const recoveryHint = noMovement ? buildScrollRecoveryHint(session, uid, edgeHint) : undefined
+    const recoveryHint = noMovement ? buildScrollRecoveryHint(session, uid, edgeHint, result) : undefined
 
     return {
       ...result,
@@ -810,7 +810,7 @@ export function createToolDispatcher({
     return "no-delta"
   }
 
-  function buildScrollRecoveryHint(session, uid, edgeHint) {
+  function buildScrollRecoveryHint(session, uid, edgeHint, result = {}) {
     const hint = {
       reason: "no-scroll-movement",
       recommendedTools: ["yunti_observe_page", "yunti_scroll"],
@@ -842,8 +842,30 @@ export function createToolDispatcher({
     } else if (edgeHint === "no-delta") {
       hint.nextAction = "provide-nonzero-scroll-delta"
     }
+    const suggestedRetry = buildScrollSuggestedRetry(uid, edgeHint, result)
+    if (suggestedRetry) hint.suggestedRetry = suggestedRetry
     hint.message = "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid."
     return hint
+  }
+
+  function buildScrollSuggestedRetry(uid, edgeHint, result = {}) {
+    const retry = {}
+    const deltaX = Number(result.deltaX)
+    const deltaY = Number(result.deltaY)
+    if (edgeHint === "possible-bottom-edge" || edgeHint === "possible-top-edge") {
+      if (!Number.isFinite(deltaY) || deltaY === 0) return undefined
+      retry.deltaY = -deltaY
+    } else if (edgeHint === "possible-right-edge" || edgeHint === "possible-left-edge") {
+      if (!Number.isFinite(deltaX) || deltaX === 0) return undefined
+      retry.deltaX = -deltaX
+    } else {
+      return undefined
+    }
+    if (uid) retry.uid = uid
+    retry.note = uid
+      ? "Try the opposite direction once on the same observed container, then observe again or switch to a nearer scrollable container if it still does not move."
+      : "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target."
+    return retry
   }
 
   async function selectElement(tabId, session, args = {}) {

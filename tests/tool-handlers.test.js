@@ -522,6 +522,10 @@ test("scroll no movement reports recoverable boundary diagnostic", async () => {
         nextAction: "observe-for-scrollable-container",
         edgeHint: "possible-bottom-edge",
         currentTarget: "document-or-coordinate-container",
+        suggestedRetry: {
+          deltaY: -600,
+          note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
+        },
         message: "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid.",
       },
       ok: false,
@@ -555,6 +559,10 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaY: -240 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-top-edge")
+    assert.deepEqual(harness.posted.at(-1).result.recoveryHint.suggestedRetry, {
+      deltaY: 240,
+      note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
+    })
 
     await harness.dispatcher.executeToolRequest(123, session, {
       id: "req-scroll-right-edge",
@@ -562,6 +570,10 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaX: 180, deltaY: 0 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-right-edge")
+    assert.deepEqual(harness.posted.at(-1).result.recoveryHint.suggestedRetry, {
+      deltaX: -180,
+      note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
+    })
 
     await harness.dispatcher.executeToolRequest(123, session, {
       id: "req-scroll-left-edge",
@@ -569,6 +581,10 @@ test("scroll no movement infers horizontal and upward edge hints", async () => {
       arguments: { deltaX: -180, deltaY: 0 },
     })
     assert.equal(harness.posted.at(-1).result.edgeHint, "possible-left-edge")
+    assert.deepEqual(harness.posted.at(-1).result.recoveryHint.suggestedRetry, {
+      deltaX: 180,
+      note: "Observe first for a scrollable container uid; only use this opposite delta if document scrolling is still the intended target.",
+    })
   } finally {
     harness.restore()
   }
@@ -639,6 +655,11 @@ test("uid scroll no movement includes observed container recovery metadata", asy
         pixelsBelow: 480,
         pixelsLeft: 0,
         pixelsRight: 0,
+      },
+      suggestedRetry: {
+        uid: "scroll-2",
+        deltaY: -300,
+        note: "Try the opposite direction once on the same observed container, then observe again or switch to a nearer scrollable container if it still does not move.",
       },
       message: "The scroll command dispatched, but the scroll position did not change. Refresh observation before retrying, inspect scroll boundaries, or target a different scrollable container uid.",
     })

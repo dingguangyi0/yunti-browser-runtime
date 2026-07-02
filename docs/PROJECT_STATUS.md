@@ -9,8 +9,9 @@ action results and deeper action semantics. Standalone `yunti_select` and
 aggregate `yunti_fill_form` are complete; `yunti_select` supports
 selector/value, uid/value, and uid/text; contenteditable fill and uid-targeted
 scroll are covered; and scroll no-movement diagnostics now include directional
-`edgeHint` plus structured `recoveryHint`. The next compatibility-preserving
-slice should continue into deeper scroll/select semantics.
+`edgeHint`, structured `recoveryHint`, and executable `suggestedRetry`
+parameters. The next compatibility-preserving slice should continue into
+deeper scroll/select semantics.
 
 ## Current State
 
@@ -503,6 +504,22 @@ slice should continue into deeper scroll/select semantics.
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
+- P6.2 scroll recovery guidance now includes `recoveryHint.suggestedRetry`.
+  When an opposite direction can be derived from `edgeHint`, the hint carries a
+  one-shot opposite `deltaX` / `deltaY`; uid-targeted scroll keeps the same
+  fresh container uid so agents can retry once, observe again, then switch
+  container or stop repeating if there is still no movement.
+- Latest P6.2 scroll suggested-retry targeted validation:
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 91
+  tests.
+- Latest P6.2 scroll suggested-retry full validation: `git diff --check`
+  passed; `node --test tests/tool-handlers.test.js tests/bridge.test.js`
+  passed 91 tests; `npm run release:check` passed with 96 node:test cases
+  total, 95 passed, and 1 real-browser smoke skipped by default; npm package
+  contents validation passed with 42 files; extension zip contents validation
+  passed with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but
+  skipped because Playwright/Chromium is not installed locally; the token
+  residue grep returned no matches.
 
 ## Decisions
 

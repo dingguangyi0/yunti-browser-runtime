@@ -1706,6 +1706,15 @@ P6.1 真实浏览器闭环验证 runbook：
 - 最新完整验证：`npm run release:check` 通过，覆盖 73 个 node:test 用例，其中 72 个
   通过、1 个 real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前
   环境因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 uid-based `yunti_click` 结果增量追加结构化字段：
+  `action: "click"`、`target`、`ok`、`recoverable`、`nextStepHint`，同时保留
+  `clicked`、`uid`、`x/y`、`browserSessionId` 兼容字段。
+- `tests/tool-handlers.test.js` 已更新 uid click 断言，确保结构化字段不会替代或破坏
+  既有兼容返回。
+- 最新验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js` 通过 4 项；
+  `npm run release:check` 通过，覆盖 73 个 node:test 用例，其中 72 个通过、1 个
+  real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少
+  Playwright/Chromium 被跳过；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

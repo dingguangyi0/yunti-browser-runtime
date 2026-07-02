@@ -131,6 +131,16 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   real-browser smoke by default, `YUNTI_E2E=1 npm run test:e2e` skipped because
   Playwright/Chromium is not installed in the current environment, and the token
   residue grep returned no matches.
+- uid-based `yunti_click` now returns additive structured action result fields
+  (`action`, `target`, `ok`, `recoverable`, and `nextStepHint`) while preserving
+  the existing `clicked`, `uid`, `x/y`, and `browserSessionId` compatibility
+  fields.
+- Latest P6.2 uid-click structured result validation: `git diff --check`
+  passed, `node --test tests/tool-handlers.test.js` passed 4 tests,
+  `npm run release:check` passed with 72 passing node:test cases and 1 skipped
+  real-browser smoke by default, `YUNTI_E2E=1 npm run test:e2e` skipped because
+  Playwright/Chromium is not installed in the current environment, and the token
+  residue grep returned no matches.
 
 ## Decisions
 

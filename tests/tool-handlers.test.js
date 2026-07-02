@@ -105,6 +105,11 @@ test("observe uid map feeds existing uid-based click path", async () => {
       x: 60,
       y: 40,
       browserSessionId: "tab-1",
+      action: "click",
+      target: { uid: "yunti-1", x: 60, y: 40 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
     })
     assert.deepEqual(
       harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
@@ -173,6 +178,11 @@ test("dispatcher preserves current action result shapes", async () => {
       x: 60,
       y: 40,
       browserSessionId: "tab-1",
+      action: "click",
+      target: { uid: "yunti-click", x: 60, y: 40 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
     })
 
     await harness.dispatcher.executeToolRequest(123, session, {
@@ -305,6 +315,11 @@ test("latest observation replaces stale uid map", async () => {
       x: 230,
       y: 95,
       browserSessionId: "tab-1",
+      action: "click",
+      target: { uid: "yunti-2", x: 230, y: 95 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
     })
   } finally {
     harness.restore()

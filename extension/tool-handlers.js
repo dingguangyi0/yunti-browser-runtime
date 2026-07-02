@@ -674,7 +674,20 @@ export function createToolDispatcher({
   async function clickViaSnapshotUid(tabId, session, uid) {
     const { x, y } = await resolveUidCenter(tabId, session, uid)
     await mouseClick(tabId, x, y, 1)
-    return { clicked: true, uid, x: Math.round(x), y: Math.round(y), browserSessionId: session.browserSessionId }
+    const roundedX = Math.round(x)
+    const roundedY = Math.round(y)
+    return {
+      clicked: true,
+      uid,
+      x: roundedX,
+      y: roundedY,
+      browserSessionId: session.browserSessionId,
+      action: "click",
+      target: { uid, x: roundedX, y: roundedY },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
+    }
   }
   
   async function hoverViaSnapshotUid(tabId, session, uid) {

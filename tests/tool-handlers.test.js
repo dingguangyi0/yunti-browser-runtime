@@ -473,6 +473,76 @@ test("uid fill select path preserves compatibility fields with structured result
   }
 })
 
+test("uid fill contenteditable path reports semantic method and text summary", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-editor",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-editor",
+            role: "textbox",
+            name: "Notes",
+            rect: { x: 40, y: 110, width: 240, height: 80 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "div",
+            type: undefined,
+            contentEditable: true,
+            before: { textLength: 8 },
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-editor",
+      tool: "yunti_fill",
+      arguments: { uid: "yunti-editor", value: "draft" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: true,
+      uid: "yunti-editor",
+      method: "contenteditable",
+      value: "draft",
+      before: { textLength: 8 },
+      after: { textLength: 5 },
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { uid: "yunti-editor", method: "contenteditable" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Contenteditable fill dispatched. Observe again, read page text, or evaluate textContent to verify the intended change.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands.filter((command) => command.method === "Input.dispatchKeyEvent").map((command) => command.params.text),
+      ["d", "r", "a", "f", "t"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("selector fill preserves content result with structured result", async () => {
   const harness = createDispatcherHarness({
     contentToolResponses: {

@@ -637,13 +637,20 @@ export function createToolDispatcher({
             const opts = Array.from(el.options);
             return { tag: 'select', options: opts.map(o => ({ value: o.value, text: o.text.slice(0, 80) })), selectedIndex: el.selectedIndex };
           }
+          const beforeText = el.isContentEditable ? String(el.textContent || '') : '';
           if (el.isContentEditable) {
+            el.focus();
             el.textContent = '';
           } else if (tag === 'input' || tag === 'textarea') {
             el.focus();
             el.select();
           }
-          return { tag, type: el.type, contentEditable: el.isContentEditable };
+          return {
+            tag,
+            type: el.type,
+            contentEditable: el.isContentEditable,
+            before: el.isContentEditable ? { textLength: beforeText.length } : undefined,
+          };
         })()`,
           returnByValue: true,
         }
@@ -695,17 +702,24 @@ export function createToolDispatcher({
           { type: "char", text: char, unmodifiedText: char }
         )
       }
+      const method = elInfo?.contentEditable ? "contenteditable" : "keyboard"
+      const before = elInfo?.before
+      const after = elInfo?.contentEditable ? { textLength: text.length } : undefined
       return {
         filled: true,
         uid,
-        method: "keyboard",
+        method,
         value: text,
+        ...(before ? { before } : {}),
+        ...(after ? { after } : {}),
         browserSessionId: session.browserSessionId,
         action: "fill",
-        target: { uid, method: "keyboard" },
+        target: { uid, method },
         ok: true,
         recoverable: false,
-        nextStepHint: "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+        nextStepHint: elInfo?.contentEditable
+          ? "Contenteditable fill dispatched. Observe again, read page text, or evaluate textContent to verify the intended change."
+          : "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
       }
     }
   

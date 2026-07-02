@@ -95,6 +95,18 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Compatibility fields must remain available while structured result fields are
   introduced.
 
+## Fill Guidance
+
+- Prefer a fresh `uid` from `yunti_observe_page` or `yunti_take_snapshot` when
+  filling inputs, textareas, selects, or contenteditable targets.
+- Uid-targeted contenteditable fills now return `method: "contenteditable"` and
+  include `before` / `after` text length summaries when available.
+- Treat contenteditable results as dispatch evidence, not final proof. Verify
+  with observe, snapshot, evaluate `textContent`, or a page-specific assertion
+  when exact editor state matters.
+- Selector-based fill remains compatible and may return content-script-shaped
+  fields such as `element` or `valueLength`.
+
 ## Select Guidance
 
 - Current `yunti_select` runtime behavior supports selector/value, uid/value,

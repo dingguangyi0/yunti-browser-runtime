@@ -425,6 +425,22 @@ fill/select/scroll semantics.
   validation passed with 42 files; extension zip contents validation passed
   with 13 files; the token residue grep returned no matches. Real-browser E2E
   was not rerun for this docs-only audit patch.
+- P6.2 deeper fill semantics have started with uid-targeted contenteditable
+  result reporting. The runtime keeps the existing CDP keyboard input flow, but
+  contenteditable targets now return `method: "contenteditable"` plus
+  before/after text length summaries and a verification-oriented next step
+  hint. Selector fill and normal keyboard fill compatibility fields are
+  unchanged.
+- Latest P6.2 contenteditable fill targeted validation:
+  `node --test tests/tool-handlers.test.js` passed 22 tests.
+- Latest P6.2 contenteditable fill full validation: `git diff --check`
+  passed; `node --test tests/tool-handlers.test.js tests/bridge.test.js`
+  passed 87 tests; `npm run release:check` passed with 92 node:test cases
+  total, 91 passed, and 1 real-browser smoke skipped by default; npm package
+  contents validation passed with 42 files; extension zip contents validation
+  passed with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but
+  skipped because Playwright/Chromium is not installed locally; the token
+  residue grep returned no matches.
 
 ## Decisions
 

@@ -1141,9 +1141,10 @@ export function toolUsageHints(args = {}) {
         "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Use selector when uid is unavailable.",
         "Coordinate-only fill is not supported; use uid or selector.",
+        "Uid-targeted contenteditable fills now report method=contenteditable with before/after textLength summaries; still verify the rendered text after the action.",
         "After filling, verify through yunti_observe_page, yunti_get_page_snapshot, or yunti_evaluate_script when exact field value matters.",
         "If the input is hidden, disabled, or no longer present, observe again, scroll, wait for rendering, or switch tabs before retrying.",
-        "Current results are compatibility-shaped and may include filled, uid, selector, method, value/valueLength, and browserSessionId; P6.2 will converge action outputs toward action, target, ok/code, recoverable, nextStepHint, and before/after summaries.",
+        "Current results are compatibility-shaped and may include filled, uid, selector, method, value/valueLength, before/after, and browserSessionId; P6.2 will converge action outputs toward action, target, ok/code, recoverable, nextStepHint, and richer before/after summaries.",
       ],
       recovery: [
         "Stale or missing uid: call yunti_observe_page again and use a fresh editable uid.",

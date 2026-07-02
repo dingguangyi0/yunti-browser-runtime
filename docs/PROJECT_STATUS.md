@@ -104,6 +104,14 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   balanced redaction, and stale uid replacement.
 - `docs/EXECUTION_PLAN.md` now includes a P6.1 real-browser closure runbook for
   the remaining `observe -> click uid -> observe/verify` validation gap.
+- P6.2 preparation has started with tool usage action recovery guidance for
+  click/hover/fill, without changing the runtime action implementation.
+- Latest P6.2 preparation validation: `git diff --check` passed,
+  `node --test tests/bridge.test.js` passed 63 tests, `npm run release:check`
+  passed with 70 passing node:test cases and 1 skipped real-browser smoke by
+  default, `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is
+  not installed in the current environment, and the token residue grep returned
+  no matches.
 
 ## Decisions
 
@@ -156,8 +164,10 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   P6.1 validation gap until Playwright/Chromium is available locally.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   broadening into P6.2 action semantics.
-- Start P6.2 fill/select/scroll action semantics only after the P6.1 closure
-  gap is either verified or explicitly tracked as an environment limitation.
+- Continue P6.2 in small compatibility-preserving slices: next candidates are
+  documented result contracts, then fill/select/scroll semantics after the P6.1
+  closure gap is either verified or explicitly tracked as an environment
+  limitation.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

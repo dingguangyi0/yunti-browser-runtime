@@ -62,6 +62,14 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - `yunti_close_page` accepts `browserSessionId`, not raw `tabId` or `targetId`; use `yunti_cdp_send_command` with `Target.closeTarget` for raw browser targets.
 - `yunti_forget_learning_memory` needs a memory `id`, or `all=true` and `confirmed=true` for deleting everything.
 
+## Action Recovery
+
+- After `yunti_click`, `yunti_fill`, or `yunti_hover`, observe again or read page state before assuming the action succeeded.
+- If a uid is stale or missing, call `yunti_observe_page` again and retry with a fresh uid.
+- If an element may be outside the viewport, use observe scroll hints and `yunti_scroll` before falling back to coordinates.
+- If the page is loading or changing, wait or observe again instead of blindly repeating the same action.
+- If the target tab is uncertain, call `yunti_list_browser_targets` and continue with the intended `browserSessionId`.
+
 ## Safety
 
 - Read-only inspection is allowed by default.

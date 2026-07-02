@@ -590,6 +590,57 @@ test("mcp usage hints include observe-first page operation guidance", async () =
   assert.match(payload.tools.yunti_observe_page.commonMistakes.join("\n"), /permanent selectors/)
 })
 
+test("mcp usage hints include action recovery guidance", async () => {
+  const clickResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_click" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(clickResponse.result.isError, undefined)
+  const clickPayload = JSON.parse(clickResponse.result.content[0].text)
+  assert.match(clickPayload.tools.yunti_click.notes.join("\n"), /observe again/)
+  assert.match(clickPayload.tools.yunti_click.recovery.join("\n"), /Stale or missing uid/)
+  assert.match(clickPayload.tools.yunti_click.recovery.join("\n"), /yunti_scroll/)
+  assert.match(clickPayload.tools.yunti_click.commonMistakes.join("\n"), /successful dispatch/)
+
+  const fillResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_fill" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(fillResponse.result.isError, undefined)
+  const fillPayload = JSON.parse(fillResponse.result.content[0].text)
+  assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /verify through yunti_observe_page/)
+  assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /fresh editable uid/)
+  assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /contenteditable/)
+
+  const workflowResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 3,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: {},
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(workflowResponse.result.isError, undefined)
+  const workflowPayload = JSON.parse(workflowResponse.result.content[0].text)
+  assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /observe -> act by fresh uid -> observe\/verify/)
+  assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /blind retries/)
+  assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /coordinate fallbacks/)
+})
+
 test("bridge stores sanitized network observations", async () => {
   const hub = new BridgeHub()
   hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://shop.example.test/" })

@@ -65,6 +65,19 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - `yunti_forget_learning_memory` requires `id`, or `all=true` plus
   `confirmed=true` when deleting every memory.
 
+## Action Recovery Rules
+
+- After a click, fill, or hover, observe again or read page state before treating
+  the action as successful.
+- If a uid is stale or missing, call `yunti_observe_page` again for a fresh uid
+  before retrying the same action.
+- If an element may be outside the viewport, use observe scroll hints and
+  `yunti_scroll` before falling back to coordinates.
+- If the page is loading or changing, wait or observe again instead of blindly
+  repeating the same action.
+- If the target tab is uncertain, call `yunti_list_browser_targets` and route
+  follow-up work through the intended `browserSessionId`.
+
 ## Safety Rules
 
 - Read-only inspection is allowed by default.

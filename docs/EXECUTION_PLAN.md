@@ -1673,6 +1673,20 @@ P6.1 真实浏览器闭环验证 runbook：
 - P6.2 需要增加 uid 与 visible text 支持，并写明如何与 `yunti_observe_page` 的 uid
   衔接。
 
+最新切片记录（2026-07-03）：
+
+- `yunti_get_tool_usage_hints` 已新增 P6.2 前置 action recovery guidance，不改写实际
+  action layer。
+- `yunti_click` / `yunti_hover` / `yunti_fill` hints 现在明确失败或无页面变化后应先
+  observe/verify，再根据情况 scroll、wait、switch tab、使用 selector/coordinate fallback
+  或询问用户，避免盲目重复同一动作。
+- `tests/bridge.test.js` 已覆盖 action recovery guidance，确保 fresh uid、stale/missing
+  uid、滚动、等待、tab 切换和 fallback 的恢复提示不会退化。
+- 最新验证：`git diff --check` 通过；`node --test tests/bridge.test.js` 通过 63 项；
+  `npm run release:check` 通过，覆盖 71 个 node:test 用例，其中 70 个通过、1 个
+  real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少
+  Playwright/Chromium 被跳过；token 残留检查无输出。
+
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
 ## P6.3 Agent 工作流契约

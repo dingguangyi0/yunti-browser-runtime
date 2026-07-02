@@ -1076,6 +1076,18 @@ export function toolUsageHints(args = {}) {
         "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Use selector when uid is unavailable.",
         "Coordinate mode requires both x and y; yunti_click_at is clearer for coordinate-only clicks.",
+        "After clicking, observe again or read page state before deciding whether the action succeeded.",
+        "If the target is missing or stale, observe again; if it may be below the fold, scroll first; if the page is changing, wait before retrying.",
+      ],
+      recovery: [
+        "Stale or missing uid: call yunti_observe_page again for the current browserSessionId, or yunti_take_snapshot for compatibility workflows.",
+        "Element not visible: use observe scroll hints, yunti_scroll, or a screenshot before falling back to coordinates.",
+        "No visible page change: call yunti_observe_page or yunti_get_page_snapshot to verify, then wait, scroll, switch tabs, or ask the user instead of repeating the same click.",
+        "Wrong page: call yunti_list_browser_targets and switch to the intended browserSessionId.",
+      ],
+      commonMistakes: [
+        "Do not treat a successful dispatch as proof that the page changed.",
+        "Do not repeat the same uid click after a stale uid error; refresh the observation first.",
       ],
     },
     yunti_hover: {
@@ -1086,6 +1098,11 @@ export function toolUsageHints(args = {}) {
         "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Selector mode resolves the element center and dispatches CDP mouse move.",
         "Coordinate mode requires both x and y.",
+        "Observe again after hover when menus, tooltips, or hover-only controls are expected to appear.",
+      ],
+      recovery: [
+        "Stale or missing uid: observe again before retrying the hover.",
+        "Expected menu did not appear: wait briefly, observe again, or use screenshot before switching to coordinate fallback.",
       ],
     },
     yunti_fill: {
@@ -1097,10 +1114,19 @@ export function toolUsageHints(args = {}) {
         "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot for reliability.",
         "Use selector when uid is unavailable.",
         "Coordinate-only fill is not supported; use uid or selector.",
+        "After filling, verify through yunti_observe_page, yunti_get_page_snapshot, or yunti_evaluate_script when exact field value matters.",
+        "If the input is hidden, disabled, or no longer present, observe again, scroll, wait for rendering, or switch tabs before retrying.",
+      ],
+      recovery: [
+        "Stale or missing uid: call yunti_observe_page again and use a fresh editable uid.",
+        "Field not editable: check disabled/editable fields from the observation, then wait, scroll, or ask the user if the control is gated.",
+        "Value did not stick: verify whether the target is contenteditable, masked, controlled by framework state, or requires typing/press_key semantics.",
+        "Wrong page: refresh targets with yunti_list_browser_targets and route the fill through the intended browserSessionId.",
       ],
       commonMistakes: [
         "Do not omit value.",
         "Do not pass only x/y coordinates to yunti_fill.",
+        "Do not keep retrying a fill without observing whether the field exists and is editable.",
       ],
     },
   }
@@ -1161,6 +1187,14 @@ export function toolUsageHints(args = {}) {
       memoryDelete: [
         "Call yunti_get_learning_memory to find the id.",
         "Call yunti_forget_learning_memory with that id.",
+      ],
+      actionRecovery: [
+        "For page actions, prefer observe -> act by fresh uid -> observe/verify.",
+        "If an action fails with a stale or missing uid, refresh with yunti_observe_page before retrying.",
+        "If the element may be outside the viewport, use observe scroll hints and yunti_scroll before falling back to coordinates.",
+        "If the page is loading or changing, use yunti_wait_for or observe again instead of blind retries.",
+        "If the target tab is uncertain, call yunti_list_browser_targets and switch to the intended browserSessionId.",
+        "Use selector or coordinate fallbacks only as recovery/debugging paths, not as the default when fresh uids are available.",
       ],
     },
     tools: selectedTools,

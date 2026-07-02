@@ -72,7 +72,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 
 ## Action Results
 
-- Current action results may use compatibility fields such as `clicked`, `hovered`, `filled`, `selected`, `scrolled`, `typed`, `pressed`, `uploaded`, `dragged`, `uid`, `selector`, coordinates, `method`, `valueLength`, `before`, `after`, and `browserSessionId`.
+- Current action results may use compatibility fields such as `clicked`, `hovered`, `filled`, `selected`, `scrolled`, `typed`, `pressed`, `uploaded`, `dragged`, aggregate counts like `failed`, per-field `results`, `uid`, `selector`, coordinates, `method`, `valueLength`, `before`, `after`, and `browserSessionId`.
 - Structured P6.2 fields are additive when present: prefer `action`, `target`, `ok`, `recoverable`, and `nextStepHint`, while still reading existing compatibility fields.
 - Treat action results as execution evidence, then verify page state when the task depends on the result.
 - Do not require agents to abandon existing result fields while structured action results are being introduced.

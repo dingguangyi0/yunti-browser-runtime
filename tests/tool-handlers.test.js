@@ -546,6 +546,77 @@ test("selector select preserves content result with structured result", async ()
   }
 })
 
+test("fill form preserves aggregate fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-fill-form",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-name",
+            role: "textbox",
+            name: "Name",
+            rect: { x: 20, y: 30, width: 120, height: 24 },
+          },
+        ],
+      },
+    ],
+    contentToolResponses: {
+      yunti_fill: (message) => {
+        if (message.arguments.selector === "#missing") {
+          throw new Error("selector not found")
+        }
+        return { filled: true, element: "input#email", valueLength: 13 }
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-form",
+      tool: "yunti_fill_form",
+      arguments: {
+        fields: [
+          { uid: "yunti-name", value: "Ada" },
+          { selector: "#email", value: "ada@test.dev" },
+          { selector: "#missing", value: "nope" },
+        ],
+      },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: 2,
+      failed: 1,
+      results: [
+        { uid: "yunti-name", selector: undefined, ok: true },
+        { uid: undefined, selector: "#email", ok: true },
+        { uid: undefined, selector: "#missing", ok: false, error: "selector not found" },
+      ],
+      browserSessionId: "tab-1",
+      action: "fill_form",
+      target: {
+        fieldCount: 3,
+        filled: 2,
+        failed: 1,
+      },
+      ok: false,
+      recoverable: true,
+      nextStepHint: "Form fill partially failed. Inspect per-field results, observe again for fresh uids, or retry failed fields with selector fallback.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid type text preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

@@ -964,7 +964,23 @@ export function createToolDispatcher({
       }
     }
   
-    return { filled, failed, results, browserSessionId: session.browserSessionId }
+    return {
+      filled,
+      failed,
+      results,
+      browserSessionId: session.browserSessionId,
+      action: "fill_form",
+      target: {
+        fieldCount: fields.length,
+        filled,
+        failed,
+      },
+      ok: failed === 0,
+      recoverable: failed > 0,
+      nextStepHint: failed === 0
+        ? "Form fill dispatched. Observe again, read page state, or evaluate field values to verify the intended changes."
+        : "Form fill partially failed. Inspect per-field results, observe again for fresh uids, or retry failed fields with selector fallback.",
+    }
   }
   
   async function waitForCondition(tabId, session, args = {}) {

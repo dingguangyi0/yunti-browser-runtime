@@ -5,8 +5,9 @@
 Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`. Current implementation focus is P6.2 structured
-action results; standalone `yunti_select` is complete and aggregate
-`yunti_fill_form` is the next compatibility-preserving slice.
+action results; standalone `yunti_select` and aggregate `yunti_fill_form` are
+complete, and the next compatibility-preserving slice should move into deeper
+fill/select/scroll semantics.
 
 ## Current State
 
@@ -354,6 +355,21 @@ action results; standalone `yunti_select` is complete and aggregate
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
+- Aggregate `yunti_fill_form` now returns additive structured action result
+  fields (`action`, `target`, `ok`, `recoverable`, `nextStepHint`, and
+  `browserSessionId`) around the existing aggregate summary while preserving
+  compatibility fields (`filled`, `failed`, and `results`). Per-field
+  `fillByUid` and content-script selector fill semantics are intentionally
+  unchanged in this slice.
+- Latest P6.2 fill_form structured result targeted validation: `git diff --check`
+  passed and `node --test tests/tool-handlers.test.js` passed 19 tests.
+- Latest P6.2 fill_form structured result full validation: `git diff --check`
+  passed; `npm run release:check` passed with 88 node:test cases total, 87
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
 
 ## Decisions
 
@@ -407,8 +423,8 @@ action results; standalone `yunti_select` is complete and aggregate
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   broadening into P6.2 action semantics.
 - Continue P6.2 in small compatibility-preserving slices: next candidates are
-  aggregate `yunti_fill_form` structured result, then deeper fill/select/scroll
-  semantics.
+  deeper fill/select/scroll semantics now that first-pass structured action
+  result coverage is complete.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

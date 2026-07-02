@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 standalone select 结构化切片，下一步补 aggregate fill_form | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成第一轮 action result 覆盖，下一步进入更深 fill/select/scroll 语义增强 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -75,10 +75,9 @@
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
   upload uid/selector path、coordinate drag、standalone `yunti_select` content-script
-  passthrough。
-- P6.2 剩余 action result 缺口：aggregate `yunti_fill_form` 仍是 compatibility-shaped；
-  下一步先补这个小切片，再进入更深的 fill/select/scroll 语义增强，同时保留所有既有兼容字段
-  与 CDP fallback。
+  passthrough、aggregate `yunti_fill_form` summary。
+- P6.2 第一轮 action result 覆盖已补齐；下一步进入更深的 fill/select/scroll 语义增强，
+  继续保留所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1913,18 +1912,13 @@ P6.1 真实浏览器闭环验证 runbook：
 - `yunti_upload_file`：uid path、selector path；保留 `uploaded`、`fileCount`、`filePaths`
   等兼容字段。
 - `yunti_drag`：coordinate path；保留 `dragged`、`from`、`to`、`steps` 等兼容字段。
+- `yunti_select`：standalone content-script passthrough；保留 `selected`、`element`、
+  `value` 等兼容字段。
+- `yunti_fill_form`：aggregate summary；保留 `filled`、`failed`、`results`、
+  `browserSessionId` 等兼容字段。
 
-尚未补齐结构化字段的 action surfaces：
-
-- `yunti_select` standalone content-script passthrough 仍返回 `selected`、`element`、`value`；
-  下一切片应增量追加 `action: "select"`、`target`、`ok`、`recoverable`、
-  `nextStepHint`、`browserSessionId`，不改 `input/change` 事件派发语义。
-- `yunti_fill_form` aggregate summary 仍返回 `filled`、`failed`、`results`、
-  `browserSessionId`；下一切片应增量追加 `action: "fill_form"`、`target`、`ok`、
-  `recoverable`、`nextStepHint`，不改逐字段调用 `fillByUid` / content-script fill 的语义。
-
-本覆盖清单确认 P6.2 action result 第一阶段尚未结束；在 `yunti_select` 和
-`yunti_fill_form` 补齐前，不进入更深的 fill/select/scroll 语义增强。
+本覆盖清单确认 P6.2 action result 第一阶段已覆盖主要 action surfaces；后续可以进入
+更深的 fill/select/scroll 语义增强，但仍必须小切片推进，并保留兼容字段与 CDP fallback。
 
 最新验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 86 个
 node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
@@ -1943,6 +1937,19 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   通过 18 项。
 - 最新 full 验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 87 个
   node:test 用例，其中 86 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
+  内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
+  残留检查无输出。
+- `extension/tool-handlers.js` 已为 aggregate `yunti_fill_form` summary 增量追加
+  结构化字段：`action: "fill_form"`、`target`、`ok`、`recoverable`、`nextStepHint`
+  和 `browserSessionId`，同时保留 `filled`、`failed`、`results` 兼容字段；本切片不改
+  逐字段 `fillByUid` 或 content-script selector fill 语义。
+- `tests/tool-handlers.test.js` 已新增部分成功/部分失败的 fill_form aggregate 断言，确保
+  结构化字段不会替代或破坏既有 aggregate summary 与 per-field results。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 19 项。
+- 最新 full 验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 88 个
+  node:test 用例，其中 87 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
   内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
   `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
   残留检查无输出。

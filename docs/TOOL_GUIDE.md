@@ -82,8 +82,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 
 - Current action results remain compatibility-shaped and may include fields such
   as `clicked`, `hovered`, `filled`, `selected`, `scrolled`, `typed`, `pressed`,
-  `uploaded`, `dragged`, `uid`, `selector`, `x`, `y`, `method`, `valueLength`,
-  `before`, `after`, and `browserSessionId`.
+  `uploaded`, `dragged`, aggregate counts like `failed`, per-field `results`,
+  `uid`, `selector`, `x`, `y`, `method`, `valueLength`, `before`, `after`, and
+  `browserSessionId`.
 - P6.2 structured action result fields are being introduced additively. Agents
   should prefer `action`, `target`, `ok`, `recoverable`, and `nextStepHint` when
   present, while still preserving and reading compatibility fields. `code` and

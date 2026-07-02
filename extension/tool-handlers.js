@@ -1208,11 +1208,35 @@ export function createToolDispatcher({
     const uid = String(args.uid || "").trim()
     if (!uid) {
       // Fall back to content script for selector/coordinate-based typing
-      return chrome.tabs.sendMessage(tabId, {
+      const selector = String(args.selector || "").trim()
+      const hasX = Number.isFinite(Number(args.x))
+      const hasY = Number.isFinite(Number(args.y))
+      const result = await chrome.tabs.sendMessage(tabId, {
         type: "yunti_execute_tool",
         tool: "yunti_type_text",
         arguments: args,
       })
+
+      if (!result || typeof result !== "object" || result.typed !== true) {
+        return result
+      }
+
+      const target =
+        selector
+          ? { selector, method: "selector" }
+          : hasX && hasY
+            ? { method: "coordinate", x: Math.round(Number(args.x)), y: Math.round(Number(args.y)) }
+            : { method: "focused" }
+
+      return {
+        ...result,
+        browserSessionId: session.browserSessionId,
+        action: "type_text",
+        target,
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Type text dispatched. Observe again, read page state, or evaluate the active field value to verify the intended change.",
+      }
     }
   
     const text = String(args.text || "")
@@ -1232,7 +1256,18 @@ export function createToolDispatcher({
       )
     }
   
-    return { typed: true, uid, text, method: "cdp.keyboard", browserSessionId: session.browserSessionId }
+    return {
+      typed: true,
+      uid,
+      text,
+      method: "cdp.keyboard",
+      browserSessionId: session.browserSessionId,
+      action: "type_text",
+      target: { uid, method: "cdp.keyboard" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Type text dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+    }
   }
   
   async function pressKeyByUid(tabId, session, args = {}) {

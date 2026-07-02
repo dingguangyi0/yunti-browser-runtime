@@ -510,6 +510,93 @@ test("selector fill preserves content result with structured result", async () =
   }
 })
 
+test("uid type text preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-type",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-input",
+            role: "textbox",
+            name: "Search",
+            rect: { x: 30, y: 90, width: 160, height: 30 },
+          },
+        ],
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-type-uid",
+      tool: "yunti_type_text",
+      arguments: { uid: "yunti-input", text: "hi" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      typed: true,
+      uid: "yunti-input",
+      text: "hi",
+      method: "cdp.keyboard",
+      browserSessionId: "tab-1",
+      action: "type_text",
+      target: { uid: "yunti-input", method: "cdp.keyboard" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Type text dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("selector type text preserves content result with structured result", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_type_text: {
+        typed: true,
+        element: "input#search",
+        textLength: 5,
+        mode: "append",
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-type-selector",
+      tool: "yunti_type_text",
+      arguments: { selector: "#search", text: "hello" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      typed: true,
+      element: "input#search",
+      textLength: 5,
+      mode: "append",
+      browserSessionId: "tab-1",
+      action: "type_text",
+      target: { selector: "#search", method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Type text dispatched. Observe again, read page state, or evaluate the active field value to verify the intended change.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("missing uid now points agents back to observe or snapshot", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

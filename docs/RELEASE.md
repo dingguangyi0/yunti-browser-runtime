@@ -124,6 +124,16 @@ npm adduser --registry=https://registry.npmjs.org/
 npm run release:whoami
 ```
 
+If the npm account requires two-factor authentication for publishing, pass the
+current one-time password to the publish script:
+
+```bash
+npm run release:publish -- --otp=<6-digit-code>
+```
+
+Alternatively, publish with a granular access token that has package publish
+permission and bypass 2FA enabled.
+
 After publishing, verify:
 
 ```bash

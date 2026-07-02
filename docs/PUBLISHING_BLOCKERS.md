@@ -3,6 +3,31 @@
 This document tracks release blockers that require external confirmation before
 publishing `yunti-browser-runtime`.
 
+## Active Blocker: npm 2FA Publish OTP
+
+Status: active as of 2026-07-03.
+
+`npm run release:publish` now passes local release gates and npm login preflight,
+then reaches `npm publish --registry=https://registry.npmjs.org/`. The registry
+rejects the publish with `E403` because the logged-in account requires
+two-factor authentication for package publishing.
+
+Resolution:
+
+```bash
+npm run release:publish -- --otp=<6-digit-code>
+```
+
+Use a fresh npm one-time password from the account authenticator. As an
+alternative, configure a granular npm access token with package publish
+permission and bypass 2FA enabled, then rerun `npm run release:publish`.
+
+After publish succeeds, run:
+
+```bash
+npm run release:verify-published
+```
+
 ## Resolved Blocker: P4.3 Package URLs
 
 Status: resolved on 2026-07-02 with

@@ -2,9 +2,9 @@
 
 ## Current Phase
 
-Release readiness: local MVP is prepared for first public release. P4.3 package
-repository/homepage/bugs URL confirmation is complete for the
-`dingguangyi0/yunti-browser-runtime` GitHub repository.
+Release readiness: local MVP is prepared for first public release. P4.19 formal
+npm publish is in progress and currently blocked only by npm two-factor
+authentication OTP.
 
 ## Current State
 
@@ -98,7 +98,7 @@ repository/homepage/bugs URL confirmation is complete for the
 
 ## Open Work
 
-- Follow `docs/EXECUTION_PLAN.md` for final publish dry-run and publish steps.
+- Follow `docs/EXECUTION_PLAN.md` for the active P4.19 npm publish step.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository
@@ -212,9 +212,8 @@ repository/homepage/bugs URL confirmation is complete for the
 - P4.17 npm auth preflight is complete: `release:whoami` checks login against
   `https://registry.npmjs.org/`, and `release:publish` runs it before
   `npm publish`.
-- Latest P4.17 validation: `npm run release:whoami` currently fails with
-  `ENEEDAUTH`, so this machine needs `npm adduser --registry=https://registry.npmjs.org/`
-  before the final publish.
+- Latest P4.17 validation: after npm login, `npm run release:whoami` succeeds
+  against `https://registry.npmjs.org/` and reports account `xuanzhu`.
 - P4.18 post-publish verification command is complete:
   `release:verify-published` checks the published npm package name, version,
   repository, homepage, bugs URL, and tarball URL against local `package.json`.
@@ -223,9 +222,18 @@ repository/homepage/bugs URL confirmation is complete for the
   `node --check scripts/check-published-package.js` passes, and
   `release:dry-run` passes with a 40-file npm tarball that includes the new
   verifier.
-- Next required release step: log in to npmjs.org, rerun `npm run
-  release:whoami`, then if `0.1.0` is confirmed as the first release, run
-  `npm run release:publish`, followed by `npm run release:verify-published`.
+- P4.19 formal npm publish execution is in progress: `npm run release:publish`
+  passed metadata checks, release gates, `npm run release:whoami`, `npm run
+  check`, `npm test`, npm package contents validation, and extension zip
+  validation before reaching `npm publish`.
+- Latest P4.19 validation: official npm publish reached
+  `https://registry.npmjs.org/` with a 40-file tarball, then failed with npm
+  `E403` because the account requires two-factor authentication OTP or a
+  granular access token with bypass 2FA enabled.
+- Next required release step: rerun
+  `npm run release:publish -- --otp=<6-digit-code>` with a current npm OTP, or
+  configure an npm granular access token that can publish with bypass 2FA; after
+  publish succeeds, run `npm run release:verify-published`.
 
 ## Known Risks
 
@@ -235,9 +243,9 @@ repository/homepage/bugs URL confirmation is complete for the
   long-tail tools can still receive the same treatment before a later release.
 - Extension broad host permissions are now documented, but should still be
   re-reviewed before any store-distributed release.
-- Package repository/homepage/bugs metadata is now publicly reachable, but the
-  final npm publish should still wait for an explicit `npm run release:dry-run`
-  review and publish confirmation.
+- Package repository/homepage/bugs metadata is publicly reachable, and the
+  final npm publish is now waiting on npm 2FA OTP or a publish-capable granular
+  access token.
 - Tool names and descriptions must stay clear enough for agents to choose the
   right route without relying on hidden model knowledge.
 

@@ -54,6 +54,7 @@
 | P4.16 | 已完成 | 正式发布脚本内置门禁 |
 | P4.17 | 已完成 | npm 登录预检门禁 |
 | P4.18 | 已完成 | npm 发布后验证命令 |
+| P4.19 | 进行中 | npm 正式发布执行 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1195,6 +1196,42 @@ metadata 与当前 `package.json` 一致。
 - `npm run release:dry-run` 通过：内置 prepublish gate 通过，官方 npm registry
   dry-run tarball 包含 40 个文件。
 
+## P4.19 npm 正式发布执行
+
+状态：进行中（2026-07-03，阻塞于 npm 2FA OTP）
+
+执行摘要：
+
+- `npm run release:whoami` 已确认当前官方 npm registry 登录账号为 `xuanzhu`。
+- 已按用户确认执行 `npm run release:publish`。
+- `release:publish` 已通过内置 `release:prepublish`、`release:whoami` 和全部本地
+  发布门禁；本次测试覆盖 59 项，58 项通过，1 项真实浏览器 smoke 按配置跳过。
+- 本次正式发布已进入 `npm publish --registry=https://registry.npmjs.org/`，tarball
+  包含 40 个文件。
+- npm registry 返回 `E403`：当前账号发布包需要双因素认证 OTP，或使用开启
+  bypass 2FA 的 granular access token。
+- 因 npm 2FA 阻塞，`yunti-browser-runtime@0.1.0` 尚未发布成功。
+
+### 目标
+
+完成 `yunti-browser-runtime@0.1.0` 首次 npm 发布，并用已发布包验证命令确认 registry
+上的版本和 metadata。
+
+### 验收标准
+
+- 使用当前有效 npm OTP 执行
+  `npm run release:publish -- --otp=<6-digit-code>`，或使用具备 publish 权限且允许
+  bypass 2FA 的 npm granular access token。
+- `npm publish` 返回成功，并显示发布到 `https://registry.npmjs.org/`。
+- `npm run release:verify-published` 返回 0，确认已发布包 name、version、
+  repository、homepage、bugs 和 tarball URL 与本地 `package.json` 匹配。
+- 发布结果同步到 `docs/PROJECT_STATUS.md`。
+
+### 当前阻塞
+
+等待 npm 2FA OTP 或可绕过 2FA 的发布 token。拿到 OTP 后只需要重跑正式发布命令，
+不需要继续增加新的发布门禁。
+
 ## 每阶段完成后的固定检查
 
 ```bash
@@ -1216,11 +1253,13 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P4.3-P4.18 已完成，当前发布前最后动作：
+P4.3-P4.18 已完成，P4.19 正在执行：
 
 - `npm run release:dry-run` 已通过内置发布前门禁和官方 npm registry 预览。
-- 先执行 `npm adduser --registry=https://registry.npmjs.org/` 完成 npm 登录。
-- 登录后执行 `npm run release:whoami` 确认认证状态。
-- 如确认要发布 `0.1.0`，执行 `npm run release:publish`。
+- `npm run release:whoami` 已确认登录账号为 `xuanzhu`。
+- `npm run release:publish` 已通过本地发布门禁，但正式 `npm publish` 被 npm 2FA
+  要求拦截。
+- 下一步使用当前 npm OTP 执行 `npm run release:publish -- --otp=<6-digit-code>`，
+  或改用具备 publish 权限且允许 bypass 2FA 的 granular access token。
 - 发布后执行 `npm run release:verify-published` 确认 npm registry 版本和 metadata。
 - 浏览器扩展如需上架商店，发布前还需重新审查 broad host permissions。

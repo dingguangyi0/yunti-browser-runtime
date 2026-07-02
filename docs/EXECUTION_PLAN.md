@@ -1052,27 +1052,6 @@ skill 文档里的本地跳转都能指向实际文件。
 - npm package contents check 通过并确认 dry-run tarball 包含 39 个文件；
   extension zip contents check 通过并确认扩展 zip 包含 12 个运行时文件。
 
-## 每阶段完成后的固定检查
-
-```bash
-npm run check
-npm test
-```
-
-涉及真实浏览器链路时额外执行：
-
-```bash
-npm run test:e2e
-```
-
-涉及文档/开源化时额外检查：
-
-```bash
-rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
-```
-
-## 当前下一步
-
 ## P4.15 npm 官方 registry 发布脚本
 
 状态：已完成（2026-07-02）
@@ -1104,6 +1083,25 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 - `npm run release:dry-run` 已通过，输出显示
   `Publishing to https://registry.npmjs.org/`。
 - npm publish dry-run tarball 包含 39 个文件。
+
+## 每阶段完成后的固定检查
+
+```bash
+npm run check
+npm test
+```
+
+涉及真实浏览器链路时额外执行：
+
+```bash
+npm run test:e2e
+```
+
+涉及文档/开源化时额外检查：
+
+```bash
+rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
+```
 
 ## 当前下一步
 

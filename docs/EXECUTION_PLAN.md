@@ -1585,6 +1585,26 @@ uid 生命周期：
 - `tests/e2e.test.js` 的 opt-in real-browser smoke 已改为先 observe，再用 observe uid
   执行 click；本切片不重写 fill/select/scroll action layer。
 
+P6.1 真实浏览器闭环验证 runbook：
+
+- 验证目标：在真实 Chromium + unpacked extension 环境中跑通
+  `observe -> click uid -> observe/verify`，证明 content script observe 生成的 fresh uid
+  能驱动现有 `yunti_click` 路径，并且点击后的页面状态可以被后续读取验证。
+- 环境准备：安装 Playwright npm 依赖和 Chromium 浏览器二进制；如果本地只安装了项目依赖但
+  缺少浏览器二进制，应先执行 Playwright 的 Chromium 安装命令，再运行本 smoke。
+- 执行命令：`YUNTI_E2E=1 npm run test:e2e`。
+- 当前 smoke 行为：测试会启动本地 bridge、加载 unpacked extension、打开本地 fixture 页面、
+  调用 `yunti_observe_page` 找到 "Click me" fresh uid、用该 uid 调用 `yunti_click`，
+  再通过页面读回确认点击计数和填充值。
+- 成功判定：`real browser extension bridge smoke` 不再 skip，测试通过，并且 artifact
+  目录没有 failure screenshot 或 error log。
+- 环境缺口判定：如果输出 `install Playwright and Chromium before running
+  YUNTI_E2E=1 npm run test:e2e`，该结果只说明当前机器缺少真实浏览器验证依赖，不代表
+  P6.1 runtime 逻辑失败；在进入 P6.2 前应重新补跑或明确记录为环境限制。
+- 失败恢复：优先查看测试输出的 artifact 目录、`failure.png` 和 `error.log`；再确认 extension
+  是否加载、bridge URL 是否写入 extension storage、页面是否刷新注册、以及
+  `yunti_list_browser_targets` 是否能看到测试页面。
+
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
 ## P6.2 稳定 DOM action 层

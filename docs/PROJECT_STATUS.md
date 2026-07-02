@@ -102,6 +102,8 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Deterministic observe fixtures now cover hidden/offscreen target handling and
   redaction edge modes in addition to fresh uid, text tree, scroll metadata,
   balanced redaction, and stale uid replacement.
+- `docs/EXECUTION_PLAN.md` now includes a P6.1 real-browser closure runbook for
+  the remaining `observe -> click uid -> observe/verify` validation gap.
 
 ## Decisions
 
@@ -152,6 +154,8 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   closure once Playwright/Chromium is available in the validation environment.
 - Keep `observe -> click uid -> observe` real-browser closure as the remaining
   P6.1 validation gap until Playwright/Chromium is available locally.
+- Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
+  broadening into P6.2 action semantics.
 - Start P6.2 fill/select/scroll action semantics only after the P6.1 closure
   gap is either verified or explicitly tracked as an environment limitation.
 - P4.1 release-readiness docs and permission review is complete.

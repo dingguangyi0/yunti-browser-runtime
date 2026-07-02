@@ -101,7 +101,8 @@ YUNTI_E2E=1 npm run test:e2e
 ```
 
 The default `npm test` run skips the real-browser smoke test unless `YUNTI_E2E=1`
-is set.
+is set. The smoke test loads the unpacked extension in Chromium and verifies the
+P6.1 `observe -> click uid -> verify` path against a local fixture page.
 
 ## Publish
 

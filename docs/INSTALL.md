@@ -212,6 +212,7 @@ YUNTI_E2E=1 npm run test:e2e
 
 It uses Playwright with a persistent Chromium profile, loads the unpacked
 extension, starts a local test page, starts the bridge, and verifies MCP list
-targets, page snapshot, click/fill, and CDP `Runtime.evaluate`. Install
+targets, page snapshot, `observe -> click uid -> verify`, fill, and CDP
+`Runtime.evaluate`. Install
 Playwright and Chromium before enabling it. Failures print the artifact
 directory containing screenshot and error log paths.

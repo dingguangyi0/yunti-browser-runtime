@@ -38,18 +38,26 @@ yunti-browser-runtime/
 
 ## 快速启动
 
+推荐作为 MCP 工具接入 Agent，由 Agent 自动启动本地 bridge：
+
 ```bash
-cd yunti-browser-runtime
-npm install
-npm run bridge
+npm install -g yunti-browser-runtime
+yunti-browser-runtime print-config -- --agent codex --human
 ```
 
-安装为 npm 包后，也可以使用 CLI：
+把输出的 MCP 配置加入 Agent 后，加载浏览器扩展并刷新任意 `http` / `https` 页面即可。
+默认不需要填写 token，不需要打开扩展 popup，也不需要保存设置。
+
+需要独立调试 bridge 时，可以手动运行：
 
 ```bash
 yunti-browser-runtime bridge
+```
+
+其他常用 CLI：
+
+```bash
 yunti-browser-runtime doctor
-yunti-browser-runtime print-config -- --agent codex --human
 yunti-browser-runtime package-extension
 ```
 
@@ -79,7 +87,37 @@ npm run doctor
 npm run doctor:json
 ```
 
+## 复制给 Agent 的安装引导
+
+把下面这段话复制给你正在使用的 Agent，让它一步步引导你安装和验证：
+
+```text
+请帮我安装并接入 Yunti Browser Runtime。它是一个本地浏览器运行时，让你通过 MCP 操作我本机 Chrome/Edge 页面。
+
+请按步骤引导我完成，不要跳步：
+
+1. 确认我本机有 Node.js 22+。
+2. 执行：npm install -g yunti-browser-runtime
+3. 执行：yunti-browser-runtime print-config -- --agent 当前Agent名称 --human
+4. 根据输出，把 MCP server 配置加入当前 Agent 的 MCP 配置。
+5. 告诉我：当前 Agent 启动 MCP server 后会自动启动本地 bridge，一般不需要单独运行 bridge。
+6. 引导我打开 Chrome/Edge 的扩展管理页，开启开发者模式，手动加载扩展目录：
+   $(npm root -g)/yunti-browser-runtime/extension
+7. 告诉我：扩展默认 bridge URL 是 http://127.0.0.1:48887，本地默认不需要 token，不需要打开 popup，也不需要保存设置。
+8. 打开任意 http/https 页面并刷新。
+9. 执行：yunti-browser-runtime doctor
+10. 如果 doctor 正常，再调用 yunti_list_browser_targets 或 yunti_get_tool_usage_hints 验证你能看到浏览器页面。
+
+注意：Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后默认立即可用，不要要求我填写 token、打开 popup 或保存设置；除非 doctor 明确提示 bridge 未运行，才让我单独执行 yunti-browser-runtime bridge。
+```
+
 ## 安装浏览器扩展
+
+npm 全局安装后，扩展目录通常是：
+
+```bash
+$(npm root -g)/yunti-browser-runtime/extension
+```
 
 开发加载方式：
 
@@ -88,10 +126,12 @@ npm run doctor:json
 3. 点击“加载已解压的扩展程序”。
 4. 选择本项目的 `extension/` 目录。
 5. 打开任意 `http` 或 `https` 页面。
-6. 点击扩展图标，确认 bridge 地址为 `http://127.0.0.1:48887`，保存设置。
-7. 刷新目标页面，确认页面已连接。
+6. 刷新目标页面即可连接。
 
-扩展只负责把页面注册到本地 bridge，并执行 Agent 发来的浏览器动作。
+扩展默认使用 `http://127.0.0.1:48887`，本地安装不需要 token，不需要打开 popup，
+也不需要保存设置。扩展 popup 首屏只显示连接状态；自定义 bridge URL、页面匹配或
+可选 token 都收在高级设置里。扩展只负责把页面注册到本地 bridge，并执行 Agent
+发来的浏览器动作。
 
 也可以生成 zip 包用于分发或归档：
 
@@ -255,7 +295,8 @@ token。
 
 ## 发布状态与后续事项
 
-- `yunti-browser-runtime@0.1.1` 已发布到官方 npm registry。
-- `0.1.1` 将本地默认使用路径改为免 bridge token。
+- `yunti-browser-runtime@0.1.3` 已发布到官方 npm registry。
+- `0.1.3` 将扩展 popup 首屏改成零配置状态面板，并补充“Agent 会自动启动 bridge”
+  的安装引导。
 - 发布后验证命令：`npm run release:verify-published`。
 - 如要上架浏览器扩展商店，需要再次审查 broad host permissions。

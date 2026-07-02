@@ -10,20 +10,23 @@
     <main>
       <h1>Yunti Browser Runtime</h1>
       <p id="status">正在读取状态...</p>
-      <label>
-        Bridge URL
-        <input id="bridgeUrl" autocomplete="off" />
-      </label>
-      <label>
-        Bridge Token
-        <input id="bridgeToken" autocomplete="off" type="password" />
-      </label>
-      <label>
-        页面匹配
-        <textarea id="platformMatches" rows="3"></textarea>
-      </label>
-      <button id="save">保存设置</button>
       <button id="refresh">刷新状态</button>
+      <details id="advancedSettings">
+        <summary>高级设置</summary>
+        <label>
+          Bridge URL
+          <input id="bridgeUrl" autocomplete="off" />
+        </label>
+        <label>
+          页面匹配
+          <textarea id="platformMatches" rows="3"></textarea>
+        </label>
+        <label>
+          Bridge Token（可选）
+          <input id="bridgeToken" autocomplete="off" type="password" />
+        </label>
+        <button id="save">保存设置</button>
+      </details>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

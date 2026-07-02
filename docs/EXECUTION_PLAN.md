@@ -56,6 +56,8 @@
 | P4.18 | 已完成 | npm 发布后验证命令 |
 | P4.19 | 已完成 | npm 正式发布执行 |
 | P5.1 | 已完成 | 本地默认免 bridge token |
+| P5.2 | 已完成 | 扩展 popup 与安装引导简化 |
+| P5.3 | 已完成 | 扩展首屏零配置 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1297,6 +1299,81 @@ metadata 与当前 `package.json` 一致。
 - `npm run release:publish` 成功发布 `yunti-browser-runtime@0.1.1`。
 - `npm run release:verify-published` 返回 0。
 
+## P5.2 扩展 popup 与安装引导简化
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- 扩展 popup 首屏不再展示 Bridge Token 输入框，避免用户误以为本地默认安装需要填写
+  token。
+- Bridge Token 移入“高级设置”，并标注为可选；如果用户已有 token 配置，高级设置会
+  自动展开。
+- popup 默认状态文案改为“默认无需设置，打开或刷新 http/https 页面即可”。
+- README 增加“复制给 Agent 的安装引导”，让用户可以把一段话交给 Agent，由 Agent
+  分步骤带用户完成 npm 安装、MCP 配置、扩展加载和 doctor 验证。
+- README / INSTALL 明确：加载扩展后默认不需要保存设置，不需要 token。
+- package 和 extension 版本同步提升到 `0.1.2`。
+
+### 目标
+
+让用户在安装扩展后尽量立即可用：默认无需填写 token、无需保存 popup 设置；需要
+自定义 bridge URL、页面匹配或 token 时再进入高级/设置路径。
+
+### 验收标准
+
+- popup 首屏不出现 Bridge Token 输入框。
+- popup 仍保留可选 token 配置能力。
+- README 包含可复制给 Agent 的安装引导词。
+- README / INSTALL 不再要求默认本地安装时点击 popup 保存 token 或保存设置。
+- `npm run release:check` 通过。
+- `npm run release:publish` 发布 `yunti-browser-runtime@0.1.2`，并通过
+  `npm run release:verify-published` 验证。
+
+### 验收记录
+
+- `npm run release:check` 通过。
+- `npm run release:publish` 成功发布 `yunti-browser-runtime@0.1.2`。
+- `npm run release:verify-published` 返回 0。
+
+## P5.3 扩展首屏零配置
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- 扩展 popup 首屏只保留连接状态和“刷新状态”，不再展示 Bridge URL、页面匹配、
+  Bridge Token 或保存按钮。
+- Bridge URL、页面匹配和可选 Bridge Token 统一收进“高级设置”；只有检测到用户已
+  配置自定义值时才自动展开。
+- popup 根据 bridge 健康状态区分“Agent MCP/bridge 未启动”和“刷新页面即可连接”，
+  避免把用户引向不必要的设置项。
+- README / INSTALL 明确：作为 MCP 接入时，Agent 启动 MCP server 后会自动启动本地
+  bridge；`yunti-browser-runtime bridge` 是独立调试路径。
+- package 和 extension 版本同步提升到 `0.1.3`。
+
+### 目标
+
+让用户在完成扩展加载后立即进入可用路径：不打开 popup、不填写 token、不保存设置；
+除非 doctor 明确提示 bridge 未运行，否则不要求用户单独启动 bridge。
+
+### 验收标准
+
+- popup 首屏没有任何输入框或保存按钮。
+- 默认本地安装仍可在刷新 http/https 页面后自动注册 session。
+- README 的复制给 Agent 引导不再把独立 `bridge` 当作必选步骤。
+- `npm run release:check` 通过。
+- `npm run release:publish` 发布 `yunti-browser-runtime@0.1.3`，并通过
+  `npm run release:verify-published` 验证。
+
+### 验收记录
+
+- `npm run release:check` 通过。
+- `npm run release:publish` 成功发布 `yunti-browser-runtime@0.1.3`。
+- 首次 `npm run release:verify-published` 遇到 npm registry 同步延迟；重试后返回 0。
+- `npm view yunti-browser-runtime version dist-tags.latest --registry=https://registry.npmjs.org/`
+  返回 `0.1.3`。
+
 ## 每阶段完成后的固定检查
 
 ```bash
@@ -1318,10 +1395,11 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P0.1-P5.1 已完成，`yunti-browser-runtime@0.1.1` 已发布到官方 npm registry。
+P0.1-P5.3 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm registry。
 
 - 发布后验证已通过：`npm run release:verify-published`。
 - 本地默认使用不再需要 bridge token；需要加固时可显式设置
   `YUNTI_BROWSER_BRIDGE_TOKEN`。
+- 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
 - 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
 - 后续版本开发前，先在本文档新增下一阶段目标、范围和验收标准。

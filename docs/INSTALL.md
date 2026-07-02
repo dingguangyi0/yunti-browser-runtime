@@ -6,9 +6,13 @@
 - Chrome, Edge, or another Chromium browser with extension developer mode.
 - An MCP-capable agent.
 
-## Start The Local Bridge
+## Bridge Startup
 
-From the project root:
+Normal MCP usage does not require manually starting the bridge. After the agent
+loads the `yunti-browser-runtime` MCP server, that stdio process starts the
+local bridge automatically.
+
+For standalone debugging from the project root:
 
 ```bash
 npm install
@@ -46,6 +50,11 @@ When installed as an npm package, the equivalent CLI command is:
 yunti-browser-runtime bridge
 ```
 
+When Yunti Browser Runtime is registered as an MCP server, the agent starts the
+stdio MCP process and that process starts the local bridge automatically. The
+standalone `bridge` command is useful for debugging, doctor checks, or manual
+extension testing.
+
 ## Load The Extension
 
 Development loading:
@@ -54,12 +63,14 @@ Development loading:
 2. Enable developer mode.
 3. Choose "Load unpacked".
 4. Select the project `extension/` directory.
-5. Click the extension icon and confirm the bridge URL is `http://127.0.0.1:48887`.
-6. Open any `http` or `https` page and click the extension icon to confirm the
-   page is connected.
+5. Open or refresh any `http` or `https` page.
+6. Do not open the extension popup unless you want to confirm status or
+   customize settings.
 
-The extension registers browser pages with the local bridge. It does not create
-agent conversations or depend on a remote workspace.
+The extension defaults to `http://127.0.0.1:48887`. Local installs do not need a
+token, opening the popup, or saving popup settings. The extension registers
+browser pages with the local bridge. It does not create agent conversations or
+depend on a remote workspace.
 
 To create a distributable zip:
 

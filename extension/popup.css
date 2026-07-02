@@ -34,6 +34,27 @@ label {
   font-size: 12px;
 }
 
+details {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+details label {
+  margin-top: 6px;
+}
+
+details button {
+  width: 100%;
+  margin-top: 6px;
+}
+
 input,
 textarea {
   width: 100%;
@@ -59,7 +80,7 @@ button {
   font: 500 13px/1 system-ui;
 }
 
-button:first-of-type {
+main > button {
   border-color: #0f766e;
   background: #0f766e;
   color: white;

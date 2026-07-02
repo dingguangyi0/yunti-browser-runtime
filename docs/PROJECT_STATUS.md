@@ -2,9 +2,10 @@
 
 ## Current Phase
 
-Patch release `yunti-browser-runtime@0.1.1` is complete. The local loopback
-bridge no longer requires a token by default, and the published package is
-verified with `npm run release:verify-published`.
+Patch release `yunti-browser-runtime@0.1.3` is complete. The local loopback
+bridge no longer requires a token by default, the extension popup no longer
+shows settings as a first-run task, and the published package is verified with
+`npm run release:verify-published`.
 
 ## Current State
 
@@ -42,7 +43,9 @@ verified with `npm run release:verify-published`.
 - `npm run release:dry-run` and `npm run release:publish` pin the official npm
   registry at `https://registry.npmjs.org/`, avoiding accidental publication to
   a locally configured mirror registry.
-- `yunti-browser-runtime@0.1.1` is published on the official npm registry.
+- `yunti-browser-runtime@0.1.3` is published on the official npm registry.
+- Extension popup is a zero-config status panel by default; Bridge URL, page
+  matching, and optional Bridge Token stay under advanced settings.
 - `npm run test:e2e` provides an opt-in real-browser Playwright smoke test for
   extension loading, page registration, MCP target listing, snapshot, click/fill,
   and CDP `Runtime.evaluate`.
@@ -248,6 +251,22 @@ verified with `npm run release:verify-published`.
   real-browser smoke skipped by configuration; `npm run check` and
   `npm run release:check` passed; `npm run release:publish` published
   `yunti-browser-runtime@0.1.1`; `npm run release:verify-published` returned 0.
+- P5.2 extension popup and onboarding simplification is complete: Bridge Token
+  is now optional under advanced settings, README contains a copyable Agent
+  installation prompt, and default extension loading no longer asks users to
+  save popup settings.
+- Latest P5.2 validation: `npm run release:check` passed; `npm run
+  release:publish` published `yunti-browser-runtime@0.1.2`; `npm run
+  release:verify-published` returned 0.
+- P5.3 extension zero-config first-run is complete: popup first screen now only
+  shows connection status plus refresh, optional Bridge URL/page match/token
+  controls are hidden under advanced settings, and docs explain that the MCP
+  server starts the local bridge automatically.
+- Latest P5.3 validation: `npm run release:check` passed; `npm run
+  release:publish` published `yunti-browser-runtime@0.1.3`; a first
+  `npm run release:verify-published` hit npm registry lag, then a retry passed
+  and `npm view yunti-browser-runtime version dist-tags.latest` returned
+  `0.1.3`.
 
 ## Known Risks
 

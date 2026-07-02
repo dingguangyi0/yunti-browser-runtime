@@ -95,7 +95,7 @@ function humanOutput(payload) {
     "",
     `Project root: ${payload.projectRoot}`,
     `MCP server: ${payload.mcpServerPath}`,
-    `Bridge port: ${payload.bridge.port}`,
+    `Bridge port: ${payload.bridge.port} (started automatically by the MCP server)`,
     `Token: ${payload.bridge.tokenInstruction}`,
     `Skill: ${payload.skill.sourcePath}`,
     payload.ok ? "" : `Unsupported agent "${payload.agent}". Supported: ${payload.supportedAgents.join(", ")}`,

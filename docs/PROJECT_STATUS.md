@@ -110,6 +110,9 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Implementation should proceed step by step: first use Page Agent/browser-use
   as the concrete reference for P6.1 page observation and P6.2 indexed actions,
   then absorb Playwright/CDP/BrowserGym-style reliability and diagnostics later.
+- Each `0.2.0` implementation slice should be documented before code changes:
+  user-facing capability, compatibility rule, non-goals, acceptance checks, and
+  why it strengthens Yunti's own direction.
 - Yunti should not require an LLM API key, mandatory hub tab, side panel, or
   single black-box `execute_task` tool in the default path.
 - Yunti should preserve its own distinctive capabilities: fine-grained MCP
@@ -119,7 +122,9 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 ## Open Work
 
 - Follow `docs/NEXT_MAJOR_PLAN.md` for the next major cycle.
-- Start P6.1 by defining and implementing `yunti_observe_page`.
+- Start P6.1 by confirming the `yunti_observe_page` output contract, uid
+  relationship, default redaction, and first `observe -> click uid -> observe`
+  smoke path before implementation.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

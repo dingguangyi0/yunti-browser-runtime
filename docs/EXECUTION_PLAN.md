@@ -59,7 +59,7 @@
 | P5.2 | 已完成 | 扩展 popup 与安装引导简化 |
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
-| P6.1 | 计划中 | Agent 友好的页面观察 |
+| P6.1 | 文档准备中 | Agent 友好的页面观察契约 |
 | P6.2 | 计划中 | 稳定 DOM action 层 |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
@@ -1423,7 +1423,7 @@ Yunti 自己的特色。后续实现应直接从仓库文档恢复目标、非�
 
 ## P6.1 Agent 友好的页面观察
 
-状态：计划中
+状态：文档准备中
 
 目标：
 
@@ -1432,6 +1432,33 @@ Yunti 自己的特色。后续实现应直接从仓库文档恢复目标、非�
 
 第一阶段以 Page Agent 的 PageController / browser-state 思路为主要参考，但实现要适配
 Yunti 的 MCP/extension/bridge 架构。
+
+### 文档先行约束
+
+在动功能代码前，先确认以下契约：
+
+- `yunti_observe_page` 是增量增强，不替换或破坏 `yunti_get_page_snapshot` 与
+  `yunti_take_snapshot`。
+- 第一版优先走 content script DOM collection，使基础页面观察不依赖 CDP attach。
+- 输出同时包含结构化字段和紧凑文本树，便于程序消费和 LLM prompt 消费。
+- uid 与最新 observation 绑定；uid 过期、缺失或不可见时，错误提示应引导重新调用
+  `yunti_observe_page`。
+- 默认不返回 password、token-like、credential-like 输入值；完整 DOM 脱敏策略放到
+  P6.4 深化。
+
+### 本阶段不做
+
+- 不把 LLM task loop 放进 runtime。
+- 不引入必选 hub tab、side panel 或运行时控制台。
+- 不做完整 Playwright locator engine。
+- 不做大规模 benchmark harness，只做最小 fixture/smoke。
+- 不混入 remote multi-user browser orchestration。
+
+### 第一批验收
+
+- 文档确认 `yunti_observe_page` 的输出契约、uid 关系、默认脱敏和第一条 smoke 路径。
+- 后续代码实现再进入 schema、content script collection、dispatcher routing、测试和
+  skill/docs 更新。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -1446,6 +1473,21 @@ Yunti 的 MCP/extension/bridge 架构。
 
 第一阶段优先参考 Page Agent 的 click/input/select/scroll 事件序列；Playwright/CDP 风格
 的 auto-wait、trace 和更深诊断后续再逐步补。
+
+### 文档先行约束
+
+- 保持现有 `yunti_click`、`yunti_hover`、`yunti_fill`、`yunti_select`、
+  `yunti_type_text`、`yunti_press_key`、`yunti_scroll` 工具名稳定。
+- 让 uid action 自然衔接 P6.1 `yunti_observe_page`。
+- 错误提示要帮助 Agent 判断下一步是重新 observe、scroll、wait、switch tab，还是使用
+  selector/coordinate fallback。
+- 保留 CDP、selector 和 coordinate fallback，不把动作层收窄成 page-only abstraction。
+
+### 本阶段不做
+
+- 不引入隐藏细粒度工具的大型 action runner。
+- 不要求用户打开 mandatory replay/trace UI。
+- 不移除现有 CDP fallback 能力。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -1522,6 +1564,6 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
 - `0.2.0 Best Browser Automation Runtime` 的大版本计划已沉淀到
   `docs/NEXT_MAJOR_PLAN.md`。
-- 下一步从 P6.1 `yunti_observe_page` 开始。
+- 下一步先完成 P6.1 文档契约确认，再开始 `yunti_observe_page` 代码实现。
 - 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
 - 后续版本开发前，先按 `docs/NEXT_MAJOR_PLAN.md` 拆阶段执行并更新本文档验收记录。

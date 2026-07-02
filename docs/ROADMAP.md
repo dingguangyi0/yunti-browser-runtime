@@ -54,6 +54,8 @@ plan.
   browser-use, Page Agent, BrowserGym, and extension runtimes.
 - Sequence the work: first implement the Page Agent / browser-use inspired
   observe/action spine, then absorb the other ecosystem lessons step by step.
+- Keep planning ahead of code for each slice: confirm the user-facing capability,
+  compatibility rule, non-goals, and validation path before implementation.
 - Add agent-friendly page observation with text DOM, stable uids, and scroll
   hints.
 - Improve DOM actions for click, fill, select, contenteditable, and scrollable

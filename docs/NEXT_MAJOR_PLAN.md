@@ -27,6 +27,27 @@ on Page Agent / browser-use style page observation and indexed actions. Other
 ecosystem lessons are backlog inputs for later phases after the observe/action
 spine is stable.
 
+## Planning Discipline Before Code
+
+Before each implementation slice, update this document and
+`docs/EXECUTION_PLAN.md` with the concrete scope, non-goals, acceptance checks,
+and the reason the slice strengthens Yunti's own product direction.
+
+This prevents two failure modes:
+
+- copying a reference project's architecture instead of extracting useful
+  concepts;
+- starting a broad rewrite before the current Yunti tool surface has a stable
+  incremental path forward.
+
+For `0.2.0`, code should move only after the relevant phase has:
+
+- a user-facing capability statement;
+- a stable tool/API contract or compatibility rule;
+- an explicit "not this phase" list;
+- tests or smoke checks that prove the slice works;
+- documentation updates that an external agent can follow.
+
 ## Yunti-First Principle
 
 Yunti should not become a clone of any single existing tool. Every browser
@@ -126,6 +147,27 @@ How Yunti should differ:
 When a design choice conflicts with Yunti's current strengths, keep Yunti's
 current strengths.
 
+## Reference Absorption Ladder
+
+Yunti should absorb browser automation ideas in this order:
+
+1. **Observe/action spine**: Page Agent and browser-use inspire compact page
+   observation, indexed interactive elements, and scroll hints.
+2. **Action reliability**: Playwright, Puppeteer, and Selenium inspire more
+   predictable clicking, filling, selecting, waiting, and upload behavior.
+3. **Diagnostics and escape hatches**: CDP remains Yunti's deep browser-control
+   layer for screenshots, network, console, targets, runtime evaluation, and
+   lower-level recovery.
+4. **Regression confidence**: BrowserGym-style fixtures and scenario checks
+   help measure whether common browser actions keep working.
+5. **Operator experience**: extension/runtime patterns help reduce install
+   friction and make connection health visible without adding mandatory UI.
+
+Each rung must be additive. If a new idea requires removing fine-grained
+`yunti_*` tools, hiding browser state behind an opaque task runner, or requiring
+an LLM provider key inside the runtime, it does not belong in the default
+`0.2.0` path.
+
 ## Non Goals
 
 - Do not require an LLM API key inside Yunti Browser Runtime.
@@ -188,6 +230,27 @@ to Yunti's MCP/extension architecture. It returns:
 - clear next-step hints when no elements are visible, the page is restricted, or
   the content script is stale.
 
+First slice:
+
+- add the tool as an additive replacement path, not a breaking change to
+  `yunti_get_page_snapshot` or `yunti_take_snapshot`;
+- prefer content-script DOM collection first so basic observation works without
+  CDP attachment;
+- return both structured fields and a compact text tree so agents can choose
+  programmatic or prompt-oriented consumption;
+- keep uid generation scoped to the latest observation and make stale uid errors
+  point back to `yunti_observe_page`;
+- redact sensitive input values by default, even before the full P6.4 policy is
+  complete.
+
+Not this phase:
+
+- no LLM task loop inside the runtime;
+- no Page Agent hub tab, side panel, or visual console requirement;
+- no full Playwright-style locator engine;
+- no benchmark harness beyond a focused fixture/smoke test;
+- no remote multi-user browser orchestration.
+
 Acceptance:
 
 - `yunti_observe_page` works on a simple page without CDP attachment.
@@ -215,6 +278,21 @@ Scope:
   fallback behavior;
 - support scrolling the document or a scrollable container by uid;
 - return structured action results with before/after summary where useful.
+
+First slice:
+
+- keep existing `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
+  `yunti_type_text`, `yunti_press_key`, and `yunti_scroll` names stable;
+- make uid-based actions work naturally after `yunti_observe_page`;
+- improve errors so agents understand whether to observe again, scroll, wait, or
+  switch tabs;
+- keep selector and coordinate fallbacks available for recovery and debugging.
+
+Not this phase:
+
+- no large action-runner abstraction that hides individual tool calls;
+- no mandatory replay/trace UI;
+- no removal of CDP-based fallback behavior.
 
 Acceptance:
 
@@ -369,11 +447,19 @@ npm run release:verify-published
 
 ## Current Next Step
 
-Start with P6.1:
+Start with docs-first P6.1 preparation:
 
-1. Define the `yunti_observe_page` schema in `mcp/tools.js`.
-2. Implement content-script collection for page metrics and interactive text
-   tree.
-3. Add routing through the extension dispatcher.
-4. Add unit tests for schema/routing and an E2E smoke update.
-5. Update skill and docs to prefer observe-first workflows.
+1. Confirm the `yunti_observe_page` output contract in this plan and
+   `docs/EXECUTION_PLAN.md`.
+2. Confirm how its uid map relates to existing `yunti_take_snapshot` uid
+   behavior.
+3. Confirm the first smoke fixture: `observe -> click uid -> observe`.
+4. Confirm default redaction rules for password/token-like values.
+5. Only then begin the implementation slice:
+
+   - define the `yunti_observe_page` schema in `mcp/tools.js`;
+   - implement content-script collection for page metrics and interactive text
+     tree;
+   - add routing through the extension dispatcher;
+   - add unit tests for schema/routing and an E2E smoke update;
+   - update skill and docs to prefer observe-first workflows.

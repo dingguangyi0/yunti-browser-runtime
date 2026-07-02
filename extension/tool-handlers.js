@@ -73,6 +73,8 @@ export function createToolDispatcher({
         result = await evaluateScript(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_take_snapshot") {
         result = await takeSnapshot(tabId, session, event.arguments || {})
+      } else if (event.tool === "yunti_observe_page") {
+        result = await observePage(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_click") {
         result = await clickByUid(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_hover") {
@@ -343,8 +345,8 @@ export function createToolDispatcher({
     }
   }
   
-  // Snapshot state — maps uid to element info for click/fill/hover
-  const snapshotStore = new Map()
+  // Latest page uid state from yunti_observe_page or yunti_take_snapshot.
+  const pageUidStore = new Map()
   
   async function takeSnapshot(tabId, session, args = {}) {
     const maxElements = Number.isFinite(Number(args.maxElements))
@@ -367,12 +369,7 @@ export function createToolDispatcher({
       elements = await domFallbackSnapshot(tabId, maxElements)
     }
   
-    // Build uid mapping
-    const uidMap = {}
-    for (const el of elements) {
-      uidMap[el.uid] = { ...el }
-    }
-    snapshotStore.set(session.browserSessionId, uidMap)
+    storePageUidMap(session, "snapshot", elements)
   
     return {
       browserSessionId: session.browserSessionId,
@@ -382,6 +379,35 @@ export function createToolDispatcher({
       elementCount: elements.length,
       snapshotId: `snap-${Date.now()}`,
     }
+  }
+
+  async function observePage(tabId, session, args = {}) {
+    const observation = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_observe_page",
+      arguments: args,
+    })
+    if (Array.isArray(observation?.elements)) {
+      storePageUidMap(session, "observe", observation.elements, {
+        observationId: observation.observationId,
+        uidMapVersion: observation.uidMapVersion,
+      })
+    }
+    return observation
+  }
+
+  function storePageUidMap(session, source, elements, meta = {}) {
+    const uidMap = {}
+    for (const el of elements || []) {
+      if (!el?.uid) continue
+      uidMap[el.uid] = { ...el, source }
+    }
+    pageUidStore.set(session.browserSessionId, {
+      source,
+      uidMap,
+      storedAt: Date.now(),
+      ...meta,
+    })
   }
   
   function flattenAXTree(nodes, maxElements, includeHidden) {
@@ -695,9 +721,12 @@ export function createToolDispatcher({
   }
   
   async function resolveUidCenter(tabId, session, uid) {
-    const uidMap = snapshotStore.get(session.browserSessionId)
+    const uidState = pageUidStore.get(session.browserSessionId)
+    const uidMap = uidState?.uidMap
     if (!uidMap || !uidMap[uid]) {
-      throw new Error(`uid ${uid} not found. Run yunti_take_snapshot first.`)
+      throw new Error(
+        `uid ${uid} not found in the latest page uid map. Run yunti_observe_page or yunti_take_snapshot again before retrying.`
+      )
     }
     const el = uidMap[uid]
   
@@ -724,7 +753,7 @@ export function createToolDispatcher({
       }
     }
   
-    throw new Error(`Cannot resolve coordinates for uid ${uid}. Element may be off-screen or hidden.`)
+    throw new Error(`Cannot resolve coordinates for uid ${uid}. Element may be off-screen, hidden, or stale. Run yunti_observe_page again before retrying.`)
   }
   
   async function mouseClick(tabId, x, y, clickCount = 1) {

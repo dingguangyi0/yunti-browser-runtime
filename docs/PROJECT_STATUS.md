@@ -89,13 +89,14 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Product-specific fixed conversation, workspace, and side-panel entry points
   have been removed from the standalone extension.
 - The next major execution plan is captured in `docs/NEXT_MAJOR_PLAN.md`.
-- P6.1 content-script observe MVP has started: `yunti_observe_page` now has an
+- P6.1 observe/action compatibility has started: `yunti_observe_page` now has an
   MCP tool schema, observe-first usage hints, bridge routing contract tests, a
   content-script DOM observer, focused DOM observer tests, and an opt-in
-  real-browser smoke assertion. The uid map/action compatibility layer is not
-  implemented yet.
-- Latest P6.1 observe MVP validation: `git diff --check` passed,
-  `npm run release:check` passed with 64 passing node:test cases and 1 skipped
+  real-browser smoke assertion. Fresh observe uids now feed the existing
+  click/hover/fill uid resolver while preserving the `yunti_take_snapshot`
+  compatibility path.
+- Latest P6.1 observe/action validation: `git diff --check` passed,
+  `npm run release:check` passed with 66 passing node:test cases and 1 skipped
   real-browser smoke by default, and `YUNTI_E2E=1 npm run test:e2e` skipped
   because Playwright/Chromium is not installed in the current environment.
 
@@ -137,17 +138,17 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   tools, real Chrome/Edge state, CDP, screenshots, network/console diagnostics,
   tab control, local bridge routing, and zero-config local install.
 - P6.1 implementation is proceeding in small slices: schema/tool hints/bridge
-  routing are complete, content-script observation MVP is underway, and uid
-  map/action compatibility plus observe/action E2E remain separate follow-up
-  slices.
+  routing are complete, content-script observation MVP is underway, and fresh
+  observe uids now feed existing uid-based actions without replacing the
+  snapshot path.
 
 ## Open Work
 
 - Follow `docs/NEXT_MAJOR_PLAN.md` for the next major cycle.
-- Continue P6.1 with uid map/action compatibility so fresh observation uids can
-  drive existing click/fill/hover paths without breaking `yunti_take_snapshot`.
+- Continue P6.1 with a verified `observe -> click uid -> observe` real-browser
+  closure once Playwright/Chromium is available in the validation environment.
 - Expand deterministic observe fixtures for dynamic/stale uid behavior before
-  broadening action semantics.
+  broadening fill/select/scroll action semantics.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

@@ -192,6 +192,20 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   13 files, `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium
   is not installed in the current environment, and the token residue grep
   returned no matches.
+- Coordinate fallback `yunti_hover` now returns additive structured action
+  result fields (`action`, `target`, `ok`, `recoverable`, and `nextStepHint`)
+  while preserving the existing `hovered`, `x/y`, `method`, and
+  `browserSessionId` compatibility fields. Coordinate hover dispatch semantics
+  are intentionally unchanged in this slice.
+- Latest P6.2 coordinate-hover structured result targeted validation: `git diff
+  --check` passed and `node --test tests/tool-handlers.test.js` passed 7 tests.
+- Latest P6.2 coordinate-hover structured result full validation: `git diff
+  --check` passed, `npm run release:check` passed with 75 passing node:test
+  cases and 1 skipped real-browser smoke by default, npm package contents
+  validation passed with 42 files, extension zip contents validation passed with
+  13 files, `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium
+  is not installed in the current environment, and the token residue grep
+  returned no matches.
 
 ## Decisions
 

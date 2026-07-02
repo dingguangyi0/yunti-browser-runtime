@@ -560,7 +560,20 @@ export function createToolDispatcher({
         throw new Error("yunti_hover coordinate mode requires both x and y. Call yunti_take_snapshot to get uid, pass selector, or provide both coordinates.")
       }
       await mouseMove(tabId, x, y)
-      return { hovered: true, x: Math.round(x), y: Math.round(y), browserSessionId: session.browserSessionId, method: "coordinate" }
+      const roundedX = Math.round(x)
+      const roundedY = Math.round(y)
+      return {
+        hovered: true,
+        x: roundedX,
+        y: roundedY,
+        browserSessionId: session.browserSessionId,
+        method: "coordinate",
+        action: "hover",
+        target: { method: "coordinate", x: roundedX, y: roundedY },
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Coordinate hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+      }
     }
     const selector = String(args.selector || "").trim()
     if (!selector) {

@@ -160,6 +160,38 @@ test("coordinate click preserves compatibility fields with structured result", a
   }
 })
 
+test("coordinate hover preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness()
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-hover-coordinate",
+      tool: "yunti_hover",
+      arguments: { x: 44.4, y: 88.8 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      hovered: true,
+      x: 44,
+      y: 89,
+      browserSessionId: "tab-1",
+      method: "coordinate",
+      action: "hover",
+      target: { method: "coordinate", x: 44, y: 89 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Coordinate hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
+      ["mouseMoved"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("dispatcher preserves current action result shapes", async () => {
   const harness = createDispatcherHarness({
     observations: [

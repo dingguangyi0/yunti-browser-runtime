@@ -196,6 +196,11 @@ test("dispatcher preserves current action result shapes", async () => {
       x: 60,
       y: 40,
       browserSessionId: "tab-1",
+      action: "hover",
+      target: { uid: "yunti-click", x: 60, y: 40 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Hover dispatched. Observe again or read page state to verify menus, tooltips, or hover-only controls.",
     })
 
     await harness.dispatcher.executeToolRequest(123, session, {

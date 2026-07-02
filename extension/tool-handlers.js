@@ -693,7 +693,20 @@ export function createToolDispatcher({
   async function hoverViaSnapshotUid(tabId, session, uid) {
     const { x, y } = await resolveUidCenter(tabId, session, uid)
     await mouseMove(tabId, x, y)
-    return { hovered: true, uid, x: Math.round(x), y: Math.round(y), browserSessionId: session.browserSessionId }
+    const roundedX = Math.round(x)
+    const roundedY = Math.round(y)
+    return {
+      hovered: true,
+      uid,
+      x: roundedX,
+      y: roundedY,
+      browserSessionId: session.browserSessionId,
+      action: "hover",
+      target: { uid, x: roundedX, y: roundedY },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Hover dispatched. Observe again or read page state to verify menus, tooltips, or hover-only controls.",
+    }
   }
   
   async function clickAtCoordinate(tabId, session, x, y) {

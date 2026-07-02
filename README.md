@@ -217,6 +217,12 @@ npm adduser --registry=https://registry.npmjs.org/
 npm run release:whoami
 ```
 
+发布后运行：
+
+```bash
+npm run release:verify-published
+```
+
 真实浏览器 E2E smoke test 默认跳过；需要本机安装 Playwright / Chromium 后显式启用：
 
 ```bash

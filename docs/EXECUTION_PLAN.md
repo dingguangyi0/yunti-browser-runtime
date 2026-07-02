@@ -53,6 +53,7 @@
 | P4.15 | 已完成 | npm 官方 registry 发布脚本 |
 | P4.16 | 已完成 | 正式发布脚本内置门禁 |
 | P4.17 | 已完成 | npm 登录预检门禁 |
+| P4.18 | 已完成 | npm 发布后验证命令 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1153,6 +1154,47 @@ release gate、npm package 内容检查和 extension zip 内容检查。
   `https://registry.npmjs.org/`。
 - `release:publish` 已内置登录预检；登录前不会进入正式 npm publish。
 
+## P4.18 npm 发布后验证命令
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- 新增 `scripts/check-published-package.js`，从官方 npm registry 读取
+  `yunti-browser-runtime@0.1.0` 的发布信息。
+- 新增 `npm run release:verify-published`，校验已发布包的 name、version、
+  repository、homepage、bugs 和 dist tarball URL。
+- `npm run check` 已纳入 `scripts/check-published-package.js` 的语法检查。
+- `npm run release:check` 的 npm package contents gate 已要求 tarball 包含
+  `scripts/check-published-package.js`。
+- README、`docs/RELEASE.md` 和项目状态已同步发布后验证命令。
+
+### 目标
+
+把发布后的 `npm view` 人工检查固化为脚本，确保 npm registry 上的实际包版本和
+metadata 与当前 `package.json` 一致。
+
+### 验收标准
+
+- `npm run release:verify-published` 会读取官方 npm registry。
+- 已发布版本的 name、version、repository、homepage、bugs 和 tarball URL 与当前
+  `package.json` 匹配时命令返回 0。
+- 当前版本未发布时，命令返回非零退出码并输出结构化 JSON 报告。
+- 未发布失败路径不会把 npm 本机 debug log 路径写入 JSON 报告。
+- `npm run release:check` 继续通过，且 npm tarball 包含发布后验证脚本。
+
+### 验收记录
+
+- `npm run release:verify-published` 当前返回非零退出码，报告
+  `yunti-browser-runtime@0.1.0` 尚未发布到 `https://registry.npmjs.org/`；
+  失败路径输出结构化 JSON，且不包含 npm 本机 debug log 路径。
+- `node --check scripts/check-published-package.js` 通过。
+- `npm run release:check` 通过：`npm run check` 已覆盖
+  `scripts/check-published-package.js`，npm package contents check 确认 tarball
+  包含 40 个文件。
+- `npm run release:dry-run` 通过：内置 prepublish gate 通过，官方 npm registry
+  dry-run tarball 包含 40 个文件。
+
 ## 每阶段完成后的固定检查
 
 ```bash
@@ -1174,10 +1216,11 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P4.3-P4.17 已完成，当前发布前最后动作：
+P4.3-P4.18 已完成，当前发布前最后动作：
 
 - `npm run release:dry-run` 已通过内置发布前门禁和官方 npm registry 预览。
 - 先执行 `npm adduser --registry=https://registry.npmjs.org/` 完成 npm 登录。
 - 登录后执行 `npm run release:whoami` 确认认证状态。
 - 如确认要发布 `0.1.0`，执行 `npm run release:publish`。
+- 发布后执行 `npm run release:verify-published` 确认 npm registry 版本和 metadata。
 - 浏览器扩展如需上架商店，发布前还需重新审查 broad host permissions。

@@ -127,8 +127,7 @@ npm run release:whoami
 After publishing, verify:
 
 ```bash
-npm view yunti-browser-runtime version
-npm view yunti-browser-runtime repository homepage bugs --json
+npm run release:verify-published
 ```
 
 ## Post-Release

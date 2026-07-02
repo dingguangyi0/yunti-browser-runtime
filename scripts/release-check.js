@@ -335,6 +335,7 @@ function checkPackageContents() {
     "docs/RELEASE.md",
     "docs/PUBLISHING_BLOCKERS.md",
     "scripts/check-package-metadata.js",
+    "scripts/check-published-package.js",
     "scripts/release-check.js",
   ]
 

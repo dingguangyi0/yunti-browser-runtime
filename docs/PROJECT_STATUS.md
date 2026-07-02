@@ -215,9 +215,17 @@ repository/homepage/bugs URL confirmation is complete for the
 - Latest P4.17 validation: `npm run release:whoami` currently fails with
   `ENEEDAUTH`, so this machine needs `npm adduser --registry=https://registry.npmjs.org/`
   before the final publish.
+- P4.18 post-publish verification command is complete:
+  `release:verify-published` checks the published npm package name, version,
+  repository, homepage, bugs URL, and tarball URL against local `package.json`.
+- Latest P4.18 validation: `release:verify-published` currently fails with a
+  structured unpublished-package report for `yunti-browser-runtime@0.1.0`,
+  `node --check scripts/check-published-package.js` passes, and
+  `release:dry-run` passes with a 40-file npm tarball that includes the new
+  verifier.
 - Next required release step: log in to npmjs.org, rerun `npm run
   release:whoami`, then if `0.1.0` is confirmed as the first release, run
-  `npm run release:publish`.
+  `npm run release:publish`, followed by `npm run release:verify-published`.
 
 ## Known Risks
 

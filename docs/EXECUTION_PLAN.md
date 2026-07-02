@@ -2033,6 +2033,17 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   用例，其中 92 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
   包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
   test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
+- `yunti_scroll` 已增加无位移诊断：当 content-script 返回的 `before` / `after`
+  scroll position 可比较时，runtime 会追加 `moved`；若位置未变化，则返回
+  `code: "NO_SCROLL_MOVEMENT"`、`ok: false`、`recoverable: true`，并提示 observe、
+  检查边界、尝试最近的 scrollable container uid 或停止重复同一 scroll。本切片不改变
+  原有 scroll 派发路径和 `scrolled`、`target`、`before/after` 兼容字段。
+- 最新 targeted 验证：`node --test tests/tool-handlers.test.js` 通过 24 项。
+- 最新 full 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js
+  tests/bridge.test.js` 通过 89 项；`npm run release:check` 通过，覆盖 94 个 node:test
+  用例，其中 93 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
+  包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
+  test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

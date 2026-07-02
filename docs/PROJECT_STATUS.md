@@ -457,6 +457,21 @@ fill/select/scroll semantics.
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
+- P6.2 scroll boundary diagnostics now report movement when before/after scroll
+  positions are comparable. A scroll that dispatches but does not move returns
+  `moved: false`, `code: "NO_SCROLL_MOVEMENT"`, `ok: false`, and
+  `recoverable: true`, while preserving existing `scrolled`, `target`, and
+  before/after compatibility fields.
+- Latest P6.2 scroll no-movement targeted validation:
+  `node --test tests/tool-handlers.test.js` passed 24 tests.
+- Latest P6.2 scroll no-movement full validation: `git diff --check` passed;
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 89
+  tests; `npm run release:check` passed with 94 node:test cases total, 93
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
 
 ## Decisions
 

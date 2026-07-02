@@ -397,6 +397,7 @@ test("dispatcher preserves current action result shapes", async () => {
       after: { left: 0, top: 600 },
       browserSessionId: "tab-1",
       action: "scroll",
+      moved: true,
       ok: true,
       recoverable: false,
       nextStepHint: "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
@@ -471,9 +472,52 @@ test("uid scroll uses observed scrollable container center and preserves result 
       uid: "scroll-1",
       method: "uid",
       scrollTarget: { uid: "scroll-1", method: "uid" },
+      moved: true,
       ok: true,
       recoverable: false,
       nextStepHint: "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("scroll no movement reports recoverable boundary diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_scroll: {
+        scrolled: true,
+        deltaX: 0,
+        deltaY: 600,
+        target: "document",
+        before: { left: 0, top: 1200 },
+        after: { left: 0, top: 1200 },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-boundary",
+      tool: "yunti_scroll",
+      arguments: { deltaY: 600 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      scrolled: true,
+      deltaX: 0,
+      deltaY: 600,
+      target: "document",
+      before: { left: 0, top: 1200 },
+      after: { left: 0, top: 1200 },
+      browserSessionId: "tab-1",
+      action: "scroll",
+      moved: false,
+      code: "NO_SCROLL_MOVEMENT",
+      ok: false,
+      recoverable: true,
+      nextStepHint: "Scroll dispatched but before/after positions did not change. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.",
     })
   } finally {
     harness.restore()

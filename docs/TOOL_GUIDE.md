@@ -116,8 +116,12 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   compatible.
 - Uid scroll preserves the existing `target` compatibility field and adds
   `uid`, `method: "uid"`, and `scrollTarget` for structured interpretation.
+- When `before` / `after` positions are comparable, scroll results include
+  `moved`; if positions do not change, the result reports
+  `code: "NO_SCROLL_MOVEMENT"`, `ok: false`, and `recoverable: true`.
 - After scrolling, observe again and compare document or container `before` /
-  `after` positions before assuming the needed element is visible.
+  `after` positions before assuming the needed element is visible. Stop
+  repeating the same scroll when `moved: false` appears.
 
 ## Select Guidance
 

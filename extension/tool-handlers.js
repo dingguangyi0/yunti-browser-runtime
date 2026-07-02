@@ -767,17 +767,32 @@ export function createToolDispatcher({
       return result
     }
 
+    const hasComparableScrollPosition =
+      Number.isFinite(Number(result.before?.left)) &&
+      Number.isFinite(Number(result.before?.top)) &&
+      Number.isFinite(Number(result.after?.left)) &&
+      Number.isFinite(Number(result.after?.top))
+    const moved = hasComparableScrollPosition
+      ? Number(result.before.left) !== Number(result.after.left) ||
+        Number(result.before.top) !== Number(result.after.top)
+      : undefined
+    const noMovement = moved === false
+
     return {
       ...result,
       browserSessionId: session.browserSessionId,
       action: "scroll",
       ...(uid ? { uid, method: "uid" } : {}),
       ...(uid ? { scrollTarget: { uid, method: "uid" } } : {}),
-      ok: true,
-      recoverable: false,
-      nextStepHint: uid
-        ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
-        : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
+      ...(moved !== undefined ? { moved } : {}),
+      ...(noMovement ? { code: "NO_SCROLL_MOVEMENT" } : {}),
+      ok: !noMovement,
+      recoverable: noMovement,
+      nextStepHint: noMovement
+        ? "Scroll dispatched but before/after positions did not change. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll."
+        : uid
+          ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
+          : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
     }
   }
 

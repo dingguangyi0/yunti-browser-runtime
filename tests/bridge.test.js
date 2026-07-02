@@ -665,7 +665,10 @@ test("mcp usage hints include action recovery guidance", async () => {
   const scrollPayload = JSON.parse(scrollResponse.result.content[0].text)
   assert.match(scrollPayload.tools.yunti_scroll.notes.join("\n"), /scrollable container uid/)
   assert.match(scrollPayload.tools.yunti_scroll.notes.join("\n"), /scrollTarget/)
+  assert.match(scrollPayload.tools.yunti_scroll.notes.join("\n"), /NO_SCROLL_MOVEMENT/)
   assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /fresh scrollable container uid/)
+  assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /No movement/)
+  assert.match(scrollPayload.tools.yunti_scroll.commonMistakes.join("\n"), /moved=false/)
 
   const workflowResponse = await handleJsonRpc({
     jsonrpc: "2.0",

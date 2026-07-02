@@ -73,9 +73,10 @@
   `observe -> click uid -> observe/verify` 真实浏览器闭环。
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
-  scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback。
-- P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 drag 或 upload，同时保留
-  所有既有兼容字段与 CDP fallback。
+  scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
+  upload uid/selector path。
+- P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 drag，同时保留所有既有
+  兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1861,6 +1862,19 @@ P6.1 真实浏览器闭环验证 runbook：
 - 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
   通过 14 项。
 - 最新完整验证：`npm run release:check` 通过，覆盖 83 个 node:test 用例，其中 82 个
+  通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
+  npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
+  因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 `yunti_upload_file` uid path 和 selector path
+  结果增量追加结构化字段：`action: "upload_file"`、`target`、`ok`、`recoverable`、
+  `nextStepHint` 和 `browserSessionId`，同时保留 `uploaded`、`fileCount`、`filePaths`
+  兼容字段；本切片不改 `DOM.getNodeForLocation`、`DOM.querySelector`、`DOM.describeNode`
+  或 `DOM.setFileInputFiles` 上传语义。
+- `tests/tool-handlers.test.js` 已新增 uid upload_file 和 selector upload_file 断言，确保结构化
+  字段不会替代或破坏既有 upload 返回。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 16 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 85 个 node:test 用例，其中 84 个
   通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
   npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
   因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。

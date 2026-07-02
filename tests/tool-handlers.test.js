@@ -683,6 +683,101 @@ test("selector press key preserves content result with structured result", async
   }
 })
 
+test("uid upload file preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-upload",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-file",
+            role: "textbox",
+            name: "Upload",
+            rect: { x: 30, y: 90, width: 160, height: 30 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      { backendNodeId: 1234 },
+      {},
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-upload-uid",
+      tool: "yunti_upload_file",
+      arguments: { uid: "yunti-file", filePaths: ["/tmp/example.txt"] },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      uploaded: true,
+      fileCount: 1,
+      filePaths: ["/tmp/example.txt"],
+      browserSessionId: "tab-1",
+      action: "upload_file",
+      target: { uid: "yunti-file", method: "uid" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "File upload dispatched. Observe again, read page state, or verify the selected file input before submitting any form.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands.map((command) => command.method),
+      ["DOM.getNodeForLocation", "DOM.setFileInputFiles"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
+test("selector upload file preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    cdpResponses: [
+      { root: { nodeId: 1 } },
+      { nodeId: 2 },
+      { node: { backendNodeId: 5678 } },
+      {},
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-upload-selector",
+      tool: "yunti_upload_file",
+      arguments: { selector: "#file", filePaths: ["/tmp/a.txt", "/tmp/b.txt"] },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      uploaded: true,
+      fileCount: 2,
+      filePaths: ["/tmp/a.txt", "/tmp/b.txt"],
+      browserSessionId: "tab-1",
+      action: "upload_file",
+      target: { selector: "#file", method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "File upload dispatched. Observe again, read page state, or verify the selected file input before submitting any form.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands.map((command) => command.method),
+      ["DOM.getDocument", "DOM.querySelector", "DOM.describeNode", "DOM.setFileInputFiles"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("missing uid now points agents back to observe or snapshot", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

@@ -1201,7 +1201,17 @@ export function createToolDispatcher({
       backendNodeId,
     })
   
-    return { uploaded: true, fileCount: filePaths.length, filePaths, browserSessionId: session.browserSessionId }
+    return {
+      uploaded: true,
+      fileCount: filePaths.length,
+      filePaths,
+      browserSessionId: session.browserSessionId,
+      action: "upload_file",
+      target: uid ? { uid, method: "uid" } : { selector, method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "File upload dispatched. Observe again, read page state, or verify the selected file input before submitting any form.",
+    }
   }
   
   async function typeTextByUid(tabId, session, args = {}) {

@@ -117,6 +117,10 @@ function loadObserver({ document, location, viewport = {}, sessionId = "tab-1" }
   return context.YuntiBrowserRuntimeObserver
 }
 
+function elementNames(observation) {
+  return Array.from(observation.elements, (element) => element.name)
+}
+
 test("DOM observer returns fresh uids, text tree, and balanced redaction", () => {
   const elements = [
     new FakeElement("input", { id: "keyword", name: "keyword", placeholder: "Search" }, {
@@ -211,4 +215,89 @@ test("DOM observer returns document and container scroll metadata", () => {
   assert.equal(observation.scrollableContainers[0].pixelsBelow, 520)
   assert.ok(observation.hints.some((hint) => /content below/.test(hint)))
   assert.ok(observation.hints.some((hint) => /Scrollable containers/.test(hint)))
+})
+
+test("DOM observer excludes hidden and offscreen elements by default", () => {
+  const elements = [
+    new FakeElement("button", {}, {
+      innerText: "Visible action",
+      rect: { x: 20, y: 20, width: 120, height: 32 },
+    }),
+    new FakeElement("button", {}, {
+      innerText: "Hidden action",
+      rect: { x: 20, y: 70, width: 120, height: 32 },
+      style: { display: "none", visibility: "hidden", opacity: "1" },
+    }),
+    new FakeElement("button", {}, {
+      innerText: "Below fold",
+      rect: { x: 20, y: 900, width: 120, height: 32 },
+    }),
+  ]
+  const observer = loadObserver({
+    document: createDocument(elements, { pageHeight: 1200, viewportHeight: 600 }),
+    location: new URL("https://example.test/actions"),
+    viewport: { width: 800, height: 600 },
+  })
+
+  const viewportObservation = observer.observePage()
+  assert.deepEqual(elementNames(viewportObservation), ["Visible action"])
+  assert.equal(viewportObservation.limits.mode, "viewport")
+  assert.ok(viewportObservation.hints.some((hint) => /content below/.test(hint)))
+
+  const fullPageObservation = observer.observePage({ mode: "fullPage" })
+  assert.deepEqual(elementNames(fullPageObservation), ["Visible action", "Below fold"])
+  assert.equal(fullPageObservation.limits.mode, "fullPage")
+
+  const hiddenObservation = observer.observePage({ mode: "fullPage", includeHidden: true })
+  assert.deepEqual(elementNames(hiddenObservation), [
+    "Visible action",
+    "Hidden action",
+    "Below fold",
+  ])
+  assert.equal(hiddenObservation.elements.find((element) => element.name === "Hidden action").visible, false)
+})
+
+test("DOM observer handles redaction edge modes conservatively", () => {
+  const tokenValue = "Bearer abcdefghijklmnopqrstuvwxyz1234567890"
+  const longRandom = "fixture_1234567890abcdefghijklmnopqrstuvwxyzABCDEF"
+  const elements = [
+    new FakeElement("input", { id: "auth", name: "authorization" }, {
+      value: tokenValue,
+      rect: { x: 20, y: 20, width: 260, height: 32 },
+    }),
+    new FakeElement("input", { id: "ordinary", name: "query" }, {
+      value: "ordinary business text",
+      rect: { x: 20, y: 70, width: 260, height: 32 },
+    }),
+    new FakeElement("input", { id: "strict", name: "reference" }, {
+      value: "sixteen-char-ref",
+      rect: { x: 20, y: 120, width: 260, height: 32 },
+    }),
+    new FakeElement("input", { id: "random", name: "note" }, {
+      value: longRandom,
+      rect: { x: 20, y: 170, width: 260, height: 32 },
+    }),
+  ]
+  const document = createDocument(elements)
+  const location = new URL("https://example.test/settings?api_key=secret-api-key-value&safe=1")
+  const observer = loadObserver({ document, location })
+
+  const balanced = observer.observePage({ redaction: "balanced" })
+  const balancedText = JSON.stringify(balanced)
+  assert.equal(balanced.elements.find((element) => element.uid === "yunti-1").valuePreview, "[REDACTED]")
+  assert.equal(balanced.elements.find((element) => element.uid === "yunti-2").valuePreview, "ordinary business text")
+  assert.equal(balanced.elements.find((element) => element.uid === "yunti-4").valuePreview, "[REDACTED]")
+  assert.equal(balancedText.includes(tokenValue), false)
+  assert.equal(balancedText.includes(longRandom), false)
+  assert.equal(balancedText.includes("secret-api-key-value"), false)
+  assert.ok(balanced.redactions.categories.includes("token"))
+
+  const strict = observer.observePage({ redaction: "strict" })
+  assert.equal(strict.elements.find((element) => element.uid === "yunti-2").valuePreview, "[REDACTED]")
+  assert.equal(strict.elements.find((element) => element.uid === "yunti-3").valuePreview, "[REDACTED]")
+
+  const off = observer.observePage({ redaction: "off" })
+  assert.equal(off.elements.find((element) => element.uid === "yunti-1").valuePreview, tokenValue.slice(0, 120))
+  assert.equal(off.redactions.count, 0)
+  assert.ok(off.warnings.some((warning) => /redaction is off/i.test(warning)))
 })

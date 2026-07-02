@@ -96,9 +96,12 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   click/hover/fill uid resolver while preserving the `yunti_take_snapshot`
   compatibility path.
 - Latest P6.1 observe/action validation: `git diff --check` passed,
-  `npm run release:check` passed with 67 passing node:test cases and 1 skipped
+  `npm run release:check` passed with 69 passing node:test cases and 1 skipped
   real-browser smoke by default, and `YUNTI_E2E=1 npm run test:e2e` skipped
   because Playwright/Chromium is not installed in the current environment.
+- Deterministic observe fixtures now cover hidden/offscreen target handling and
+  redaction edge modes in addition to fresh uid, text tree, scroll metadata,
+  balanced redaction, and stale uid replacement.
 
 ## Decisions
 
@@ -147,8 +150,10 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
 - Follow `docs/NEXT_MAJOR_PLAN.md` for the next major cycle.
 - Continue P6.1 with a verified `observe -> click uid -> observe` real-browser
   closure once Playwright/Chromium is available in the validation environment.
-- Expand deterministic observe fixtures for hidden/offscreen targets and
-  redaction edge cases before broadening fill/select/scroll action semantics.
+- Keep `observe -> click uid -> observe` real-browser closure as the remaining
+  P6.1 validation gap until Playwright/Chromium is available locally.
+- Start P6.2 fill/select/scroll action semantics only after the P6.1 closure
+  gap is either verified or explicitly tracked as an environment limitation.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

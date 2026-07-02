@@ -1567,14 +1567,16 @@ uid 生命周期：
 - `tests/dom-observer.test.js` 已覆盖基础 DOM 观察、fresh uid、textTree、balanced
   redaction、URL query 脱敏和 scroll metadata。
 - `tests/e2e.test.js` 已把 `yunti_observe_page` 加入 opt-in real-browser smoke。
-- 最新验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 67 个
-  node:test 用例，其中 66 个通过、1 个 real-browser smoke 按默认配置跳过；
+- 最新验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 68 个
+  node:test 用例，其中 67 个通过、1 个 real-browser smoke 按默认配置跳过；
   `YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少 Playwright/Chromium 被跳过。
 - `extension/tool-handlers.js` 已把 `yunti_observe_page` 返回的 elements 写入最新页面
   uid map，`yunti_click` / `yunti_hover` / `yunti_fill` 继续通过现有 uid resolver 使用
   fresh observe uid，同时保留 `yunti_take_snapshot` 兼容路径。
 - `tests/tool-handlers.test.js` 已覆盖 `observe -> click uid` 的 background dispatcher
   最小闭环，以及 missing uid 时提示重新 observe/snapshot。
+- `tests/tool-handlers.test.js` 也已覆盖最新 observation 替换旧 uid map：第二次 observe
+  后旧 uid 会失败并提示重新 observe/snapshot，新 uid 可以继续驱动现有 click 路径。
 - `tests/e2e.test.js` 的 opt-in real-browser smoke 已改为先 observe，再用 observe uid
   执行 click；本切片不重写 fill/select/scroll action layer。
 

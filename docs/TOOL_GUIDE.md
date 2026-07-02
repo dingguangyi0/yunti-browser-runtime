@@ -140,7 +140,7 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   and uid/visible text.
 - Use `text` with a fresh uid when the user-facing option label is clearer than
   the option value; selector path remains selector/value compatible.
-- Uid option misses and non-select uid targets return structured
+- Uid and selector option misses plus non-select targets return structured
   `selected: false` diagnostics with `code`, `matchMode`, `targetOption`, and
   `recoveryHint`; option misses include `availableValues` / `availableTexts`
   when the page exposes them.

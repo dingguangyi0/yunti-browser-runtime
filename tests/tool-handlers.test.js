@@ -892,6 +892,103 @@ test("selector select preserves content result with structured result", async ()
   }
 })
 
+test("selector select value miss returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_select: {
+        selected: true,
+        element: "select#plan",
+        value: "",
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-selector-miss",
+      tool: "yunti_select",
+      arguments: { selector: "#plan", value: "enterprise" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: false,
+      element: "select#plan",
+      value: "",
+      code: "OPTION_NOT_FOUND",
+      error: "Option value not found",
+      actualValue: "",
+      selector: "#plan",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { selector: "#plan", method: "selector" },
+      ok: false,
+      recoverable: true,
+      matchMode: "value",
+      targetOption: "enterprise",
+      recoveryHint: {
+        reason: "selector-select-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+        nextAction: "inspect-available-options",
+        decision: "inspect-options-before-retry",
+        selector: "#plan",
+        matchMode: "value",
+        targetOption: "enterprise",
+        message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
+      },
+      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("selector select thrown failure returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_select: () => {
+        throw new Error("Target is not a select element")
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-selector-not-select",
+      tool: "yunti_select",
+      arguments: { selector: ".plan-label", value: "pro" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: false,
+      selector: ".plan-label",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { selector: ".plan-label", method: "selector" },
+      ok: false,
+      recoverable: true,
+      code: "SELECTOR_SELECT_FAILED",
+      error: "Target is not a select element",
+      matchMode: "value",
+      targetOption: "pro",
+      recoveryHint: {
+        reason: "selector-select-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+        nextAction: "inspect-target-element",
+        decision: "use-select-element-or-uid-fallback",
+        selector: ".plan-label",
+        matchMode: "value",
+        targetOption: "pro",
+        message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
+      },
+      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid select value path preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

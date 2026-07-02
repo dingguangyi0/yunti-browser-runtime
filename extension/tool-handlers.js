@@ -949,14 +949,32 @@ export function createToolDispatcher({
     }
 
     const selector = String(args.selector || "").trim()
-    const result = await chrome.tabs.sendMessage(tabId, {
-      type: "yunti_execute_tool",
-      tool: "yunti_select",
-      arguments: args,
-    })
+    let result
+    try {
+      result = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_select",
+        arguments: args,
+      })
+    } catch (error) {
+      return buildSelectorSelectFailureResult(session, selector, args.value, {
+        code: "SELECTOR_SELECT_FAILED",
+        error: error?.message || "Selector select failed",
+      })
+    }
 
     if (!result || typeof result !== "object" || result.selected !== true) {
-      return result
+      return buildSelectorSelectFailureResult(session, selector, args.value, result)
+    }
+
+    const requestedValue = String(args.value ?? "")
+    if (requestedValue && String(result.value ?? "") !== requestedValue) {
+      return buildSelectorSelectFailureResult(session, selector, requestedValue, {
+        ...result,
+        code: "OPTION_NOT_FOUND",
+        error: "Option value not found",
+        actualValue: result.value,
+      })
     }
 
     return {
@@ -968,6 +986,44 @@ export function createToolDispatcher({
       ok: true,
       recoverable: false,
       nextStepHint: "Select dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
+    }
+  }
+
+  function buildSelectorSelectFailureResult(session, selector, targetOption, selectResult = {}) {
+    const availableValues = Array.isArray(selectResult?.availableValues) ? selectResult.availableValues : undefined
+    const availableTexts = Array.isArray(selectResult?.availableTexts) ? selectResult.availableTexts : undefined
+    const code = selectResult?.code || (selectResult?.selected === false ? "SELECTOR_SELECT_FAILED" : "SELECTOR_SELECT_FAILED")
+    const error = selectResult?.error || "Selector select failed"
+    const recoveryHint = {
+      reason: "selector-select-failed",
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+      nextAction: code === "OPTION_NOT_FOUND" ? "inspect-available-options" : "inspect-target-element",
+      decision: code === "OPTION_NOT_FOUND" ? "inspect-options-before-retry" : "use-select-element-or-uid-fallback",
+      selector,
+      matchMode: "value",
+      targetOption: String(targetOption ?? ""),
+      ...(availableValues ? { availableValues } : {}),
+      ...(availableTexts ? { availableTexts } : {}),
+      message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
+    }
+
+    return {
+      ...(selectResult && typeof selectResult === "object" ? selectResult : {}),
+      selected: false,
+      selector,
+      browserSessionId: session.browserSessionId,
+      action: "select",
+      target: { selector, method: "selector" },
+      ok: false,
+      recoverable: true,
+      code,
+      error,
+      matchMode: "value",
+      targetOption: String(targetOption ?? ""),
+      ...(availableValues ? { availableValues } : {}),
+      ...(availableTexts ? { availableTexts } : {}),
+      recoveryHint,
+      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
     }
   }
 

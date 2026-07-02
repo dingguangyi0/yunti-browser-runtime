@@ -201,14 +201,15 @@ learning memory 和核心工具分发。
 `npm run release:check` 会串行执行公开文档残留检查、语法检查、单元测试和
 `npm pack --dry-run`，适合作为发布前门禁。
 
-仓库 URL 和 npm metadata 已确认公开可达后，再运行：
+仓库 URL 和 npm metadata 已确认公开可达。发布前运行：
 
 ```bash
 npm run release:prepublish
+npm run release:dry-run
 ```
 
-该命令会先执行 `npm run check:metadata`，再执行 `npm run release:check`；当前
-GitHub 仓库 URL 仍返回 404 时会按预期失败。
+该命令会先执行 `npm run check:metadata`，再执行 `npm run release:check`。
+`release:dry-run` 会显式使用官方 npm registry，避免本机 registry mirror 影响发布预览。
 
 真实浏览器 E2E smoke test 默认跳过；需要本机安装 Playwright / Chromium 后显式启用：
 
@@ -238,8 +239,6 @@ bridge token 是本地 HTTP bridge 的访问凭证。MCP server、extension 和 
 
 ## 当前未完成项
 
-- npm 发布前需要确认 `https://github.com/dingguangyi0/yunti-browser-runtime`
-  及对应 issues URL 公开可达；处理步骤见 [发布阻塞处理](docs/PUBLISHING_BLOCKERS.md)。
-- 可运行 `npm run check:metadata` 复查 repository/homepage/bugs URL 是否公开可达。
+- 如确认要发布 `0.1.0`，运行 `npm run release:publish`。
 - 当前 `npm view yunti-browser-runtime` 返回 E404；如 `0.1.0` 是首次发布，这是预期状态。
 - 发布前如要上架浏览器扩展商店，需要再次审查 broad host permissions。

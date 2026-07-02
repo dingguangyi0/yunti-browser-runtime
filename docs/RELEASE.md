@@ -55,15 +55,15 @@ This command verifies:
 - `npm run package:extension` creates an extension zip containing only the
   required runtime files.
 
-When the external package metadata is expected to be live, run the stricter
-prepublish gate:
+After external package metadata is live, run the stricter prepublish gate:
 
 ```bash
 npm run release:prepublish
 ```
 
-This runs `npm run check:metadata` first, then `npm run release:check`. It is
-expected to fail while the GitHub repository or issue URL still returns 404.
+This runs `npm run check:metadata` first, then `npm run release:check`.
+For the current `dingguangyi0/yunti-browser-runtime` repository metadata, this
+gate is expected to pass before publishing.
 
 ## Extension Package
 
@@ -109,9 +109,12 @@ After the external URL confirmation and local release gate pass:
 
 ```bash
 npm run release:prepublish
-npm publish --dry-run
-npm publish
+npm run release:dry-run
+npm run release:publish
 ```
+
+The publish scripts pin `https://registry.npmjs.org/` so a local mirror registry
+configuration cannot accidentally receive the release.
 
 After publishing, verify:
 

@@ -4,6 +4,7 @@ import https from "node:https"
 import packageJson from "../package.json" with { type: "json" }
 
 const timeoutMs = Number(process.env.YUNTI_BROWSER_METADATA_CHECK_TIMEOUT_MS || 15000)
+const retryCount = Number(process.env.YUNTI_BROWSER_METADATA_CHECK_RETRIES || 2)
 
 function normalizeRepositoryUrl(value) {
   return String(value || "")
@@ -12,7 +13,15 @@ function normalizeRepositoryUrl(value) {
     .replace(/\.git$/, "")
 }
 
-function requestHead(url) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRetryableHeadResult(result) {
+  return result.status === 0 || result.status >= 500
+}
+
+function requestHeadOnce(url) {
   return new Promise((resolve) => {
     const req = https.request(url, { method: "HEAD", timeout: timeoutMs }, (res) => {
       const location = res.headers.location
@@ -20,7 +29,7 @@ function requestHead(url) {
         location &&
         [301, 302, 303, 307, 308].includes(Number(res.statusCode))
       ) {
-        resolve(requestHead(new URL(location, url).toString()))
+        resolve(requestHeadOnce(new URL(location, url).toString()))
         return
       }
       resolve({
@@ -37,6 +46,19 @@ function requestHead(url) {
     })
     req.end()
   })
+}
+
+async function requestHead(url) {
+  let result
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    result = await requestHeadOnce(url)
+    if (!isRetryableHeadResult(result)) return result
+    if (attempt < retryCount) await sleep(250 * (attempt + 1))
+  }
+  return {
+    ...result,
+    attempts: retryCount + 1,
+  }
 }
 
 function npmViewPackage(name) {
@@ -69,11 +91,18 @@ function npmViewPackage(name) {
 
 const repositoryUrl = normalizeRepositoryUrl(packageJson.repository?.url)
 const homepageUrl = String(packageJson.homepage || "").trim()
+const normalizedHomepageUrl = homepageUrl.replace(/#.*$/, "")
 const bugsUrl = String(packageJson.bugs?.url || "").trim()
 
+const repositoryCheck = await requestHead(repositoryUrl)
+const homepageCheck =
+  normalizedHomepageUrl === repositoryUrl
+    ? { ...repositoryCheck, url: normalizedHomepageUrl }
+    : await requestHead(normalizedHomepageUrl)
+
 const checks = {
-  repository: await requestHead(repositoryUrl),
-  homepage: await requestHead(homepageUrl.replace(/#.*$/, "")),
+  repository: repositoryCheck,
+  homepage: homepageCheck,
   bugs: await requestHead(bugsUrl),
   npm: npmViewPackage(packageJson.name),
 }

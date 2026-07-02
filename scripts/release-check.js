@@ -138,7 +138,7 @@ function checkVersionConsistency() {
 function checkCliSmoke() {
   const packageJson = readJsonFile("package.json")
   const binPath = packageJson.bin?.["yunti-browser-runtime"]
-  if (binPath !== "./bin/yunti-browser-runtime.js") {
+  if (binPath !== "bin/yunti-browser-runtime.js") {
     console.error("CLI smoke check failed:")
     console.error(`- package.json bin yunti-browser-runtime: ${binPath || "(missing)"}`)
     return false

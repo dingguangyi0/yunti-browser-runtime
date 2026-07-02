@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-Release readiness: local MVP is prepared for first public release, with P4.3
-package repository/homepage/bugs URL confirmation now moving to the
+Release readiness: local MVP is prepared for first public release. P4.3 package
+repository/homepage/bugs URL confirmation is complete for the
 `dingguangyi0/yunti-browser-runtime` GitHub repository.
 
 ## Current State
@@ -36,6 +36,9 @@ package repository/homepage/bugs URL confirmation now moving to the
   skill installation hints.
 - `npm run package:extension` writes a minimal extension zip to `dist/` with
   only extension runtime files.
+- `npm run release:dry-run` and `npm run release:publish` pin the official npm
+  registry at `https://registry.npmjs.org/`, avoiding accidental publication to
+  a locally configured mirror registry.
 - `npm run test:e2e` provides an opt-in real-browser Playwright smoke test for
   extension loading, page registration, MCP target listing, snapshot, click/fill,
   and CDP `Runtime.evaluate`.
@@ -95,12 +98,13 @@ package repository/homepage/bugs URL confirmation now moving to the
 
 ## Open Work
 
-- Follow `docs/EXECUTION_PLAN.md` for the remaining P4.3 external confirmation.
+- Follow `docs/EXECUTION_PLAN.md` for final publish dry-run and publish steps.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
-- P4.3 npm publishing URL confirmation is being resolved with the new GitHub
-  repository `https://github.com/dingguangyi0/yunti-browser-runtime`; package
-  metadata has been switched to that repository/homepage/issues URL set.
+- P4.3 npm publishing URL confirmation is complete with the GitHub repository
+  `https://github.com/dingguangyi0/yunti-browser-runtime`; package metadata
+  points to that repository/homepage/issues URL set and all three URLs return
+  HTTP 200.
 - `npm view yunti-browser-runtime` currently returns E404, which is acceptable
   only if `0.1.0` is intended to be the first npm release under this package
   name.
@@ -183,13 +187,24 @@ package repository/homepage/bugs URL confirmation now moving to the
   required npm package contents validation, and extension zip contents
   validation. The release gate test run covered 59 tests, with 58 passed and 1
   real-browser smoke test skipped by configuration.
-- Latest P4.3 progress: SSH access to
-  `git@github.com:dingguangyi0/yunti-browser-runtime.git` succeeds, and
-  `package.json` now points repository, homepage, and bugs metadata to the
-  matching public GitHub URLs.
-- Next required release step: initialize the local Git repository, push `main`
-  to `origin`, then rerun `npm run check:metadata` and
-  `npm run release:prepublish`.
+- Latest P4.3 validation: `git push -u origin main` succeeded, `npm run
+  check:metadata` passed with repository/homepage/bugs all returning HTTP 200,
+  and `npm run release:prepublish` passed end to end.
+- `npm run check:metadata` now retries transient repository/homepage/bugs HEAD
+  request failures, so temporary GitHub TLS disconnects do not immediately block
+  an otherwise reachable public URL set.
+- `npm run check:metadata` also reuses the repository HEAD result when homepage
+  resolves to the same GitHub URL, reducing duplicate external requests during
+  release gates.
+- P4.15 npm official registry publish scripts are complete:
+  `release:dry-run` and `release:publish` explicitly use
+  `https://registry.npmjs.org/`.
+- Latest P4.15 validation: local npm registry is
+  `https://registry.npmmirror.com`, while
+  `npm run release:dry-run` passed and showed the official npm registry as the
+  target; the dry-run tarball contained 39 files.
+- Next required release step: if `0.1.0` is confirmed as the first release, run
+  `npm run release:publish`.
 
 ## Known Risks
 
@@ -199,9 +214,9 @@ package repository/homepage/bugs URL confirmation now moving to the
   long-tail tools can still receive the same treatment before a later release.
 - Extension broad host permissions are now documented, but should still be
   re-reviewed before any store-distributed release.
-- Package repository/homepage/bugs metadata has been switched to the
-  `dingguangyi0/yunti-browser-runtime` GitHub repository, but publishing should
-  still wait until the pushed repository passes `npm run release:prepublish`.
+- Package repository/homepage/bugs metadata is now publicly reachable, but the
+  final npm publish should still wait for an explicit `npm run release:dry-run`
+  review and publish confirmation.
 - Tool names and descriptions must stay clear enough for agents to choose the
   right route without relying on hidden model knowledge.
 

@@ -3,9 +3,10 @@
 This document tracks release blockers that require external confirmation before
 publishing `yunti-browser-runtime`.
 
-## Current Blocker: P4.3 Package URLs
+## Resolved Blocker: P4.3 Package URLs
 
-Status: resolving with `https://github.com/dingguangyi0/yunti-browser-runtime`.
+Status: resolved on 2026-07-02 with
+`https://github.com/dingguangyi0/yunti-browser-runtime`.
 
 The package metadata currently points to:
 
@@ -14,8 +15,8 @@ The package metadata currently points to:
 - Issues: `https://github.com/dingguangyi0/yunti-browser-runtime/issues`
 
 The previous `yunti-ai/yunti-browser-runtime` metadata returned HTTP 404. The
-project is now moving to the `dingguangyi0/yunti-browser-runtime` GitHub
-repository; after the initial push, rerun the validation commands below.
+project moved to the `dingguangyi0/yunti-browser-runtime` GitHub repository,
+and the initial `main` push succeeded.
 
 ## Resolution Options
 
@@ -53,7 +54,7 @@ npm run check:metadata
 npm run release:prepublish
 ```
 
-Expected result after P4.3 is resolved:
+Actual result after P4.3 is resolved:
 
 - `npm run check:metadata` exits 0.
 - Repository, homepage, and issue URLs are publicly reachable.
@@ -64,11 +65,10 @@ Expected result after P4.3 is resolved:
 Before the final publish, also run:
 
 ```bash
-npm publish --dry-run
+npm run release:dry-run
 ```
 
-## Do Not Publish While Blocked
+## Publish Readiness
 
-Do not run `npm publish` until `npm run release:prepublish` passes. A failing
-metadata check means users may install a package whose repository, homepage, or
-issue tracker points to a missing public location.
+`npm run release:prepublish` now passes. Before running `npm run
+release:publish`, run and review `npm run release:dry-run`.

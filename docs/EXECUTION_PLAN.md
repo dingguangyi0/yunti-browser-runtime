@@ -38,7 +38,7 @@
 | P3.2 | 已完成 | 工具参数校验与错误提示增强 |
 | P4.1 | 已完成 | 发布前文档与权限审查 |
 | P4.2 | 已完成 | Agent 接入示例补全 |
-| P4.3 | 进行中 | npm 发布 URL 最终确认 |
+| P4.3 | 已完成 | npm 发布 URL 最终确认 |
 | P4.4 | 已完成 | 发布门禁脚本固化 |
 | P4.5 | 已完成 | 发布运行手册 |
 | P4.6 | 已完成 | package metadata 检查命令 |
@@ -50,6 +50,7 @@
 | P4.12 | 已完成 | Agent config smoke 门禁 |
 | P4.13 | 已完成 | doctor JSON smoke 门禁 |
 | P4.14 | 已完成 | 公开文档相对链接门禁 |
+| P4.15 | 已完成 | npm 官方 registry 发布脚本 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -579,7 +580,7 @@ Extension：
 
 ## P4.3 npm 发布 URL 最终确认
 
-状态：进行中（2026-07-02）
+状态：已完成（2026-07-02）
 
 阶段进展：
 
@@ -602,6 +603,16 @@ Extension：
   `bugs=https://github.com/dingguangyi0/yunti-browser-runtime/issues`。
 - 已修正 `scripts/release-check.js` 的公开文档残留门禁：允许正式公开 GitHub
   owner `dingguangyi0`，继续拦截本机路径和内部残留词。
+- 已增强 `scripts/check-package-metadata.js`：repository/homepage/bugs 的 HEAD
+  请求遇到 TLS 断连或 5xx 等临时网络失败时会重试，避免 GitHub 瞬时网络抖动误挡发布。
+- `scripts/check-package-metadata.js` 会在 homepage 去掉锚点后与 repository URL
+  相同时复用 repository 检查结果，避免对同一 GitHub 页面重复发起 HEAD 请求。
+- 已执行 `git push -u origin main`，本地 `main` 已跟踪远端
+  `origin/main`。
+- 已运行 `npm pkg fix`，将 `bin.yunti-browser-runtime` 规范化为
+  `bin/yunti-browser-runtime.js`，避免 npm publish dry-run 自动修正 package metadata。
+- `npm run check:metadata` 已确认 repository、homepage、bugs URL 均返回 HTTP 200。
+- `npm run release:prepublish` 已完整通过。
 
 ### 目标
 
@@ -616,21 +627,24 @@ Extension：
 
 当前结论：
 
-- P4.3 已进入 Option B 处理路径：`package.json` 已改为
-  `https://github.com/dingguangyi0/yunti-browser-runtime`。
-- 下一步需要初始化 Git 仓库、推送 `main` 分支，并运行 `npm run check:metadata`
-  与 `npm run release:prepublish` 验证新 metadata 公开可达。
-- npm 包名 `yunti-browser-runtime` 当前未占用/未发布；如果这是预期首次发布状态，可以保留。
+- P4.3 已完成：`package.json` 的 repository/homepage/bugs metadata 指向
+  `https://github.com/dingguangyi0/yunti-browser-runtime`，且公开可达。
+- npm 包名 `yunti-browser-runtime` 当前未发布；作为 `0.1.0` 首次发布状态已被接受。
+- 发布前最后保留 `npm publish --dry-run` 和人工发布确认。
 
 发布门禁结果：
 
-- 公开文档残留检查通过：
-  `rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json`
-  无输出。
-- `npm run check` 通过，P4.3 文档同步未影响 JS 语法检查。
-- `npm test` 通过：59 项测试，58 项通过，1 项真实浏览器 smoke 按配置跳过。
-- `npm pack --dry-run` 通过，npm tarball 包含更新后的 README、docs、skill、
-  MCP 和 extension 文件，共 35 个文件。
+- `npm run check:metadata` 通过（2026-07-02T15:47:32.161Z）：
+  repository、homepage、bugs URL 均返回 HTTP 200；npm 未发布状态被识别为首次发布可接受。
+- `npm run release:prepublish` 通过（metadata checkedAt:
+  2026-07-02T15:57:16.352Z）：`npm run check:metadata` 和
+  `npm run release:check` 均通过。
+- `npm run release:check` 覆盖公开文档残留检查、public Markdown link check
+  （11 个 Markdown 文件）、version consistency check、CLI smoke check、
+  print-config smoke check、doctor smoke check、`npm run check`、`npm test`、
+  npm package contents check 和 extension zip contents check。
+- release gate 内部 `npm test` 通过：59 项测试，58 项通过，1 项真实浏览器
+  smoke 按配置跳过。
 
 ## P4.4 发布门禁脚本固化
 
@@ -904,7 +918,7 @@ extension zip 版本不一致的组合。
 
 - `scripts/release-check.js` 已新增 CLI smoke check。
 - release gate 会校验 `package.json` 中 `bin.yunti-browser-runtime` 指向
-  `./bin/yunti-browser-runtime.js`。
+  `bin/yunti-browser-runtime.js`。
 - release gate 会运行 `node bin/yunti-browser-runtime.js --help`，确认帮助输出包含
   `Yunti Browser Runtime` 和 `package-extension` 命令。
 - release gate 会运行 `node bin/yunti-browser-runtime.js --version`，确认输出与
@@ -1059,22 +1073,42 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P4.3 已收到真实仓库地址，正在推送并验证：
+## P4.15 npm 官方 registry 发布脚本
 
-- 使用 `git@github.com:dingguangyi0/yunti-browser-runtime.git` 作为 Git remote origin。
-- `package.json` 已切换到 `https://github.com/dingguangyi0/yunti-browser-runtime`
-  对应的 repository/homepage/bugs URL。
-- 下一步执行 `git push -u origin main` 后运行 `npm run check:metadata` 和
-  `npm run release:prepublish`。
-- 确认是否继续使用 npm 包名 `yunti-browser-runtime` 作为首次发布包名。
-- P4.4 已固化 `npm run release:check`；后续发布前直接运行该门禁命令。
-- P4.5 已补充发布运行手册；后续继续等待 P4.3 外部确认。
-- P4.6 已固化 `npm run check:metadata`；后续继续等待 P4.3 外部确认。
-- P4.7 已完成 `npm run release:prepublish` 串联；后续继续等待 P4.3 外部确认。
-- P4.8 已完成 npm package 内容门禁；后续继续等待 P4.3 外部确认。
-- P4.9 已完成 extension zip 内容门禁；后续继续等待 P4.3 外部确认。
-- P4.10 已完成 package / extension 版本一致性门禁；后续继续等待 P4.3 外部确认。
-- P4.11 已完成 npm bin CLI smoke 门禁；后续继续等待 P4.3 外部确认。
-- P4.12 已完成 Agent config smoke 门禁；后续继续等待 P4.3 外部确认。
-- P4.13 已完成 doctor JSON smoke 门禁；后续继续等待 P4.3 外部确认。
-- P4.14 已完成公开文档相对链接门禁；后续继续等待 P4.3 外部确认。
+状态：已完成（2026-07-02）
+
+实现摘要：
+
+- 新增 `npm run release:dry-run`，执行
+  `npm publish --dry-run --registry=https://registry.npmjs.org/`。
+- 新增 `npm run release:publish`，执行
+  `npm publish --registry=https://registry.npmjs.org/`。
+- README 和 `docs/RELEASE.md` 已改用这两个脚本，避免本机 npm registry mirror
+  影响发布预览或正式发布。
+
+### 目标
+
+确保最终 npm 发布明确指向官方 npm registry，而不是开发机当前配置的
+`registry.npmmirror.com` 等镜像源。
+
+### 验收标准
+
+- `npm run release:dry-run` 能生成 npm 发布预览。
+- dry-run 输出显示发布目标为 `https://registry.npmjs.org/`。
+- dry-run tarball 内容仍为预期的 39 个文件。
+
+### 验收记录
+
+- 本机 `npm config get registry` 返回 `https://registry.npmmirror.com`，确认存在
+  mirror registry 误发布风险。
+- `npm run release:dry-run` 已通过，输出显示
+  `Publishing to https://registry.npmjs.org/`。
+- npm publish dry-run tarball 包含 39 个文件。
+
+## 当前下一步
+
+P4.3-P4.15 已完成，当前发布前最后动作：
+
+- `npm run release:dry-run` 已通过。
+- 如确认要发布 `0.1.0`，执行 `npm run release:publish`。
+- 浏览器扩展如需上架商店，发布前还需重新审查 broad host permissions。

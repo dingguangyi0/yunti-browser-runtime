@@ -641,6 +641,32 @@ test("mcp usage hints include action recovery guidance", async () => {
   assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /coordinate fallbacks/)
 })
 
+test("mcp usage hints document action result contract", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: {},
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  const contract = payload.workflows.actionResultContract.join("\n")
+
+  assert.match(contract, /compatibility-shaped/)
+  assert.match(contract, /clicked, hovered, filled, scrolled/)
+  assert.match(contract, /action, browserSessionId, target, ok, code, recoverable, nextStepHint/)
+  assert.match(contract, /Do not remove existing success booleans/)
+  assert.match(contract, /verify page state/)
+
+  assert.match(payload.tools.yunti_click.notes.join("\n"), /Current results are compatibility-shaped/)
+  assert.match(payload.tools.yunti_click.notes.join("\n"), /P6\.2 will converge action outputs/)
+  assert.match(payload.tools.yunti_fill.notes.join("\n"), /value\/valueLength/)
+})
+
 test("bridge stores sanitized network observations", async () => {
   const hub = new BridgeHub()
   hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://shop.example.test/" })

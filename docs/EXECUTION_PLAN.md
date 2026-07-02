@@ -1661,11 +1661,15 @@ P6.1 真实浏览器闭环验证 runbook：
 
 动作结果至少包含：
 
-- action 名称、target uid/selector/coordinate、`browserSessionId`。
-- 成功/失败状态，失败时给结构化 code。
-- `nextStepHint` 和 recoverable 标记。
+- 当前兼容返回可以继续保留 `clicked`、`hovered`、`filled`、`selected`、`scrolled`、
+  `uid`、`selector`、`x/y`、`method`、`valueLength`、`before/after`、
+  `browserSessionId` 等现有字段。
+- P6.2 目标结构以增量方式收敛到：`action`、`browserSessionId`、`target`、`ok`、
+  `code`、`recoverable`、`nextStepHint`。
+- `target` 应能表达 uid、selector、coordinate 或 scroll container，不强迫单一路径。
 - 必要时包含 before/after 摘要，例如 scroll position、value length、selected option、
   URL/title 变化、toast/dialog 状态。
+- 迁移期间不移除现有成功布尔值或 selector/coordinate 字段，避免破坏外部 Agent 和旧 workflow。
 
 `yunti_select` 兼容缺口：
 
@@ -1684,6 +1688,14 @@ P6.1 真实浏览器闭环验证 runbook：
   uid、滚动、等待、tab 切换和 fallback 的恢复提示不会退化。
 - 最新验证：`git diff --check` 通过；`node --test tests/bridge.test.js` 通过 63 项；
   `npm run release:check` 通过，覆盖 71 个 node:test 用例，其中 70 个通过、1 个
+  real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少
+  Playwright/Chromium 被跳过；token 残留检查无输出。
+- `yunti_get_tool_usage_hints` 已新增 action result contract guidance，明确当前 action
+  返回是 compatibility-shaped，P6.2 后续只能增量收敛到结构化 `action` / `target` /
+  `ok` / `code` / `recoverable` / `nextStepHint` / before-after 摘要，不能破坏现有
+  `clicked` / `filled` / `hovered` / selector / coordinate 返回字段。
+- 最新验证：`git diff --check` 通过；`node --test tests/bridge.test.js` 通过 64 项；
+  `npm run release:check` 通过，覆盖 72 个 node:test 用例，其中 71 个通过、1 个
   real-browser smoke 按默认配置跳过；`YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少
   Playwright/Chromium 被跳过；token 残留检查无输出。
 

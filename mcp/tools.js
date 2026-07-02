@@ -1078,6 +1078,7 @@ export function toolUsageHints(args = {}) {
         "Coordinate mode requires both x and y; yunti_click_at is clearer for coordinate-only clicks.",
         "After clicking, observe again or read page state before deciding whether the action succeeded.",
         "If the target is missing or stale, observe again; if it may be below the fold, scroll first; if the page is changing, wait before retrying.",
+        "Current results are compatibility-shaped and may include clicked, uid, selector/coordinate, method, and browserSessionId; P6.2 will converge action outputs toward action, target, ok/code, recoverable, nextStepHint, and before/after summaries.",
       ],
       recovery: [
         "Stale or missing uid: call yunti_observe_page again for the current browserSessionId, or yunti_take_snapshot for compatibility workflows.",
@@ -1099,6 +1100,7 @@ export function toolUsageHints(args = {}) {
         "Selector mode resolves the element center and dispatches CDP mouse move.",
         "Coordinate mode requires both x and y.",
         "Observe again after hover when menus, tooltips, or hover-only controls are expected to appear.",
+        "Current results are compatibility-shaped and may include hovered, uid, selector/coordinate, method, and browserSessionId; P6.2 will converge action outputs toward action, target, ok/code, recoverable, nextStepHint, and before/after summaries.",
       ],
       recovery: [
         "Stale or missing uid: observe again before retrying the hover.",
@@ -1116,6 +1118,7 @@ export function toolUsageHints(args = {}) {
         "Coordinate-only fill is not supported; use uid or selector.",
         "After filling, verify through yunti_observe_page, yunti_get_page_snapshot, or yunti_evaluate_script when exact field value matters.",
         "If the input is hidden, disabled, or no longer present, observe again, scroll, wait for rendering, or switch tabs before retrying.",
+        "Current results are compatibility-shaped and may include filled, uid, selector, method, value/valueLength, and browserSessionId; P6.2 will converge action outputs toward action, target, ok/code, recoverable, nextStepHint, and before/after summaries.",
       ],
       recovery: [
         "Stale or missing uid: call yunti_observe_page again and use a fresh editable uid.",
@@ -1195,6 +1198,13 @@ export function toolUsageHints(args = {}) {
         "If the page is loading or changing, use yunti_wait_for or observe again instead of blind retries.",
         "If the target tab is uncertain, call yunti_list_browser_targets and switch to the intended browserSessionId.",
         "Use selector or coordinate fallbacks only as recovery/debugging paths, not as the default when fresh uids are available.",
+      ],
+      actionResultContract: [
+        "Current action outputs are compatibility-shaped: click/hover/fill/scroll may return clicked, hovered, filled, scrolled, uid, selector, x/y, method, valueLength, before/after, and browserSessionId depending on the tool path.",
+        "P6.2 target shape should be additive and structured: action, browserSessionId, target, ok, code, recoverable, nextStepHint, and before/after summaries where useful.",
+        "Do not remove existing success booleans or selector/coordinate fields while converging on the structured result contract.",
+        "Treat successful dispatch as transport/action execution evidence, then verify page state with yunti_observe_page, yunti_get_page_snapshot, yunti_evaluate_script, screenshot, or CDP when the workflow needs proof.",
+        "Recoverable failures should clearly point to observe, scroll, wait, switch tabs, selector/coordinate fallback, or asking the user.",
       ],
     },
     tools: selectedTools,

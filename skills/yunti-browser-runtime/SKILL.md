@@ -70,6 +70,13 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - If the page is loading or changing, wait or observe again instead of blindly repeating the same action.
 - If the target tab is uncertain, call `yunti_list_browser_targets` and continue with the intended `browserSessionId`.
 
+## Action Results
+
+- Current action results may use compatibility fields such as `clicked`, `hovered`, `filled`, `scrolled`, `uid`, `selector`, coordinates, `method`, `valueLength`, `before`, `after`, and `browserSessionId`.
+- Treat those fields as action execution evidence, then verify page state when the task depends on the result.
+- Future P6.2 structured fields should be additive: `action`, `target`, `ok`, `code`, `recoverable`, `nextStepHint`, and before/after summaries.
+- Do not require agents to abandon existing result fields while structured action results are being introduced.
+
 ## Safety
 
 - Read-only inspection is allowed by default.

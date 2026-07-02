@@ -78,6 +78,20 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - If the target tab is uncertain, call `yunti_list_browser_targets` and route
   follow-up work through the intended `browserSessionId`.
 
+## Action Result Rules
+
+- Current action results are compatibility-shaped and may include fields such as
+  `clicked`, `hovered`, `filled`, `scrolled`, `uid`, `selector`, `x`, `y`,
+  `method`, `valueLength`, `before`, `after`, and `browserSessionId`.
+- P6.2 should converge results additively toward structured fields such as
+  `action`, `target`, `ok`, `code`, `recoverable`, `nextStepHint`, and
+  before/after summaries where useful.
+- Do not treat a dispatched action as final proof of success; verify page state
+  with observe, snapshot, evaluate, screenshot, or CDP when the workflow needs
+  proof.
+- Compatibility fields must remain available while structured result fields are
+  introduced.
+
 ## Safety Rules
 
 - Read-only inspection is allowed by default.

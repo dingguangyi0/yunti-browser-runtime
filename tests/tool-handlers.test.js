@@ -160,6 +160,54 @@ test("coordinate click preserves compatibility fields with structured result", a
   }
 })
 
+test("selector click preserves content result with structured result", async () => {
+  const element = {
+    tag: "button",
+    text: "Open menu",
+    selector: "#menu",
+  }
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_click: {
+        clicked: true,
+        element,
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-click-selector",
+      tool: "yunti_click",
+      arguments: { selector: "#menu" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      clicked: true,
+      element,
+      selector: "#menu",
+      browserSessionId: "tab-1",
+      method: "selector",
+      action: "click",
+      target: { selector: "#menu", method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Selector click dispatched. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
+    })
+    assert.deepEqual(harness.sentMessages.at(-1), {
+      tabId: 123,
+      message: {
+        type: "yunti_execute_tool",
+        tool: "yunti_click",
+        arguments: { selector: "#menu" },
+      },
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("coordinate hover preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

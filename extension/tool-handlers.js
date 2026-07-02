@@ -537,15 +537,30 @@ export function createToolDispatcher({
       }
       return clickAtCoordinate(tabId, session, x, y)
     }
-    if (!String(args.selector || "").trim()) {
+    const selector = String(args.selector || "").trim()
+    if (!selector) {
       throw new Error("yunti_click requires uid, selector, or both x and y. Call yunti_take_snapshot to get uid, pass a CSS selector, or use yunti_click_at for coordinate-only clicks.")
     }
     // Fall back to content script for selector-based click
-    return chrome.tabs.sendMessage(tabId, {
+    const contentResult = await chrome.tabs.sendMessage(tabId, {
       type: "yunti_execute_tool",
       tool: "yunti_click",
       arguments: args,
     })
+    if (contentResult && typeof contentResult === "object" && contentResult.clicked === true) {
+      return {
+        ...contentResult,
+        selector,
+        browserSessionId: session.browserSessionId,
+        method: "selector",
+        action: "click",
+        target: { selector, method: "selector" },
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Selector click dispatched. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
+      }
+    }
+    return contentResult
   }
   
   async function hoverByUid(tabId, session, args = {}) {

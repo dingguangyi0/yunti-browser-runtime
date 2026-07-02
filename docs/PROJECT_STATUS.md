@@ -220,6 +220,20 @@ documented in `docs/NEXT_MAJOR_PLAN.md`.
   13 files, `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium
   is not installed in the current environment, and the token residue grep
   returned no matches.
+- Selector fallback `yunti_click` now returns additive structured action result
+  fields (`action`, `target`, `ok`, `recoverable`, and `nextStepHint`) around
+  the existing content-script passthrough result while preserving `clicked`,
+  `element`, `selector`, `method`, and `browserSessionId` compatibility fields.
+  Selector click dispatch semantics are intentionally unchanged in this slice.
+- Latest P6.2 selector-click structured result targeted validation: `git diff
+  --check` passed and `node --test tests/tool-handlers.test.js` passed 9 tests.
+- Latest P6.2 selector-click structured result full validation: `git diff
+  --check` passed, `npm run release:check` passed with 77 passing node:test
+  cases and 1 skipped real-browser smoke by default, npm package contents
+  validation passed with 42 files, extension zip contents validation passed with
+  13 files, `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium
+  is not installed in the current environment, and the token residue grep
+  returned no matches.
 
 ## Decisions
 

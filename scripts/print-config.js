@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+const mcpServerPath = join(rootDir, "mcp", "server.js")
+const skillPath = join(rootDir, "skills", "yunti-browser-runtime")
+const bridgePort = process.env.YUNTI_BROWSER_BRIDGE_PORT || "48887"
+const bridgeTokenConfigured = Boolean(String(process.env.YUNTI_BROWSER_BRIDGE_TOKEN || "").trim())
+const supportedAgents = ["codex", "claude-code", "cursor", "cline"]
+
+function parseArgs(argv) {
+  const result = { agent: "codex", format: "json" }
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]
+    if (arg === "--agent") {
+      result.agent = argv[i + 1] || result.agent
+      i += 1
+      continue
+    }
+    if (arg.startsWith("--agent=")) {
+      result.agent = arg.slice("--agent=".length)
+      continue
+    }
+    if (arg === "--human") result.format = "human"
+    if (arg === "--json") result.format = "json"
+  }
+  result.agent = String(result.agent || "codex").trim().toLowerCase()
+  return result
+}
+
+function mcpServerConfig() {
+  const env = {
+    YUNTI_BROWSER_BRIDGE_PORT: bridgePort,
+  }
+  if (bridgeTokenConfigured) {
+    env.YUNTI_BROWSER_BRIDGE_TOKEN = "<set the same local bridge token>"
+  }
+  return {
+    command: "node",
+    args: [mcpServerPath],
+    env,
+  }
+}
+
+function agentConfig(agent) {
+  const server = mcpServerConfig()
+  switch (agent) {
+    case "codex":
+    case "claude-code":
+    case "cursor":
+    case "cline":
+      return {
+        mcpServers: {
+          "yunti-browser-runtime": server,
+        },
+      }
+    default:
+      return {
+        mcpServers: {
+          "yunti-browser-runtime": server,
+        },
+      }
+  }
+}
+
+function buildConfig(agent) {
+  return {
+    ok: supportedAgents.includes(agent),
+    agent,
+    supportedAgents,
+    projectRoot: rootDir,
+    mcpServerPath,
+    bridge: {
+      port: bridgePort,
+      tokenEnv: "YUNTI_BROWSER_BRIDGE_TOKEN",
+      tokenConfigured: bridgeTokenConfigured,
+      tokenInstruction: bridgeTokenConfigured
+        ? "Token is configured in the current environment; copy the same secret into your agent and extension settings without committing it."
+        : "Set YUNTI_BROWSER_BRIDGE_TOKEN in your agent and save the same token in the extension popup when bridge auth is enabled.",
+    },
+    skill: {
+      sourcePath: skillPath,
+      installHint: "Copy the yunti-browser-runtime skill directory into your agent skills directory if the agent supports skills.",
+    },
+    config: agentConfig(agent),
+  }
+}
+
+function humanOutput(payload) {
+  return [
+    `Yunti Browser Runtime MCP config for ${payload.agent}`,
+    "",
+    JSON.stringify(payload.config, null, 2),
+    "",
+    `Project root: ${payload.projectRoot}`,
+    `MCP server: ${payload.mcpServerPath}`,
+    `Bridge port: ${payload.bridge.port}`,
+    `Token: ${payload.bridge.tokenInstruction}`,
+    `Skill: ${payload.skill.sourcePath}`,
+    payload.ok ? "" : `Unsupported agent "${payload.agent}". Supported: ${payload.supportedAgents.join(", ")}`,
+  ]
+    .filter((line, index, lines) => line || lines[index - 1] !== "")
+    .join("\n")
+}
+
+const args = parseArgs(process.argv.slice(2))
+const payload = buildConfig(args.agent)
+
+if (args.format === "human") {
+  console.log(humanOutput(payload))
+} else {
+  console.log(JSON.stringify(payload, null, 2))
+}
+
+if (!payload.ok) process.exitCode = 1

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Yunti Browser Runtime</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Yunti Browser Runtime</h1>
+      <p id="status">正在读取状态...</p>
+      <label>
+        Bridge URL
+        <input id="bridgeUrl" autocomplete="off" />
+      </label>
+      <label>
+        Bridge Token
+        <input id="bridgeToken" autocomplete="off" type="password" />
+      </label>
+      <label>
+        页面匹配
+        <textarea id="platformMatches" rows="3"></textarea>
+      </label>
+      <button id="save">保存设置</button>
+      <button id="refresh">刷新状态</button>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

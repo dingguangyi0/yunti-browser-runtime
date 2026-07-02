@@ -1,0 +1,9 @@
+.yunti-browser-runtime-highlight {
+  outline: 2px solid #0f766e !important;
+  outline-offset: 2px !important;
+  background-image: linear-gradient(
+    135deg,
+    rgba(15, 118, 110, 0.12),
+    rgba(245, 158, 11, 0.12)
+  ) !important;
+}

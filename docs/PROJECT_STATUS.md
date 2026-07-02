@@ -1,0 +1,211 @@
+# Project Status
+
+## Current Phase
+
+Release readiness: local MVP is prepared for first public release, with P4.3
+package repository/homepage/bugs URL confirmation now moving to the
+`dingguangyi0/yunti-browser-runtime` GitHub repository.
+
+## Current State
+
+- Project directory created.
+- Project intent, install, tool, security, roadmap, and status docs exist.
+- Local-first architecture selected.
+- MCP server, local bridge, extension, runtime path helper, doctor command, and
+  bridge tests have been extracted.
+- A distributable agent skill exists at
+  `skills/yunti-browser-runtime/SKILL.md`.
+- README is Chinese-first and includes browser extension setup, MCP registration,
+  and agent skill installation steps.
+- A staged execution plan exists at `docs/EXECUTION_PLAN.md`.
+- Tool prefix is `yunti_*`.
+- MCP local mode defaults to `userId=local`.
+- Bridge HTTP routes now require `x-yunti-browser-token`; unauthenticated
+  `/health` only returns limited status.
+- Bridge CORS now echoes only local debug origins and browser extension origins
+  by default, with `YUNTI_BROWSER_BRIDGE_ALLOW_ORIGINS` as an override.
+- Extension popup can save the local bridge URL, token, and page match patterns.
+- Browser sessions now track `lastSeenAt`, `lastActivatedAt`, `expiresAt`, and
+  `staleReason`; extension polling refreshes heartbeat and expired sessions are
+  cleaned up with recovery guidance.
+- `npm run doctor` now checks Node version, bridge reachability, token validity,
+  registered sessions, active session, extension presence, MCP server path, and
+  skill path; it emits JSON plus a human-readable summary.
+- `npm run print-config` prints MCP configuration for Codex, Claude Code,
+  Cursor, and Cline, including project paths, bridge port, token guidance, and
+  skill installation hints.
+- `npm run package:extension` writes a minimal extension zip to `dist/` with
+  only extension runtime files.
+- `npm run test:e2e` provides an opt-in real-browser Playwright smoke test for
+  extension loading, page registration, MCP target listing, snapshot, click/fill,
+  and CDP `Runtime.evaluate`.
+- Package metadata now includes bin, files, repository, keywords, homepage,
+  bugs, and packageManager fields. The `yunti-browser-runtime` CLI routes
+  `mcp`, `bridge`, `doctor`, `print-config`, and `package-extension`.
+- MCP tool schemas and usage hints have been split into `mcp/tools.js` so
+  `mcp/server.js` is focused on bridge, routing, and JSON-RPC behavior.
+- MCP JSON-RPC response wrappers, redaction/event normalization helpers, and
+  learning memory storage have been split into `mcp/json-rpc.js`,
+  `mcp/redaction.js`, and `mcp/memory.js`.
+- MCP session hub, request queueing, network/CDP/console event caches, and
+  bridge-local tool routing have been split into `mcp/bridge-hub.js`, while
+  `mcp/server.js` keeps compatibility re-exports.
+- MCP HTTP bridge server, CORS/token checks, route handlers, and body parsing
+  have been split into `mcp/http-server.js`, while `mcp/server.js` keeps
+  compatibility re-exports.
+- Extension settings/page matching and network monitoring have been split into
+  `extension/settings.js` and `extension/network-monitor.js`, and the extension
+  package script includes those module files.
+- Extension CDP target routing, debugger attach/detach, and tracing helpers
+  have been split into `extension/cdp.js`, and the extension package script
+  includes the module file.
+- Extension session registration, polling, popup state, bridge posting, and
+  console event forwarding have been split into `extension/session-manager.js`,
+  and the extension package script includes the module file.
+- Extension tool dispatch and page operation handlers have been split into
+  `extension/tool-handlers.js`, and the extension package script includes the
+  module file.
+- P3.2 tool argument validation is complete for `yunti_click`, `yunti_hover`,
+  `yunti_fill`, `yunti_close_page`, `yunti_cdp_send_command`, and
+  `yunti_forget_learning_memory`, with recovery-oriented errors and updated
+  usage hints.
+- `docs/TOOL_GUIDE.md` and `skills/yunti-browser-runtime/SKILL.md` now document
+  the common P3.2 parameter rules.
+- README and INSTALL now include P3.2 parameter recovery guidance.
+- SECURITY now documents `storage` permission usage and broad host permission
+  rationale for the local-first extension.
+- INSTALL now includes Codex, Claude Code, Cursor, and Cline MCP setup examples
+  based on `npm run print-config`.
+- Extension registers all `http` and `https` pages by default.
+- Product-specific fixed conversation, workspace, and side-panel entry points
+  have been removed from the standalone extension.
+
+## Decisions
+
+- Project name: `yunti-browser-runtime`.
+- Public package/tooling prefix: `yunti`.
+- Environment variable prefix: `YUNTI_BROWSER_`.
+- Tool prefix target: `yunti_*`.
+- `yunti_list_pages` is a compatibility alias for the live browser target
+  inventory, not a separate registration registry.
+- If a `browserSessionId` becomes stale, agents should call
+  `yunti_list_browser_targets` to refresh the route inventory.
+- The content script must not call product-specific login APIs in the
+  standalone runtime.
+
+## Open Work
+
+- Follow `docs/EXECUTION_PLAN.md` for the remaining P4.3 external confirmation.
+- P4.1 release-readiness docs and permission review is complete.
+- P4.2 Agent integration examples are complete.
+- P4.3 npm publishing URL confirmation is being resolved with the new GitHub
+  repository `https://github.com/dingguangyi0/yunti-browser-runtime`; package
+  metadata has been switched to that repository/homepage/issues URL set.
+- `npm view yunti-browser-runtime` currently returns E404, which is acceptable
+  only if `0.1.0` is intended to be the first npm release under this package
+  name.
+- Latest release gate checks passed after documenting P4.3: public-doc residue
+  check, `npm run check`, `npm test`, and `npm pack --dry-run`.
+- P4.4 release gate scripting is complete: `npm run release:check` now runs
+  public-doc residue checks, `npm run check`, `npm test`, and
+  `npm pack --dry-run`.
+- P4.5 release runbook is complete: `docs/RELEASE.md` documents external URL
+  confirmation, release gates, extension zip checks, optional E2E, and npm
+  publish steps.
+- Latest `npm run release:check` passed after adding the runbook; the npm
+  tarball includes `docs/RELEASE.md`.
+- P4.6 package metadata checking is complete: `npm run check:metadata` reports
+  public reachability for package repository/homepage/bugs URLs and npm package
+  status, returning non-zero while the GitHub URLs are unavailable.
+- Latest `npm run release:check` passed after adding metadata checking; the npm
+  tarball includes `scripts/check-package-metadata.js`.
+- P4.7 prepublish gate is complete: `npm run release:prepublish` now runs
+  metadata checks before the local release gate and is expected to fail until
+  P4.3 repository URLs are public.
+- Latest P4.7 validation: `npm run release:check` passed public-doc residue
+  checks, `npm run check`, `npm test`, and `npm pack --dry-run`; `npm run
+  release:prepublish` failed as expected at `check:metadata` because the current
+  repository and bugs URLs still return 404 or are not publicly reachable.
+- P4.3 blocker remediation is documented in `docs/PUBLISHING_BLOCKERS.md`;
+  latest `npm run release:check` passed after adding that guide, and the npm
+  tarball now includes the blocker guide with 39 total files.
+- P4.8 npm package contents gate is complete: `npm run release:check` now parses
+  `npm pack --json --dry-run` and fails if required runtime, extension, skill,
+  release documentation, or release helper files are missing from the tarball.
+- Latest P4.8 validation: `npm run release:check` passed public-doc residue
+  checks, `npm run check`, `npm test`, and the required npm package contents
+  check; the parsed npm pack output contained 39 files.
+- P4.9 extension zip contents gate is complete: `npm run release:check` now
+  runs `npm run package:extension`, parses the generated zip, and fails if the
+  archive is missing required extension runtime files or includes unexpected
+  files.
+- Latest P4.9 validation: `npm run release:check` passed public-doc residue
+  checks, `npm run check`, `npm test`, required npm package contents validation,
+  and extension zip contents validation; the generated extension zip contained
+  exactly 12 runtime files.
+- P4.10 package / extension version consistency gate is complete:
+  `npm run release:check` now fails if `package.json.version` and
+  `extension/manifest.json.version` are missing or different.
+- Latest P4.10 validation: `npm run release:check` passed public-doc residue
+  checks, version consistency check for `0.1.0`, `npm run check`, `npm test`,
+  required npm package contents validation, and extension zip contents
+  validation.
+- P4.11 npm bin CLI smoke gate is complete: `npm run release:check` now verifies
+  `package.json` bin mapping, `yunti-browser-runtime --help`, and
+  `yunti-browser-runtime --version` behavior through the local CLI entrypoint.
+- Latest P4.11 validation: `npm run release:check` passed public-doc residue
+  checks, version consistency check for `0.1.0`, CLI smoke check for `0.1.0`,
+  `npm run check`, `npm test`, required npm package contents validation, and
+  extension zip contents validation.
+- P4.12 Agent config smoke gate is complete: `npm run release:check` now
+  validates `print-config` JSON output for Codex, Claude Code, Cursor, and
+  Cline, plus the human-readable Codex output for token and skill guidance.
+- Latest P4.12 validation: `npm run release:check` passed public-doc residue
+  checks, version consistency check for `0.1.0`, CLI smoke check for `0.1.0`,
+  print-config smoke check for 4 agents, `npm run check`, `npm test`, required
+  npm package contents validation, and extension zip contents validation.
+- P4.13 doctor JSON smoke gate is complete: `npm run release:check` now runs
+  `scripts/doctor.js`, parses stdout JSON, validates Node/MCP/skill diagnostics,
+  and accepts bridge offline as a structured diagnostic state instead of a release
+  gate failure.
+- Latest P4.13 validation: `npm run release:check` passed public-doc residue
+  checks, version consistency check for `0.1.0`, CLI smoke check for `0.1.0`,
+  print-config smoke check for 4 agents, doctor smoke check with bridge offline,
+  `npm run check`, `npm test`, required npm package contents validation, and
+  extension zip contents validation.
+- P4.14 public Markdown link gate is complete: `npm run release:check` now scans
+  README, docs, and skills Markdown files and fails if a relative Markdown link
+  points to a missing local file.
+- Latest P4.14 validation: `npm run release:check` passed public-doc residue
+  checks, public Markdown link check for 11 Markdown files, version consistency
+  check for `0.1.0`, CLI smoke check for `0.1.0`, print-config smoke check for
+  4 agents, doctor smoke check with bridge offline, `npm run check`, `npm test`,
+  required npm package contents validation, and extension zip contents
+  validation. The release gate test run covered 59 tests, with 58 passed and 1
+  real-browser smoke test skipped by configuration.
+- Latest P4.3 progress: SSH access to
+  `git@github.com:dingguangyi0/yunti-browser-runtime.git` succeeds, and
+  `package.json` now points repository, homepage, and bugs metadata to the
+  matching public GitHub URLs.
+- Next required release step: initialize the local Git repository, push `main`
+  to `origin`, then rerun `npm run check:metadata` and
+  `npm run release:prepublish`.
+
+## Known Risks
+
+- Remote relay environment variables still exist in MCP code for compatibility
+  but are not documented as the first release path.
+- Tool argument validation is improved for the P3.2 focus tools, but broader
+  long-tail tools can still receive the same treatment before a later release.
+- Extension broad host permissions are now documented, but should still be
+  re-reviewed before any store-distributed release.
+- Package repository/homepage/bugs metadata has been switched to the
+  `dingguangyi0/yunti-browser-runtime` GitHub repository, but publishing should
+  still wait until the pushed repository passes `npm run release:prepublish`.
+- Tool names and descriptions must stay clear enough for agents to choose the
+  right route without relying on hidden model knowledge.
+
+## Maintenance Rule
+
+Every meaningful change to runtime behavior, tool schema, extension behavior,
+or install flow must update this file before commit/release.

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Yunti Browser Runtime",
+  "version": "0.1.0",
+  "description": "Local browser runtime for AI agents through MCP.",
+  "permissions": [
+    "activeTab",
+    "debugger",
+    "storage",
+    "tabs",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Yunti Browser Runtime",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,1205 @@
+import test from "node:test"
+import assert from "node:assert/strict"
+import {
+  BRIDGE_TOKEN_HEADER,
+  BridgeHub,
+  handleJsonRpc,
+  startBridgeServer,
+  TOOLS,
+} from "../mcp/server.js"
+
+async function withHttpBridge(fn) {
+  const bridge = await startBridgeServer({
+    host: "127.0.0.1",
+    port: 0,
+    bridgeToken: "test-token",
+  })
+  const address = bridge.server.address()
+  const baseUrl = `http://127.0.0.1:${address.port}`
+  try {
+    await fn({ baseUrl, bridge })
+  } finally {
+    await new Promise((resolve) => bridge.server.close(resolve))
+  }
+}
+
+function authHeaders(extra = {}) {
+  return {
+    "content-type": "application/json",
+    [BRIDGE_TOKEN_HEADER]: "test-token",
+    ...extra,
+  }
+}
+
+async function readJsonResponse(response) {
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: await response.json(),
+  }
+}
+
+test("bridge routes a tool request to the registered browser session", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://shop.example.test/" })
+
+  const call = hub.callTool("yunti_get_page_snapshot", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_get_page_snapshot")
+  assert.equal(event.arguments.browserSessionId, undefined)
+
+  const outcome = hub.submitResult({
+    browserSessionId: "tab-1",
+    requestId: event.id,
+    ok: true,
+    result: { title: "Yunti" },
+  })
+
+  assert.equal(outcome.accepted, true)
+  assert.deepEqual(await call, { title: "Yunti" })
+})
+
+test("bridge HTTP routes require the configured token", async () => {
+  await withHttpBridge(async ({ baseUrl }) => {
+    const unauthorized = await readJsonResponse(await fetch(`${baseUrl}/sessions/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ browserSessionId: "tab-1", userId: "u1" }),
+    }))
+    assert.equal(unauthorized.status, 401)
+    assert.match(unauthorized.body.error, /missing or invalid/)
+
+    const authorized = await readJsonResponse(await fetch(`${baseUrl}/sessions/register`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ browserSessionId: "tab-1", userId: "u1" }),
+    }))
+    assert.equal(authorized.status, 200)
+    assert.equal(authorized.body.ok, true)
+    assert.equal(authorized.body.session.browserSessionId, "tab-1")
+  })
+})
+
+test("bridge health is limited without token and complete with token", async () => {
+  await withHttpBridge(async ({ baseUrl }) => {
+    await fetch(`${baseUrl}/sessions/register`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ browserSessionId: "tab-1", userId: "u1" }),
+    })
+
+    const limited = await readJsonResponse(await fetch(`${baseUrl}/health?userId=u1`))
+    assert.equal(limited.status, 200)
+    assert.equal(limited.body.ok, true)
+    assert.equal(limited.body.authorized, false)
+    assert.equal(limited.body.auth.header, BRIDGE_TOKEN_HEADER)
+    assert.equal(limited.body.sessions, undefined)
+
+    const complete = await readJsonResponse(await fetch(`${baseUrl}/health?userId=u1`, {
+      headers: authHeaders(),
+    }))
+    assert.equal(complete.status, 200)
+    assert.equal(complete.body.sessionCount, 1)
+    assert.equal(complete.body.sessions.length, 1)
+    assert.equal(complete.body.activeSessionId, "tab-1")
+  })
+})
+
+test("bridge CORS only echoes allowed origins", async () => {
+  await withHttpBridge(async ({ baseUrl }) => {
+    const local = await fetch(`${baseUrl}/health`, {
+      headers: { origin: "http://localhost:3000" },
+    })
+    assert.equal(local.headers.get("access-control-allow-origin"), "http://localhost:3000")
+
+    const extension = await fetch(`${baseUrl}/health`, {
+      headers: { origin: "chrome-extension://abc123" },
+    })
+    assert.equal(extension.headers.get("access-control-allow-origin"), "chrome-extension://abc123")
+
+    const remote = await fetch(`${baseUrl}/health`, {
+      headers: { origin: "https://evil.example" },
+    })
+    assert.equal(remote.headers.get("access-control-allow-origin"), null)
+  })
+})
+
+test("browser sessions expire without heartbeat and are cleaned up", () => {
+  const hub = new BridgeHub({ sessionTtlMs: 10 })
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+
+  const expired = hub.cleanupExpiredSessions(Date.now() + 6000)
+
+  assert.equal(expired.length, 1)
+  assert.equal(hub.listSessions({ userId: "u1" }).length, 0)
+  assert.equal(hub.health({ userId: "u1" }).activeSessionId, null)
+})
+
+test("old browserSessionId fails fast with recovery guidance", async () => {
+  const hub = new BridgeHub({ sessionTtlMs: 10 })
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.cleanupExpiredSessions(Date.now() + 6000)
+
+  await assert.rejects(
+    hub.callTool("yunti_get_page_snapshot", { browserSessionId: "tab-1", userId: "u1" }, 10),
+    /stale or disconnected.*yunti_list_browser_targets/
+  )
+})
+
+test("poll heartbeat refreshes session expiry", async () => {
+  const hub = new BridgeHub({ sessionTtlMs: 1000 })
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const firstExpiresAt = hub.sessions.get("tab-1").expiresAt
+
+  const call = hub.callTool("yunti_get_page_snapshot", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 1)
+  const secondExpiresAt = hub.sessions.get("tab-1").expiresAt
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: {} })
+  await call
+  assert.ok(secondExpiresAt >= firstExpiresAt)
+  assert.equal(hub.listSessions({ userId: "u1" }).length, 1)
+})
+
+test("list targets can recover route after another fresh session registers", async () => {
+  const hub = new BridgeHub({ sessionTtlMs: 10 })
+  hub.registerSession({ browserSessionId: "stale-tab", userId: "u1" })
+  hub.cleanupExpiredSessions(Date.now() + 6000)
+  hub.registerSession({ browserSessionId: "fresh-tab", userId: "u1" })
+
+  const call = hub.callTool("yunti_list_browser_targets", { userId: "u1" }, 1000)
+  const event = await hub.poll("fresh-tab", 100)
+
+  assert.equal(event.tool, "yunti_list_browser_targets")
+  hub.submitResult({
+    browserSessionId: "fresh-tab",
+    requestId: event.id,
+    ok: true,
+    result: {
+      browserSessionId: "fresh-tab",
+      targets: [{ targetId: "tab-10", type: "page", tabId: 10 }],
+      total: 1,
+    },
+  })
+  assert.equal((await call).browserSessionId, "fresh-tab")
+})
+
+test("bridge rejects calls when no browser session is active", async () => {
+  const hub = new BridgeHub()
+  await assert.rejects(
+    hub.callTool("yunti_get_page_snapshot", {}, 10),
+    /userId is required/
+  )
+})
+
+test("bridge routes default tool calls by user id when multiple users are connected", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "u1-tab", userId: "u1" })
+  hub.registerSession({ browserSessionId: "u2-tab", userId: "u2" })
+
+  await assert.rejects(
+    hub.callTool("yunti_get_page_snapshot", {}, 10),
+    /userId is required/
+  )
+
+  const call = hub.callTool("yunti_get_page_snapshot", { userId: "u1" }, 1000)
+  const event = await hub.poll("u1-tab", 100)
+
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_get_page_snapshot")
+  assert.equal(event.arguments.userId, undefined)
+
+  hub.submitResult({
+    browserSessionId: "u1-tab",
+    requestId: event.id,
+    ok: true,
+    result: { user: "u1" },
+  })
+
+  assert.deepEqual(await call, { user: "u1" })
+})
+
+test("bridge rejects explicit browser session ids owned by another user", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "u1-tab", userId: "u1" })
+  hub.registerSession({ browserSessionId: "u2-tab", userId: "u2" })
+
+  await assert.rejects(
+    hub.callTool(
+      "yunti_get_page_snapshot",
+      { browserSessionId: "u2-tab", userId: "u1" },
+      10
+    ),
+    /not owned by userId/
+  )
+})
+
+test("mcp tools/list exposes Yunti tools", async () => {
+  const response = await handleJsonRpc({ jsonrpc: "2.0", id: 1, method: "tools/list" }, {
+    mode: "owner",
+    hub: new BridgeHub(),
+  })
+  assert.equal(response.result.tools.length, TOOLS.length)
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_fetch_with_cookie"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_get_network_log"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_cdp_send_command"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_list_browser_targets"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_get_browser_target"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_get_cdp_events"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_remember_learning"))
+  assert.ok(response.result.tools.some((tool) => tool.name === "yunti_get_tool_usage_hints"))
+  const remember = response.result.tools.find((tool) => tool.name === "yunti_remember_learning")
+  const getMemory = response.result.tools.find((tool) => tool.name === "yunti_get_learning_memory")
+  const forgetMemory = response.result.tools.find((tool) => tool.name === "yunti_forget_learning_memory")
+  assert.equal(remember.inputSchema.properties.userId.type, "string")
+  assert.equal(Boolean(remember.inputSchema.required?.includes("userId")), false)
+  assert.equal(Boolean(getMemory.inputSchema.required?.includes("userId")), false)
+  assert.equal(Boolean(forgetMemory.inputSchema.required?.includes("userId")), false)
+})
+
+test("yunti-browser-runtime keeps the complete core tool surface", async () => {
+  const requiredTools = [
+    "yunti_get_tool_usage_hints",
+    "yunti_get_page_snapshot",
+    "yunti_get_selected_context",
+    "yunti_fetch_with_cookie",
+    "yunti_get_network_log",
+    "yunti_clear_network_log",
+    "yunti_clear_network_requests",
+    "yunti_list_network_requests",
+    "yunti_get_network_request",
+    "yunti_remember_learning",
+    "yunti_get_learning_memory",
+    "yunti_forget_learning_memory",
+    "yunti_apply_preview_patch",
+    "yunti_rollback_preview_patch",
+    "yunti_capture_visible_tab",
+    "yunti_click_at",
+    "yunti_type_text",
+    "yunti_press_key",
+    "yunti_scroll",
+    "yunti_drag",
+    "yunti_upload_file",
+    "yunti_click",
+    "yunti_hover",
+    "yunti_fill",
+    "yunti_select",
+    "yunti_fill_form",
+    "yunti_wait_for",
+    "yunti_list_console_messages",
+    "yunti_get_console_message",
+    "yunti_clear_console_messages",
+    "yunti_list_browser_targets",
+    "yunti_get_browser_target",
+    "yunti_cdp_send_command",
+    "yunti_cdp_detach",
+    "yunti_get_cdp_events",
+    "yunti_clear_cdp_events",
+    "yunti_list_pages",
+    "yunti_select_page",
+    "yunti_navigate_page",
+    "yunti_take_screenshot",
+    "yunti_evaluate_script",
+    "yunti_take_snapshot",
+    "yunti_handle_dialog",
+    "yunti_resize_page",
+    "yunti_emulate",
+    "yunti_performance_start_trace",
+    "yunti_performance_stop_trace",
+    "yunti_new_page",
+    "yunti_close_page",
+    "yunti_request_user_confirmation",
+  ]
+  const response = await handleJsonRpc(
+    { jsonrpc: "2.0", id: 1, method: "tools/list" },
+    { mode: "owner", hub: new BridgeHub() }
+  )
+  const names = response.result.tools.map((tool) => tool.name)
+
+  assert.equal(names.length, TOOLS.length)
+  assert.equal(new Set(names).size, names.length)
+  for (const name of requiredTools) {
+    assert.ok(names.includes(name), `${name} should remain exposed`)
+  }
+})
+
+test("single MCP entry keeps low-level browser tools inside yunti-browser-runtime", async () => {
+  const response = await handleJsonRpc(
+    { jsonrpc: "2.0", id: 1, method: "tools/list" },
+    { mode: "owner", hub: new BridgeHub() }
+  )
+  const names = response.result.tools.map((tool) => tool.name)
+
+  assert.ok(names.includes("yunti_cdp_send_command"))
+  assert.ok(names.includes("yunti_list_browser_targets"))
+  assert.ok(names.includes("yunti_fetch_with_cookie"))
+  assert.ok(names.includes("yunti_request_user_confirmation"))
+})
+
+test("browser target inventory routes through the selected browser session", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.registerSession({ browserSessionId: "tab-2", userId: "u1" })
+
+  const call = hub.callTool(
+    "yunti_list_browser_targets",
+    { browserSessionId: "tab-1", userId: "u1" },
+    1000
+  )
+  const event = await hub.poll("tab-1", 100)
+
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_list_browser_targets")
+  assert.equal(event.arguments.browserSessionId, undefined)
+  assert.equal(event.arguments.userId, undefined)
+
+  hub.submitResult({
+    browserSessionId: "tab-1",
+    requestId: event.id,
+    ok: true,
+    result: {
+      targets: [{ targetId: "tab-10", type: "page", tabId: 10 }],
+      total: 1,
+    },
+  })
+
+  assert.deepEqual(await call, {
+    targets: [{ targetId: "tab-10", type: "page", tabId: 10 }],
+    total: 1,
+  })
+})
+
+test("yunti_list_pages uses the live browser target inventory route", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+
+  const call = hub.callTool(
+    "yunti_list_pages",
+    { browserSessionId: "tab-1", userId: "u1" },
+    1000
+  )
+  const event = await hub.poll("tab-1", 100)
+
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_list_pages")
+  assert.equal(event.arguments.browserSessionId, undefined)
+  assert.equal(event.arguments.userId, undefined)
+
+  hub.submitResult({
+    browserSessionId: "tab-1",
+    requestId: event.id,
+    ok: true,
+    result: {
+      pages: [{ browserSessionId: "tab-1", targetId: "tab-10", tabId: 10 }],
+      targets: [{ targetId: "tab-10", type: "page", tabId: 10 }],
+      total: 1,
+    },
+  })
+
+  assert.deepEqual(await call, {
+    pages: [{ browserSessionId: "tab-1", targetId: "tab-10", tabId: 10 }],
+    targets: [{ targetId: "tab-10", type: "page", tabId: 10 }],
+    total: 1,
+  })
+})
+
+test("browser target detail routes through the selected browser session", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+
+  const call = hub.callTool(
+    "yunti_get_browser_target",
+    { browserSessionId: "tab-1", userId: "u1", targetId: "tab-10" },
+    1000
+  )
+  const event = await hub.poll("tab-1", 100)
+
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_get_browser_target")
+  assert.equal(event.arguments.browserSessionId, undefined)
+  assert.equal(event.arguments.userId, undefined)
+  assert.equal(event.arguments.targetId, "tab-10")
+
+  hub.submitResult({
+    browserSessionId: "tab-1",
+    requestId: event.id,
+    ok: true,
+    result: {
+      target: { targetId: "tab-10", type: "page", tabId: 10 },
+    },
+  })
+
+  assert.deepEqual(await call, {
+    target: { targetId: "tab-10", type: "page", tabId: 10 },
+  })
+})
+
+test("cdp command can target an unregistered browser tab through the user's session", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "u1-session", userId: "u1" })
+
+  const call = hub.callTool(
+    "yunti_cdp_send_command",
+    {
+      userId: "u1",
+      tabId: 99,
+      method: "Runtime.evaluate",
+      params: { expression: "document.title", returnByValue: true },
+    },
+    1000
+  )
+  const event = await hub.poll("u1-session", 100)
+
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_cdp_send_command")
+  assert.equal(event.arguments.userId, undefined)
+  assert.equal(event.arguments.browserSessionId, undefined)
+  assert.equal(event.arguments.tabId, 99)
+  assert.equal(event.arguments.method, "Runtime.evaluate")
+
+  hub.submitResult({
+    browserSessionId: "u1-session",
+    requestId: event.id,
+    ok: true,
+    result: { tabId: 99, result: { result: { value: "Target tab" } } },
+  })
+
+  assert.deepEqual(await call, {
+    tabId: 99,
+    result: { result: { value: "Target tab" } },
+  })
+})
+
+test("mcp entry injects the default local browser user scope", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_list_pages",
+      arguments: {},
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, true)
+  assert.match(response.result.content[0].text, /No Yunti browser tab is connected for userId: local/)
+})
+
+test("mcp usage hints can be called without browser user scope", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_close_page" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  assert.equal(payload.tools.yunti_close_page.schema.required.includes("browserSessionId"), true)
+  assert.match(payload.tools.yunti_close_page.commonMistakes.join("\n"), /tabId/)
+})
+
+test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async () => {
+  const fillResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_fill" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(fillResponse.result.isError, undefined)
+  const fillPayload = JSON.parse(fillResponse.result.content[0].text)
+  assert.equal(fillPayload.version, "2026-07-02")
+  assert.equal(fillPayload.tools.yunti_fill.schema.required.includes("value"), true)
+  assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /Coordinate-only fill is not supported/)
+
+  const cdpResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_cdp_send_command" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(cdpResponse.result.isError, undefined)
+  const cdpPayload = JSON.parse(cdpResponse.result.content[0].text)
+  assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /params must be an object/)
+  assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /Target.closeTarget/)
+})
+
+test("bridge stores sanitized network observations", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://shop.example.test/" })
+
+  const stored = hub.recordNetworkEvent({
+    browserSessionId: "tab-1",
+    requestId: "req-1",
+    url: "https://shop.example.test/api/search?token=abc&keyword=test",
+    method: "POST",
+    statusCode: 200,
+    ok: true,
+    requestBody: {
+      kind: "formData",
+      fieldNames: ["password", "keyword"],
+      formData: { password: "secret", keyword: "needle" },
+    },
+  })
+
+  assert.equal(stored.accepted, true)
+  const log = hub.listNetworkEvents({ browserSessionId: "tab-1", userId: "u1" })
+  assert.equal(log.returned, 1)
+  assert.match(log.events[0].url, /token=%5BREDACTED%5D/)
+  assert.equal(log.events[0].requestBody.formData.password, "[REDACTED]")
+  assert.equal(log.events[0].requestBody.formData.keyword, "needle")
+})
+
+test("bridge stores raw CDP events separately from sanitized network observations", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://shop.example.test/" })
+
+  const stored = hub.recordCdpEvent({
+    browserSessionId: "tab-1",
+    tabId: 123,
+    method: "Runtime.consoleAPICalled",
+    params: { type: "log", args: [{ value: "hello" }] },
+    receivedAt: "2026-06-22T00:00:00.000Z",
+  })
+
+  assert.equal(stored.accepted, true)
+  const log = hub.listCdpEvents({ browserSessionId: "tab-1", userId: "u1" })
+  assert.equal(log.returned, 1)
+  assert.equal(log.events[0].method, "Runtime.consoleAPICalled")
+  assert.deepEqual(log.events[0].params, {
+    type: "log",
+    args: [{ value: "hello" }],
+  })
+  assert.equal(log.events[0].capturedBy, "extension.chrome.debugger")
+
+  const cleared = hub.clearCdpEvents({ browserSessionId: "tab-1", userId: "u1" })
+  assert.equal(cleared.deleted, 1)
+  assert.equal(hub.listCdpEvents({ browserSessionId: "tab-1", userId: "u1" }).returned, 0)
+})
+
+test("learning memory can be written and searched", async () => {
+  const previousHome = process.env.YUNTI_HOME
+  const previousDataDir = process.env.YUNTI_BROWSER_DATA_DIR
+  const tempDir = await import("node:fs/promises").then((fs) =>
+    fs.mkdtemp(new URL("yunti-browser-runtime-test-", "file:///tmp/"))
+  )
+  process.env.YUNTI_HOME = tempDir
+  delete process.env.YUNTI_BROWSER_DATA_DIR
+  try {
+    const remember = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "yunti_remember_learning",
+          arguments: {
+            userId: "u1",
+            kind: "api",
+            title: "Search endpoint",
+            detail: "POST /api/search with keyword. token=abc should be redacted.",
+            tags: ["search"],
+          },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+    assert.equal(remember.result.isError, undefined)
+    assert.equal(remember.result.structuredContent.remembered, true)
+
+    const search = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "yunti_get_learning_memory",
+          arguments: { userId: "u1", query: "search" },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+    assert.equal(search.result.structuredContent.returned, 1)
+    assert.match(search.result.structuredContent.memories[0].detail, /token=\[REDACTED\]/)
+
+    const otherUserSearch = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: {
+          name: "yunti_get_learning_memory",
+          arguments: { userId: "u2", query: "search" },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+    assert.equal(otherUserSearch.result.structuredContent.returned, 0)
+  } finally {
+    if (previousHome === undefined) delete process.env.YUNTI_HOME
+    else process.env.YUNTI_HOME = previousHome
+    if (previousDataDir === undefined) delete process.env.YUNTI_BROWSER_DATA_DIR
+    else process.env.YUNTI_BROWSER_DATA_DIR = previousDataDir
+  }
+})
+
+test("learning memory uses the default local user scope", async () => {
+  const previousHome = process.env.YUNTI_HOME
+  const previousDataDir = process.env.YUNTI_BROWSER_DATA_DIR
+  const tempDir = await import("node:fs/promises").then((fs) =>
+    fs.mkdtemp(new URL("yunti-agent-home-test-", "file:///tmp/"))
+  )
+  try {
+    process.env.YUNTI_HOME = tempDir
+    delete process.env.YUNTI_BROWSER_DATA_DIR
+    const response = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "yunti_remember_learning",
+          arguments: {
+            title: "Local default",
+            detail: "This should be written to the default local memory.",
+          },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+
+    assert.equal(response.result.structuredContent.remembered, true)
+    assert.match(response.result.structuredContent.memory.title, /Local default/)
+  } finally {
+    if (previousHome === undefined) delete process.env.YUNTI_HOME
+    else process.env.YUNTI_HOME = previousHome
+    if (previousDataDir === undefined) delete process.env.YUNTI_BROWSER_DATA_DIR
+    else process.env.YUNTI_BROWSER_DATA_DIR = previousDataDir
+  }
+})
+
+test("default learning memory lives under Yunti agent home", async () => {
+  const previousHome = process.env.YUNTI_HOME
+  const previousDataDir = process.env.YUNTI_BROWSER_DATA_DIR
+  const tempDir = await import("node:fs/promises").then((fs) =>
+    fs.mkdtemp(new URL("yunti-agent-home-test-", "file:///tmp/"))
+  )
+  process.env.YUNTI_HOME = tempDir
+  delete process.env.YUNTI_BROWSER_DATA_DIR
+  try {
+    const remember = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "yunti_remember_learning",
+          arguments: {
+            userId: "u-default",
+            kind: "workflow",
+            title: "Default runtime home",
+            detail: "Yunti memories use the canonical runtime home by default.",
+          },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+    assert.equal(remember.result.structuredContent.remembered, true)
+
+    const search = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "yunti_get_learning_memory",
+          arguments: { userId: "u-default", query: "runtime home" },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+    assert.equal(search.result.structuredContent.returned, 1)
+    assert.equal(
+      search.result.structuredContent.storagePath,
+      `${tempDir}/users/u-default/memory/learning-memory.json`
+    )
+  } finally {
+    if (previousHome === undefined) delete process.env.YUNTI_HOME
+    else process.env.YUNTI_HOME = previousHome
+    if (previousDataDir === undefined) delete process.env.YUNTI_BROWSER_DATA_DIR
+    else process.env.YUNTI_BROWSER_DATA_DIR = previousDataDir
+  }
+})
+
+// --- Phase 1 CDP tools ---
+
+test("yunti_select_page switches active session", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+  hub.registerSession({ browserSessionId: "tab-2", userId: "u1", url: "https://shop.example.test/" })
+
+  const result = hub.selectPage("tab-1", { userId: "u1" })
+  assert.equal(result.browserSessionId, "tab-1")
+  const health = hub.health({ userId: "u1" })
+  assert.equal(health.activeSessionId, "tab-1")
+})
+
+test("yunti_select_page rejects another user's browser session", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "u1-tab", userId: "u1", url: "https://app.example.test/" })
+  hub.registerSession({ browserSessionId: "u2-tab", userId: "u2", url: "https://office.example.test/" })
+
+  assert.throws(
+    () => hub.selectPage("u2-tab", { userId: "u1" }),
+    /not owned by userId/
+  )
+})
+
+test("yunti_select_page rejects unknown session", () => {
+  const hub = new BridgeHub()
+  assert.throws(
+    () => hub.selectPage("nonexistent"),
+    /stale or disconnected.*yunti_list_browser_targets/
+  )
+})
+
+test("bridge health and sessions do not expose other users without scope", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "u1-tab", userId: "u1", url: "https://app.example.test/" })
+  hub.registerSession({ browserSessionId: "u2-tab", userId: "u2", url: "https://office.example.test/" })
+
+  const globalHealth = hub.health()
+  assert.equal(globalHealth.sessionCount, 2)
+  assert.equal(globalHealth.sessions.length, 0)
+  assert.equal(globalHealth.activeSessionId, null)
+
+  const u1Health = hub.health({ userId: "u1" })
+  assert.equal(u1Health.sessions.length, 1)
+  assert.equal(u1Health.sessions[0].browserSessionId, "u1-tab")
+  assert.equal(u1Health.activeSessionId, "u1-tab")
+})
+
+test("yunti_navigate_page dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_navigate_page", { browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/#/new" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.type, "tool_request")
+  assert.equal(event.tool, "yunti_navigate_page")
+  assert.equal(event.arguments.url, "https://app.example.test/#/new")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { navigated: true, url: "https://app.example.test/#/new" } })
+  assert.deepEqual(await call, { navigated: true, url: "https://app.example.test/#/new" })
+})
+
+test("yunti_navigate_page supports reload and back actions", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_navigate_page", { browserSessionId: "tab-1", userId: "u1", action: "reload" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_navigate_page")
+  assert.equal(event.arguments.action, "reload")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { navigated: true, action: "reload" } })
+  assert.deepEqual(await call, { navigated: true, action: "reload" })
+})
+
+test("yunti_take_screenshot dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_take_screenshot", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_take_screenshot")
+
+  const dataUrl = "data:image/png;base64,iVBORw0KGgo="
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { dataUrl, mimeType: "image/png", width: 1280, height: 720 } })
+  assert.deepEqual(await call, { dataUrl, mimeType: "image/png", width: 1280, height: 720 })
+})
+
+test("yunti_evaluate_script dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_evaluate_script", { browserSessionId: "tab-1", userId: "u1", expression: "document.title" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_evaluate_script")
+  assert.equal(event.arguments.expression, "document.title")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { value: "SCM Dashboard", type: "string" } })
+  assert.deepEqual(await call, { value: "SCM Dashboard", type: "string" })
+})
+
+test("yunti_take_snapshot dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_take_snapshot", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_take_snapshot")
+
+  const snapshot = {
+    browserSessionId: "tab-1",
+    url: "https://app.example.test/",
+    title: "SCM",
+    elements: [
+      { uid: "yunti-1", role: "button", name: "查询", rect: { x: 100, y: 50, width: 80, height: 32 } },
+    ],
+    elementCount: 1,
+  }
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: snapshot })
+  assert.deepEqual(await call, snapshot)
+})
+
+test("yunti_click dispatches uid-based click to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_click", { browserSessionId: "tab-1", userId: "u1", uid: "yunti-1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_click")
+  assert.equal(event.arguments.uid, "yunti-1")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { clicked: true, uid: "yunti-1" } })
+  assert.deepEqual(await call, { clicked: true, uid: "yunti-1" })
+})
+
+test("yunti_click dispatches coordinate fallback to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_click", { browserSessionId: "tab-1", userId: "u1", x: 120, y: 240 }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_click")
+  assert.equal(event.arguments.x, 120)
+  assert.equal(event.arguments.y, 240)
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { clicked: true } })
+  assert.deepEqual(await call, { clicked: true })
+})
+
+test("yunti_hover dispatches uid-based hover to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_hover", { browserSessionId: "tab-1", userId: "u1", uid: "yunti-2" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_hover")
+  assert.equal(event.arguments.uid, "yunti-2")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { hovered: true, uid: "yunti-2" } })
+  assert.deepEqual(await call, { hovered: true, uid: "yunti-2" })
+})
+
+test("yunti_hover dispatches selector fallback to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_hover", { browserSessionId: "tab-1", userId: "u1", selector: ".menu" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_hover")
+  assert.equal(event.arguments.selector, ".menu")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { hovered: true } })
+  assert.deepEqual(await call, { hovered: true })
+})
+
+test("yunti_fill dispatches uid-based fill to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_fill", { browserSessionId: "tab-1", userId: "u1", uid: "yunti-3", value: "hello" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_fill")
+  assert.equal(event.arguments.uid, "yunti-3")
+  assert.equal(event.arguments.value, "hello")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { filled: true, uid: "yunti-3" } })
+  assert.deepEqual(await call, { filled: true, uid: "yunti-3" })
+})
+
+test("yunti_fill_form dispatches batch fill to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const fields = [
+    { uid: "yunti-1", value: "张三" },
+    { uid: "yunti-2", value: "选项A" },
+  ]
+  const call = hub.callTool("yunti_fill_form", { browserSessionId: "tab-1", userId: "u1", fields }, 2000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_fill_form")
+  assert.equal(event.arguments.fields.length, 2)
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { filled: 2, failed: 0 } })
+  assert.deepEqual(await call, { filled: 2, failed: 0 })
+})
+
+test("yunti_wait_for dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_wait_for", { browserSessionId: "tab-1", userId: "u1", text: "加载完成" }, 5000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_wait_for")
+  assert.equal(event.arguments.text, "加载完成")
+
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { found: true, text: "加载完成", waitedMs: 1200 } })
+  assert.deepEqual(await call, { found: true, text: "加载完成", waitedMs: 1200 })
+})
+
+// --- Phase 2: diagnostics ---
+
+test("console messages are cached and listable by session", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+
+  hub.recordConsoleEvent({ browserSessionId: "tab-1", tabId: 1, level: "error", text: "TypeError: x is undefined", source: "console-api", url: "https://app.example.test/app.js", lineNumber: 42 })
+  hub.recordConsoleEvent({ browserSessionId: "tab-1", tabId: 1, level: "info", text: "Page loaded", source: "console-api" })
+  hub.registerSession({ browserSessionId: "tab-2", userId: "u2" })
+  hub.recordConsoleEvent({ browserSessionId: "tab-2", tabId: 2, level: "warning", text: "deprecated", source: "console-api" })
+
+  assert.throws(() => hub.listConsoleMessages({ allSessions: true }), /userId is required/)
+
+  const u1All = hub.listConsoleMessages({ allSessions: true, userId: "u1" })
+  assert.equal(u1All.total, 2)
+
+  const tab1 = hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1" })
+  assert.equal(tab1.returned, 2)
+  assert.equal(tab1.events[0].level, "info")
+  assert.equal(tab1.events[0].text, "Page loaded")
+
+  const errors = hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1", level: "error" })
+  assert.equal(errors.returned, 1)
+  assert.equal(errors.events[0].text, "TypeError: x is undefined")
+  assert.equal(errors.events[0].url, "https://app.example.test/app.js")
+})
+
+test("allSessions diagnostics are scoped to the requested user", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "u1-tab", userId: "u1" })
+  hub.registerSession({ browserSessionId: "u2-tab", userId: "u2" })
+  hub.recordNetworkEvent({
+    browserSessionId: "u1-tab",
+    requestId: "u1-req",
+    url: "https://app.example.test/api/u1",
+    method: "GET",
+  })
+  hub.recordNetworkEvent({
+    browserSessionId: "u2-tab",
+    requestId: "u2-req",
+    url: "https://app.example.test/api/u2",
+    method: "GET",
+  })
+  hub.recordCdpEvent({
+    browserSessionId: "u1-tab",
+    method: "Target.getTargets",
+    params: { targetInfos: [{ targetId: "a" }] },
+  })
+  hub.recordCdpEvent({
+    browserSessionId: "u2-tab",
+    method: "Target.getTargets",
+    params: { targetInfos: [{ targetId: "b" }] },
+  })
+
+  assert.throws(() => hub.listNetworkEvents({ allSessions: true }), /userId is required/)
+  assert.deepEqual(
+    hub.listNetworkEvents({ allSessions: true, userId: "u1" }).events.map(e => e.requestId),
+    ["u1-req"]
+  )
+  assert.equal(hub.listCdpEvents({ allSessions: true, userId: "u1" }).returned, 1)
+  assert.equal(hub.clearNetworkEvents({ allSessions: true, userId: "u1" }).deleted, 1)
+  assert.equal(hub.listNetworkEvents({ allSessions: true, userId: "u2" }).returned, 1)
+})
+
+test("yunti_clear_network_requests clears network observations like the legacy log tool", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.recordNetworkEvent({
+    browserSessionId: "tab-1",
+    requestId: "req-1",
+    url: "https://app.example.test/api/list",
+    method: "GET",
+  })
+
+  assert.equal(hub.listNetworkEvents({ browserSessionId: "tab-1", userId: "u1" }).returned, 1)
+  assert.deepEqual(
+    await hub.callBridgeLocalTool("yunti_clear_network_requests", {
+      browserSessionId: "tab-1",
+      userId: "u1",
+    }),
+    { deleted: 1 }
+  )
+  assert.equal(hub.listNetworkEvents({ browserSessionId: "tab-1", userId: "u1" }).returned, 0)
+})
+
+test("console message detail can be fetched by msgid", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.recordConsoleEvent({ browserSessionId: "tab-1", level: "error", text: "fail", stackTrace: "at foo (app.js:42)", source: "console-api" })
+
+  const log = hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1" })
+  const msg = hub.getConsoleMessage({ browserSessionId: "tab-1", userId: "u1", msgId: log.events[0].id })
+  assert.equal(msg.level, "error")
+  assert.equal(msg.stackTrace, "at foo (app.js:42)")
+})
+
+test("console message detail is scoped to the selected browser session", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.registerSession({ browserSessionId: "tab-2", userId: "u1" })
+  hub.recordConsoleEvent({ browserSessionId: "tab-1", level: "error", text: "fail" })
+
+  const log = hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1" })
+  assert.throws(
+    () => hub.getConsoleMessage({ browserSessionId: "tab-2", userId: "u1", msgId: log.events[0].id }),
+    /console message not found/
+  )
+})
+
+test("console messages can be cleared", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.recordConsoleEvent({ browserSessionId: "tab-1", level: "error", text: "boom" })
+  assert.equal(hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1" }).total, 1)
+  hub.clearConsoleMessages({ browserSessionId: "tab-1", userId: "u1" })
+  assert.equal(hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1" }).total, 0)
+})
+
+test("yunti_get_network_request returns single request by id", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const stored = hub.recordNetworkEvent({
+    browserSessionId: "tab-1",
+    requestId: "req-42",
+    url: "https://app.example.test/api/data",
+    method: "POST",
+    statusCode: 200,
+    ok: true,
+    durationMs: 150,
+    requestBody: { kind: "formData", fieldNames: ["keyword"], formData: { keyword: "test" } },
+  })
+
+  const req = hub.getNetworkRequest({ browserSessionId: "tab-1", userId: "u1", eventId: stored.event.id })
+  assert.equal(req.url, "https://app.example.test/api/data")
+  assert.equal(req.method, "POST")
+  assert.equal(req.statusCode, 200)
+  assert.equal(req.requestId, "req-42")
+  assert.equal(req.id, stored.event.id)
+})
+
+test("yunti_get_network_request throws for unknown id", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  assert.throws(
+    () => hub.getNetworkRequest({ browserSessionId: "tab-1", userId: "u1", eventId: 99999 }),
+    /network request not found/
+  )
+})
+
+test("yunti_get_network_request is scoped to the selected browser session", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  hub.registerSession({ browserSessionId: "tab-2", userId: "u1" })
+  const stored = hub.recordNetworkEvent({
+    browserSessionId: "tab-1",
+    requestId: "req-42",
+    url: "https://app.example.test/api/data",
+    method: "GET",
+  })
+
+  assert.throws(
+    () => hub.getNetworkRequest({ browserSessionId: "tab-2", userId: "u1", eventId: stored.event.id }),
+    /network request not found/
+  )
+})
+
+// --- Phase 3: emulation, dialog, performance ---
+
+test("yunti_handle_dialog dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_handle_dialog", { browserSessionId: "tab-1", userId: "u1", action: "accept", promptText: "yes" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_handle_dialog")
+  assert.equal(event.arguments.action, "accept")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { handled: true } })
+  assert.deepEqual(await call, { handled: true })
+})
+
+test("yunti_resize_page dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_resize_page", { browserSessionId: "tab-1", userId: "u1", width: 1920, height: 1080 }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_resize_page")
+  assert.equal(event.arguments.width, 1920)
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { resized: true, width: 1920, height: 1080 } })
+  assert.deepEqual(await call, { resized: true, width: 1920, height: 1080 })
+})
+
+test("yunti_emulate dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_emulate", { browserSessionId: "tab-1", userId: "u1", deviceName: "iPhone 12" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_emulate")
+  assert.equal(event.arguments.deviceName, "iPhone 12")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { emulated: true } })
+  assert.deepEqual(await call, { emulated: true })
+})
+
+test("yunti_performance_start_trace dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_performance_start_trace", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_performance_start_trace")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { tracing: true } })
+  assert.deepEqual(await call, { tracing: true })
+})
+
+test("yunti_performance_stop_trace dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_performance_stop_trace", { browserSessionId: "tab-1", userId: "u1" }, 5000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_performance_stop_trace")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { events: [], durationMs: 1000 } })
+  assert.deepEqual(await call, { events: [], durationMs: 1000 })
+})
+
+test("yunti_new_page dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_new_page", { browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_new_page")
+  assert.equal(event.arguments.url, "https://app.example.test/")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { created: true, browserSessionId: "new-tab-99", tabId: 99, url: "https://app.example.test/" } })
+  assert.deepEqual(await call, { created: true, browserSessionId: "new-tab-99", tabId: 99, url: "https://app.example.test/" })
+})
+
+test("yunti_close_page dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_close_page", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_close_page")
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: { closed: true } })
+  assert.deepEqual(await call, { closed: true })
+})

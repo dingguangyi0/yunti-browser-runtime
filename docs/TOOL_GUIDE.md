@@ -119,9 +119,13 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - When `before` / `after` positions are comparable, scroll results include
   `moved`; if positions do not change, the result reports
   `code: "NO_SCROLL_MOVEMENT"`, `ok: false`, and `recoverable: true`.
+  When direction can be inferred, it also includes `edgeHint` such as
+  `possible-bottom-edge`, `possible-top-edge`, `possible-right-edge`, or
+  `possible-left-edge`.
 - After scrolling, observe again and compare document or container `before` /
   `after` positions before assuming the needed element is visible. Stop
-  repeating the same scroll when `moved: false` appears.
+  repeating the same scroll when `moved: false` appears; use `edgeHint` to
+  choose a different container, direction, or recovery path.
 
 ## Select Guidance
 

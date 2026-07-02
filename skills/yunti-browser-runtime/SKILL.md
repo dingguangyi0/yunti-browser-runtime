@@ -89,8 +89,8 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Prefer a fresh `scrollableContainers[]` uid from `yunti_observe_page` when scrolling nested app panels or sidebars.
 - Uid-targeted scroll resolves the observed container center and reuses the existing coordinate/container scroll path, so coordinate recovery remains compatible.
 - Uid scroll preserves the existing `target` compatibility field and adds `uid`, `method: "uid"`, and `scrollTarget` for structured interpretation.
-- When `before` / `after` positions are comparable, scroll results include `moved`; if positions do not change, the result reports `code: "NO_SCROLL_MOVEMENT"`, `ok: false`, and `recoverable: true`.
-- After scrolling, observe again and compare document or container `before` / `after` positions before assuming the needed element is visible. Stop repeating the same scroll when `moved: false` appears.
+- When `before` / `after` positions are comparable, scroll results include `moved`; if positions do not change, the result reports `code: "NO_SCROLL_MOVEMENT"`, `ok: false`, `recoverable: true`, and directional `edgeHint` values such as `possible-bottom-edge`, `possible-top-edge`, `possible-right-edge`, or `possible-left-edge` when direction can be inferred.
+- After scrolling, observe again and compare document or container `before` / `after` positions before assuming the needed element is visible. Stop repeating the same scroll when `moved: false` appears; use `edgeHint` to choose a different container, direction, or recovery path.
 
 ## Select Guidance
 

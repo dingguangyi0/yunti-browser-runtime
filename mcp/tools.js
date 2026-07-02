@@ -1168,19 +1168,19 @@ export function toolUsageHints(args = {}) {
         "Uid scroll resolves the observed container center and reuses the existing coordinate/container scroll path.",
         "Coordinate scroll remains compatible for recovery and debugging when uid is unavailable.",
         "Current results preserve scrolled, deltaX/deltaY, target, before/after, browserSessionId, action, ok, recoverable, and nextStepHint; uid path also adds uid, method=uid, and scrollTarget without replacing target.",
-        "When before/after positions are comparable, results include moved; no movement returns code=NO_SCROLL_MOVEMENT, ok=false, and recoverable=true.",
+        "When before/after positions are comparable, results include moved; no movement returns code=NO_SCROLL_MOVEMENT, ok=false, recoverable=true, and edgeHint such as possible-bottom-edge, possible-top-edge, possible-right-edge, or possible-left-edge when direction can be inferred.",
       ],
       recovery: [
         "Stale or missing uid: call yunti_observe_page again and use a fresh scrollable container uid.",
         "Wrong container moved or did not move: observe again and compare scrollableContainers before/after positions.",
-        "No movement: inspect scroll boundaries, try the nearest observed scrollable container uid, or stop repeating the same scroll.",
+        "No movement: use edgeHint to inspect likely scroll boundaries, try the nearest observed scrollable container uid, or stop repeating the same scroll.",
         "Element still outside viewport: scroll the nearest scrollable container first, then observe and act by fresh uid.",
         "Wrong tab or stale route: refresh targets with yunti_list_browser_targets and route through the intended browserSessionId.",
       ],
       commonMistakes: [
         "Do not assume document scroll will move nested app panels; use observed scrollable container uids when available.",
         "Do not overwrite or reinterpret the existing target field; uid scroll adds scrollTarget while preserving target compatibility.",
-        "Do not blindly repeat scroll when moved=false or NO_SCROLL_MOVEMENT appears; observe or inspect boundaries first.",
+        "Do not blindly repeat scroll when moved=false or NO_SCROLL_MOVEMENT appears; read edgeHint, observe, or inspect boundaries first.",
       ],
     },
     yunti_select: {

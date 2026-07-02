@@ -472,6 +472,21 @@ fill/select/scroll semantics.
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
+- P6.2 scroll no-movement diagnostics now include directional `edgeHint` values
+  when delta direction can be inferred, such as `possible-bottom-edge`,
+  `possible-top-edge`, `possible-right-edge`, and `possible-left-edge`. This
+  helps agents stop repeating the same scroll and choose a different direction,
+  nearby scrollable container uid, or recovery path.
+- Latest P6.2 scroll edge-hint targeted validation:
+  `node --test tests/tool-handlers.test.js` passed 25 tests.
+- Latest P6.2 scroll edge-hint full validation: `git diff --check` passed;
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js` passed 90
+  tests; `npm run release:check` passed with 95 node:test cases total, 94
+  passed, and 1 real-browser smoke skipped by default; npm package contents
+  validation passed with 42 files; extension zip contents validation passed
+  with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
+  because Playwright/Chromium is not installed locally; the token residue grep
+  returned no matches.
 
 ## Decisions
 

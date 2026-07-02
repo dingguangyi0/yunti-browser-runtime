@@ -2044,6 +2044,16 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   用例，其中 93 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
   包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
   test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
+- `yunti_scroll` 无位移诊断已增加方向性 `edgeHint`：在 `moved: false` 且 delta 方向
+  可判断时，返回 `possible-bottom-edge`、`possible-top-edge`、`possible-right-edge` 或
+  `possible-left-edge`，帮助 Agent 判断是否可能到达滚动边界、需要换方向、换容器或停止重复。
+  本切片仍不改变原有 scroll 派发路径和兼容字段。
+- 最新 targeted 验证：`node --test tests/tool-handlers.test.js` 通过 25 项。
+- 最新 full 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js
+  tests/bridge.test.js` 通过 90 项；`npm run release:check` 通过，覆盖 95 个 node:test
+  用例，其中 94 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
+  包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
+  test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

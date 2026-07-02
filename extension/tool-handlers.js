@@ -777,6 +777,7 @@ export function createToolDispatcher({
         Number(result.before.top) !== Number(result.after.top)
       : undefined
     const noMovement = moved === false
+    const edgeHint = noMovement ? inferScrollEdgeHint(result.deltaX, result.deltaY) : undefined
 
     return {
       ...result,
@@ -786,14 +787,25 @@ export function createToolDispatcher({
       ...(uid ? { scrollTarget: { uid, method: "uid" } } : {}),
       ...(moved !== undefined ? { moved } : {}),
       ...(noMovement ? { code: "NO_SCROLL_MOVEMENT" } : {}),
+      ...(edgeHint ? { edgeHint } : {}),
       ok: !noMovement,
       recoverable: noMovement,
       nextStepHint: noMovement
-        ? "Scroll dispatched but before/after positions did not change. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll."
+        ? `Scroll dispatched but before/after positions did not change${edgeHint ? ` (${edgeHint})` : ""}. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.`
         : uid
           ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
           : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
     }
+  }
+
+  function inferScrollEdgeHint(deltaX, deltaY) {
+    const x = Number(deltaX)
+    const y = Number(deltaY)
+    if (Number.isFinite(y) && y > 0) return "possible-bottom-edge"
+    if (Number.isFinite(y) && y < 0) return "possible-top-edge"
+    if (Number.isFinite(x) && x > 0) return "possible-right-edge"
+    if (Number.isFinite(x) && x < 0) return "possible-left-edge"
+    return "no-delta"
   }
 
   async function selectElement(tabId, session, args = {}) {

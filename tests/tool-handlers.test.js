@@ -515,10 +515,52 @@ test("scroll no movement reports recoverable boundary diagnostic", async () => {
       action: "scroll",
       moved: false,
       code: "NO_SCROLL_MOVEMENT",
+      edgeHint: "possible-bottom-edge",
       ok: false,
       recoverable: true,
-      nextStepHint: "Scroll dispatched but before/after positions did not change. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.",
+      nextStepHint: "Scroll dispatched but before/after positions did not change (possible-bottom-edge). Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.",
     })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("scroll no movement infers horizontal and upward edge hints", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_scroll: (message) => ({
+        scrolled: true,
+        deltaX: Number(message.arguments.deltaX || 0),
+        deltaY: Number(message.arguments.deltaY || 0),
+        target: "document",
+        before: { left: 20, top: 80 },
+        after: { left: 20, top: 80 },
+      }),
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-top-edge",
+      tool: "yunti_scroll",
+      arguments: { deltaY: -240 },
+    })
+    assert.equal(harness.posted.at(-1).result.edgeHint, "possible-top-edge")
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-right-edge",
+      tool: "yunti_scroll",
+      arguments: { deltaX: 180, deltaY: 0 },
+    })
+    assert.equal(harness.posted.at(-1).result.edgeHint, "possible-right-edge")
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-left-edge",
+      tool: "yunti_scroll",
+      arguments: { deltaX: -180, deltaY: 0 },
+    })
+    assert.equal(harness.posted.at(-1).result.edgeHint, "possible-left-edge")
   } finally {
     harness.restore()
   }

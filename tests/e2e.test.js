@@ -65,6 +65,15 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     assert.equal(snapshot.browserSessionId, browserSessionId)
     assert.match(snapshot.visibleText, /Yunti E2E Smoke/)
 
+    const observation = await callTool(bridge, "yunti_observe_page", {
+      browserSessionId,
+      redaction: "balanced",
+    })
+    assert.equal(observation.browserSessionId, browserSessionId)
+    assert.match(observation.textTree, /Click me/)
+    assert.ok(observation.elements.some((element) => element.uid && element.name === "Click me"))
+    assert.equal(observation.redactions.screenshotRedacted, false)
+
     await callTool(bridge, "yunti_fill", {
       browserSessionId,
       selector: "#name",

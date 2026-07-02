@@ -1559,8 +1559,19 @@ uid 生命周期：
   click/hover/fill 的 uid 说明更新为 observe/snapshot fresh uid。
 - `tests/bridge.test.js` 已覆盖工具 surface、observe usage hints schema，以及
   `yunti_observe_page` 从 bridge 转发到 extension 的路由合约。
-- 本切片仍未实现 extension 侧 DOM observation collector；真实浏览器 smoke 留到
-  content script observe MVP 合并后执行。
+- `extension/dom-observer.js` 已新增 content-script DOM observation MVP，返回 fresh uid、
+  compact text tree、viewport/document scroll、scrollable container metadata、balanced
+  redaction metadata 和恢复 hints。
+- `extension/content.js` 已接入 `yunti_observe_page`，`extension/manifest.json` 和
+  extension/package release gates 已纳入 `dom-observer.js`。
+- `tests/dom-observer.test.js` 已覆盖基础 DOM 观察、fresh uid、textTree、balanced
+  redaction、URL query 脱敏和 scroll metadata。
+- `tests/e2e.test.js` 已把 `yunti_observe_page` 加入 opt-in real-browser smoke。
+- 最新验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 65 个
+  node:test 用例，其中 64 个通过、1 个 real-browser smoke 按默认配置跳过；
+  `YUNTI_E2E=1 npm run test:e2e` 在当前环境因缺少 Playwright/Chromium 被跳过。
+- 本切片仍未实现 uid map 与 action 兼容；`observe -> click uid -> observe` 闭环留到
+  下一切片，不重写 action layer。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

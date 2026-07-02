@@ -27,7 +27,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
+      "js": ["dom-observer.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

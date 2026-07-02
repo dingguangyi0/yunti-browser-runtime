@@ -366,6 +366,8 @@ function updateWidgetStatus(text, auth = null) {
 
 async function executeTool(tool, args) {
   switch (tool) {
+    case "yunti_observe_page":
+      return observePage(args)
     case "yunti_get_page_snapshot":
       return getPageSnapshot(args)
     case "yunti_get_selected_context":
@@ -395,6 +397,14 @@ async function executeTool(tool, args) {
     default:
       throw new Error(`Unknown Yunti browser tool: ${tool}`)
   }
+}
+
+function observePage(args = {}) {
+  if (!window.YuntiBrowserRuntimeObserver?.observePage) {
+    throw new Error("yunti_observe_page is unavailable because the DOM observer module was not loaded. Refresh the page and try again.")
+  }
+  window.__YUNTI_BROWSER_SESSION_ID__ = browserSessionId
+  return window.YuntiBrowserRuntimeObserver.observePage(args)
 }
 
 async function getPageSnapshot(args = {}) {

@@ -19,6 +19,7 @@ const allowedFiles = [
   "background.js",
   "cdp.js",
   "content.css",
+  "dom-observer.js",
   "content.js",
   "network-monitor.js",
   "manifest.json",

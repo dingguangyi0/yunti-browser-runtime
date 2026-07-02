@@ -707,11 +707,28 @@ export function createToolDispatcher({
       }
     }
   
-    return chrome.tabs.sendMessage(tabId, {
+    const selector = String(args.selector || "").trim()
+    const result = await chrome.tabs.sendMessage(tabId, {
       type: "yunti_execute_tool",
       tool: "yunti_fill",
       arguments: args,
     })
+
+    if (!result || typeof result !== "object" || result.filled !== true) {
+      return result
+    }
+
+    return {
+      ...result,
+      selector,
+      method: result.method || "selector",
+      browserSessionId: session.browserSessionId,
+      action: "fill",
+      target: { selector, method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Selector fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+    }
   }
 
   async function scrollPage(tabId, session, args = {}) {

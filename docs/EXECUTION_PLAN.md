@@ -72,7 +72,7 @@
   和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
   `observe -> click uid -> observe/verify` 真实浏览器闭环。
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
-  keyboard/fill select、coordinate click/hover、selector hover/click passthrough 和
+  keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough。
 - P6.2 下一切片：继续补齐剩余 action paths 的结构化结果，例如 selector fill、
   contenteditable/type/press key、drag 或 upload，同时保留所有既有兼容字段与 CDP fallback。
@@ -1819,6 +1819,20 @@ P6.1 真实浏览器闭环验证 runbook：
 - 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
   通过 9 项。
 - 最新完整验证：`npm run release:check` 通过，覆盖 78 个 node:test 用例，其中 77 个
+  通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
+  npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
+  因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 selector fallback `yunti_fill` content-script passthrough
+  结果增量追加结构化字段：`action: "fill"`、`target`、`ok`、`recoverable`、
+  `nextStepHint`、`selector`、`method: "selector"` 和 `browserSessionId`，同时保留
+  content-script 返回的 `filled`、`element`、`valueLength` 兼容字段；本切片不改
+  content-script fill 的 `scrollIntoView`、`setEditableText`、input/change 事件或
+  contenteditable 处理语义。
+- `tests/tool-handlers.test.js` 已新增 selector fill passthrough 断言，确保结构化字段不会替代或
+  破坏既有 content-script selector fill 返回。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 10 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 79 个 node:test 用例，其中 78 个
   通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
   npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
   因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。

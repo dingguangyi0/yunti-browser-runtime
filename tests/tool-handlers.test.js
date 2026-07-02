@@ -473,6 +473,43 @@ test("uid fill select path preserves compatibility fields with structured result
   }
 })
 
+test("selector fill preserves content result with structured result", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_fill: {
+        filled: true,
+        element: "input#search",
+        valueLength: 5,
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-selector",
+      tool: "yunti_fill",
+      arguments: { selector: "#search", value: "hello" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: true,
+      element: "input#search",
+      valueLength: 5,
+      selector: "#search",
+      method: "selector",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { selector: "#search", method: "selector" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Selector fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("missing uid now points agents back to observe or snapshot", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

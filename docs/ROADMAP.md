@@ -35,6 +35,28 @@
 - Publish an npm package.
 - Prepare public docs and examples.
 
+## Phase 5: Local Install Simplification
+
+- Default local loopback bridge usage does not require a token.
+- MCP server starts the local bridge automatically.
+- Extension popup stays zero-config on first run.
+- Token, bridge URL, and page match customization stay in advanced settings.
+
+## Phase 6: Agentic Page Runtime
+
+See [NEXT_MAJOR_PLAN.md](NEXT_MAJOR_PLAN.md) for the durable `0.2.0` execution
+plan.
+
+- Add agent-friendly page observation with text DOM, stable uids, and scroll
+  hints.
+- Improve DOM actions for click, fill, select, contenteditable, and scrollable
+  containers.
+- Document an observe-act-verify workflow for external agents.
+- Promote DOM redaction and page content policy to first-class behavior.
+- Add optional local runtime console without changing the zero-config install
+  path.
+- Prepare extension distribution readiness for browser stores.
+
 ## Future: Remote Mode
 
 Remote multi-user operation is intentionally out of the first release. It should

@@ -58,6 +58,13 @@
 | P5.1 | 已完成 | 本地默认免 bridge token |
 | P5.2 | 已完成 | 扩展 popup 与安装引导简化 |
 | P5.3 | 已完成 | 扩展首屏零配置 |
+| P6.0 | 已完成 | 0.2.0 大版本执行计划沉淀 |
+| P6.1 | 计划中 | Agent 友好的页面观察 |
+| P6.2 | 计划中 | 稳定 DOM action 层 |
+| P6.3 | 计划中 | Agent 工作流契约 |
+| P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
+| P6.5 | 计划中 | 可选本地运行时控制台 |
+| P6.6 | 计划中 | 浏览器扩展分发准备 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1374,6 +1381,103 @@ metadata 与当前 `package.json` 一致。
 - `npm view yunti-browser-runtime version dist-tags.latest --registry=https://registry.npmjs.org/`
   返回 `0.1.3`。
 
+## P6.0 0.2.0 大版本执行计划沉淀
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- 新增 `docs/NEXT_MAJOR_PLAN.md`，作为 `0.2.0 Agentic Page Runtime` 的持久执行契约。
+- 明确从 Page Agent 吸收的方向：文本 DOM 观察、交互元素索引、滚动提示、
+  action 稳定性、历史/活动事件思想、DOM 内容脱敏。
+- 明确不吸收的方向：默认不内置 LLM API key、不把细粒度 MCP 工具替换成单一
+  `execute_task`、不让 hub tab/side panel 成为必选项、不把远程多用户模式混入本地
+  单用户核心。
+- 将 P6.1-P6.6 写入本执行计划和 `docs/ROADMAP.md`。
+- 将 `docs/PROJECT_STATUS.md` 的当前阶段更新为 `0.2.0` 规划状态。
+
+### 目标
+
+避免上下文压缩或线程切换后丢失下一大版本方向，让后续实现可以直接从仓库文档恢复
+目标、非目标、阶段顺序、验收标准和下一步。
+
+### 验收标准
+
+- 仓库中存在独立的下一大版本计划文档。
+- `ROADMAP`、`PROJECT_STATUS`、`EXECUTION_PLAN` 都指向或记录 `0.2.0` 方向。
+- 下一步明确从 P6.1 `yunti_observe_page` 开始。
+
+### 验收记录
+
+- `npm run release:check` 通过；公开文档残留检查、Markdown 相对链接检查、语法检查、
+  单测、npm pack 内容检查和 extension zip 内容检查均通过。
+
+## P6.1 Agent 友好的页面观察
+
+状态：计划中
+
+目标：
+
+新增 `yunti_observe_page`，返回适合外部 Agent 使用的页面观察结果：URL/title、页面
+尺寸、滚动位置、可交互文本树、稳定 uid、scrollable 容器信息和脱敏元数据。
+
+详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
+
+## P6.2 稳定 DOM action 层
+
+状态：计划中
+
+目标：
+
+抽取并增强 DOM action 层，提高 click、hover、fill、select、contenteditable、scroll
+容器操作的稳定性，让动作结果更容易被 Agent 验证和恢复。
+
+详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
+
+## P6.3 Agent 工作流契约
+
+状态：计划中
+
+目标：
+
+将 `observe -> act -> verify` 作为默认 Agent 使用范式写入 skill、tool hints 和文档，
+减少盲目重试和坐标操作。
+
+详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
+
+## P6.4 DOM 脱敏与页面内容策略
+
+状态：计划中
+
+目标：
+
+把 DOM observation 的敏感内容脱敏提升为一等能力，与现有 network/console redaction
+形成统一安全边界。
+
+详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
+
+## P6.5 可选本地运行时控制台
+
+状态：计划中
+
+目标：
+
+提供非必选的本地调试控制台，用于查看 bridge 状态、连接页面、最近工具调用、错误和
+stop/cancel 操作，同时保持 popup 零配置。
+
+详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
+
+## P6.6 浏览器扩展分发准备
+
+状态：计划中
+
+目标：
+
+准备 Chrome Web Store / Edge Add-ons 上架材料和权限说明，降低最终用户手动加载扩展的
+安装成本，同时保留 unpacked extension 开发路径。
+
+详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
+
 ## 每阶段完成后的固定检查
 
 ```bash
@@ -1395,11 +1499,14 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P0.1-P5.3 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm registry。
+P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm registry。
 
 - 发布后验证已通过：`npm run release:verify-published`。
 - 本地默认使用不再需要 bridge token；需要加固时可显式设置
   `YUNTI_BROWSER_BRIDGE_TOKEN`。
 - 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
+- `0.2.0 Agentic Page Runtime` 的大版本计划已沉淀到
+  `docs/NEXT_MAJOR_PLAN.md`。
+- 下一步从 P6.1 `yunti_observe_page` 开始。
 - 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
-- 后续版本开发前，先在本文档新增下一阶段目标、范围和验收标准。
+- 后续版本开发前，先按 `docs/NEXT_MAJOR_PLAN.md` 拆阶段执行并更新本文档验收记录。

@@ -567,7 +567,7 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
   assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /Target.closeTarget/)
 })
 
-test("mcp usage hints document select uid and visible text planning", async () => {
+test("mcp usage hints document select uid value and text paths", async () => {
   const response = await handleJsonRpc({
     jsonrpc: "2.0",
     id: 1,
@@ -582,15 +582,15 @@ test("mcp usage hints document select uid and visible text planning", async () =
   const payload = JSON.parse(response.result.content[0].text)
   const selectHints = payload.tools.yunti_select
 
-  assert.equal(selectHints.schema.required.includes("value"), true)
-  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.includes("selector")), true)
-  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.includes("uid")), true)
+  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.join(",") === "selector,value"), true)
+  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.join(",") === "uid,value"), true)
+  assert.equal(selectHints.schema.anyOf.some((entry) => entry.required.join(",") === "uid,text"), true)
   assert.equal(selectHints.schema.properties.uid.type, "string")
   assert.equal(selectHints.schema.properties.text.type, "string")
-  assert.match(selectHints.notes.join("\n"), /selector\/value and uid\/value/)
-  assert.match(selectHints.notes.join("\n"), /Visible option text is still planned/)
+  assert.match(selectHints.notes.join("\n"), /selector\/value, uid\/value, and uid\/text/)
+  assert.match(selectHints.notes.join("\n"), /visible option text/)
   assert.match(selectHints.recovery.join("\n"), /available options/)
-  assert.match(selectHints.commonMistakes.join("\n"), /visible option text/)
+  assert.match(selectHints.commonMistakes.join("\n"), /text without uid/)
   assert.match(selectHints.commonMistakes.join("\n"), /selector\/value compatibility/)
 })
 

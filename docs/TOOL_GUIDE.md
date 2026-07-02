@@ -97,9 +97,10 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 
 ## Select Guidance
 
-- Current `yunti_select` runtime behavior supports selector/value and uid/value.
-- Visible option `text` remains planned; pass option `value` until that runtime
-  slice lands.
+- Current `yunti_select` runtime behavior supports selector/value, uid/value,
+  and uid/visible text.
+- Use `text` with a fresh uid when the user-facing option label is clearer than
+  the option value; selector path remains selector/value compatible.
 - Before retrying a failed select, inspect available options with observe,
   snapshot, evaluate, or a stable selector instead of blindly repeating it.
 

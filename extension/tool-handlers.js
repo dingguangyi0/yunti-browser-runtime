@@ -757,7 +757,10 @@ export function createToolDispatcher({
   async function selectElement(tabId, session, args = {}) {
     const uid = String(args.uid || "").trim()
     const value = String(args.value ?? "")
+    const text = String(args.text ?? "")
     if (uid) {
+      const matchMode = text ? "text" : "value"
+      const targetOption = text || value
       const { x, y } = await resolveUidCenter(tabId, session, uid)
       await ensureCdpAttached(tabId, "1.3")
       const result = await chromeDebuggerSendCommand(
@@ -770,13 +773,18 @@ export function createToolDispatcher({
             if (el.tagName.toLowerCase() !== "select") {
               return { ok: false, code: "NOT_SELECT", error: "Element at uid is not a select element" };
             }
-            const option = Array.from(el.options).find((item) => item.value === ${JSON.stringify(value)});
+            const options = Array.from(el.options);
+            const option = options.find((item) => {
+              if (${JSON.stringify(matchMode)} === "text") return item.text.trim() === ${JSON.stringify(targetOption)};
+              return item.value === ${JSON.stringify(targetOption)};
+            });
             if (!option) {
               return {
                 ok: false,
                 code: "OPTION_NOT_FOUND",
-                error: "Option value not found",
-                availableValues: Array.from(el.options).map((item) => item.value).slice(0, 50),
+                error: ${JSON.stringify(matchMode)} === "text" ? "Option text not found" : "Option value not found",
+                availableValues: options.map((item) => item.value).slice(0, 50),
+                availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
               };
             }
             el.value = option.value;
@@ -794,22 +802,27 @@ export function createToolDispatcher({
       )
       const selectResult = result?.result?.value
       if (!selectResult?.ok) {
-        const suffix = selectResult?.availableValues?.length
-          ? ` Available values: ${selectResult.availableValues.join(", ")}.`
+        const available = matchMode === "text" ? selectResult?.availableTexts : selectResult?.availableValues
+        const label = matchMode === "text" ? "texts" : "values"
+        const suffix = available?.length
+          ? ` Available ${label}: ${available.join(", ")}.`
           : ""
-        throw new Error(`${selectResult?.error || `Cannot select value at uid ${uid}`}.${suffix} Observe again, inspect available options, or retry with selector/value fallback.`)
+        throw new Error(`${selectResult?.error || `Cannot select option at uid ${uid}`}.${suffix} Observe again, inspect available options, or retry with selector/value fallback.`)
       }
       return {
         selected: true,
         uid,
         value: selectResult.value,
+        text: selectResult.optionText,
         selectedIndex: selectResult.selectedIndex,
         browserSessionId: session.browserSessionId,
         action: "select",
-        target: { uid, method: "uid.value" },
+        target: { uid, method: matchMode === "text" ? "uid.text" : "uid.value" },
         ok: true,
         recoverable: false,
-        nextStepHint: "Uid select dispatched by option value. Observe again, read page state, or evaluate the select value to verify the intended change.",
+        nextStepHint: matchMode === "text"
+          ? "Uid select dispatched by visible option text. Observe again, read page state, or evaluate the select value to verify the intended change."
+          : "Uid select dispatched by option value. Observe again, read page state, or evaluate the select value to verify the intended change.",
       }
     }
 

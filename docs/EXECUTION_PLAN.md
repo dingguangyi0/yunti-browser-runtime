@@ -1689,8 +1689,8 @@ P6.1 真实浏览器闭环验证 runbook：
 - 当前 selector/value 路径保留。
 - P6.2 已增加 `uid + value` runtime 路径，并写明如何与 `yunti_observe_page` 的 uid
   衔接。
-- visible text 支持仍待后续小切片实现；Agent 应继续传 option `value`，不要把可见文本
-  当作已支持的 `text` runtime 参数。
+- P6.2 已增加 `uid + visible text` runtime 路径；Agent 可以在 fresh uid 下传 `text`，
+  但 selector 路径仍保持 selector/value 兼容，不支持 selector/text。
 
 最新切片记录（2026-07-03）：
 
@@ -1982,6 +1982,23 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   tests/bridge.test.js` 通过 85 项。
 - 最新 full 验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 90 个
   node:test 用例，其中 89 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
+  内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
+  残留检查无输出。
+- `extension/tool-handlers.js` 已为 `yunti_select` 增加 `uid + visible text` runtime path：
+  复用 fresh uid 定位 select，通过 option 可见文本精确匹配并派发 `change` / `input`
+  事件；selector/value 和 uid/value 路径保持不变。
+- `mcp/tools.js`、`docs/TOOL_GUIDE.md` 和 `skills/yunti-browser-runtime/SKILL.md`
+  已同步为 selector/value、uid/value、uid/text 三条路径均可用，同时明确 selector
+  路径仍保持 selector/value 兼容。
+- `tests/tool-handlers.test.js` 已新增 uid select visible text path 断言，确保结果保留
+  `selected`、`uid`、`value`、`text`、`selectedIndex` 等兼容字段并追加结构化 action result。
+- `tests/bridge.test.js` 已更新 select usage hints 断言，锁住 schema 的 selector/value、
+  uid/value、uid/text 三条路径。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js
+  tests/bridge.test.js` 通过 86 项。
+- 最新 full 验证：`git diff --check` 通过；`npm run release:check` 通过，覆盖 91 个
+  node:test 用例，其中 90 个通过、1 个 real-browser smoke 按默认配置跳过；extension zip
   内容检查通过，包含 13 个文件；npm package 内容检查通过，包含 42 个文件；
   `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token
   残留检查无输出。

@@ -595,6 +595,7 @@ test("uid select value path preserves compatibility fields with structured resul
       selected: true,
       uid: "yunti-plan",
       value: "pro",
+      text: "Pro",
       selectedIndex: 1,
       browserSessionId: "tab-1",
       action: "select",
@@ -609,6 +610,75 @@ test("uid select value path preserves compatibility fields with structured resul
     )
     assert.equal(harness.cdpCommands.at(-1).method, "Runtime.evaluate")
     assert.match(harness.cdpCommands.at(-1).params.expression, /item\.value === "pro"/)
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid select visible text path preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select-text",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-plan",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 20, y: 30, width: 120, height: 24 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            ok: true,
+            value: "enterprise",
+            selectedIndex: 2,
+            optionText: "Enterprise",
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-uid-text",
+      tool: "yunti_select",
+      arguments: { uid: "yunti-plan", text: "Enterprise" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: true,
+      uid: "yunti-plan",
+      value: "enterprise",
+      text: "Enterprise",
+      selectedIndex: 2,
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { uid: "yunti-plan", method: "uid.text" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Uid select dispatched by visible option text. Observe again, read page state, or evaluate the select value to verify the intended change.",
+    })
+    assert.deepEqual(
+      harness.sentMessages.map((item) => item.message.tool),
+      ["yunti_observe_page"]
+    )
+    assert.equal(harness.cdpCommands.at(-1).method, "Runtime.evaluate")
+    assert.match(harness.cdpCommands.at(-1).params.expression, /item\.text\.trim\(\) === "Enterprise"/)
   } finally {
     harness.restore()
   }

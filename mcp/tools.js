@@ -622,13 +622,13 @@ export const TOOLS = [
   {
     name: "yunti_select",
     description:
-      "Select an option in a select element on the current browser page. Supports selector/value and uid/value while keeping selector/value compatible; P6.2 is preparing visible text selection.",
+      "Select an option in a select element on the current browser page. Supports selector/value plus uid/value or uid/text while keeping selector/value compatible.",
     inputSchema: {
       type: "object",
-      required: ["value"],
       anyOf: [
-        { required: ["selector"] },
-        { required: ["uid"] },
+        { required: ["selector", "value"] },
+        { required: ["uid", "value"] },
+        { required: ["uid", "text"] },
       ],
       properties: {
         browserSessionId: {
@@ -642,17 +642,17 @@ export const TOOLS = [
         uid: {
           type: "string",
           description:
-            "Fresh uid path from yunti_observe_page or yunti_take_snapshot. Uses option value matching in the current runtime.",
+            "Fresh uid path from yunti_observe_page or yunti_take_snapshot. Supports option value or visible text matching.",
         },
         value: {
           type: "string",
           description:
-            "Option value to select. Current runtime matches value through selector path.",
+            "Option value to select. Supported with selector or uid.",
         },
         text: {
           type: "string",
           description:
-            "Planned P6.2 visible option text fallback. Use value until visible text runtime support lands.",
+            "Visible option text to select. Supported with uid when the user-facing label is clearer than the value.",
         },
       },
     },
@@ -1158,14 +1158,14 @@ export function toolUsageHints(args = {}) {
       ],
     },
     yunti_select: {
-      purpose: "Select an option in a select element by selector/value or fresh uid/value while preserving the current selector/value path.",
-      required: ["value"],
+      purpose: "Select an option in a select element by selector/value, fresh uid/value, or fresh uid/visible text while preserving the current selector/value path.",
+      required: [],
       recommended: ["browserSessionId", "uid", "value"],
       notes: [
-        "Current runtime behavior supports selector/value and uid/value; selector/value remains compatible for existing workflows.",
+        "Current runtime behavior supports selector/value, uid/value, and uid/text; selector/value remains compatible for existing workflows.",
         "Prefer a fresh uid from yunti_observe_page or yunti_take_snapshot when available, then verify the selected option afterward.",
-        "Visible option text is still planned; use option value as the stable selector until that runtime slice lands.",
-        "Current successful results preserve selected, element, value, selector, browserSessionId, action, target, ok, recoverable, and nextStepHint.",
+        "Use visible option text when the user-facing label is clearer than the option value.",
+        "Current successful results preserve selected, element, value, text, uid/selector, browserSessionId, action, target, ok, recoverable, and nextStepHint.",
       ],
       recovery: [
         "Selector path fails: observe again, inspect the select element, then retry with a stable selector or wait for the form to render.",
@@ -1174,7 +1174,7 @@ export function toolUsageHints(args = {}) {
         "Wrong tab or stale route: refresh targets with yunti_list_browser_targets and route through the intended browserSessionId.",
       ],
       commonMistakes: [
-        "Do not pass visible option text as text yet; visible text support is still planned, so pass the option value.",
+        "Do not pass text without uid; selector path remains selector/value compatible.",
         "Do not remove selector/value compatibility while adding uid support.",
         "Do not treat a selected=true result as final proof when the workflow depends on the changed page state; observe or evaluate the field value.",
         "Do not blindly retry the same selector if the page is still rendering or the option list is dynamic.",

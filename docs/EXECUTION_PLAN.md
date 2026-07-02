@@ -59,12 +59,23 @@
 | P5.2 | 已完成 | 扩展 popup 与安装引导简化 |
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
-| P6.1 | 实现验证中 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中 | 稳定 DOM action 层与结构化 action result |
+| P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
+| P6.2 | 进行中：已完成 action result 多路径结构化切片，下一步 scroll result | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
 | P6.6 | 计划中 | 浏览器扩展分发准备 |
+
+当前 0.2.0 推进快照（2026-07-03）：
+
+- P6.1：`yunti_observe_page` schema、tool hints、bridge routing、content-script observer
+  和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
+  `observe -> click uid -> observe/verify` 真实浏览器闭环。
+- P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖 uid click/hover/fill
+  keyboard/fill select、coordinate click/hover、selector hover/click passthrough。
+- P6.2 下一切片：为 `yunti_scroll` content-script passthrough 结果追加非破坏性的
+  `action`、`ok`、`recoverable`、`nextStepHint` 字段，同时保留 `scrolled`、`deltaX/Y`、
+  `target`、`before/after` 等现有兼容字段。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1609,7 +1620,7 @@ P6.1 真实浏览器闭环验证 runbook：
 
 ## P6.2 稳定 DOM action 层
 
-状态：计划中
+状态：进行中（2026-07-03）
 
 目标：
 

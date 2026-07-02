@@ -115,6 +115,14 @@ npm run release:publish
 The dry-run and publish scripts both run `npm run release:prepublish` before
 publishing. They also pin `https://registry.npmjs.org/` so a local mirror
 registry configuration cannot accidentally receive the release.
+`npm run release:publish` also runs `npm run release:whoami` before publishing.
+
+If npm auth is missing, log in first:
+
+```bash
+npm adduser --registry=https://registry.npmjs.org/
+npm run release:whoami
+```
 
 After publishing, verify:
 

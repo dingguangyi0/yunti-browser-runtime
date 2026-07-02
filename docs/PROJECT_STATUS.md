@@ -209,7 +209,14 @@ repository/homepage/bugs URL confirmation is complete for the
 - Latest P4.16 validation: `npm run release:dry-run` passed, entered
   `release:prepublish` first, then completed npm publish dry-run against
   `https://registry.npmjs.org/`; the tarball contained 39 files.
-- Next required release step: if `0.1.0` is confirmed as the first release, run
+- P4.17 npm auth preflight is complete: `release:whoami` checks login against
+  `https://registry.npmjs.org/`, and `release:publish` runs it before
+  `npm publish`.
+- Latest P4.17 validation: `npm run release:whoami` currently fails with
+  `ENEEDAUTH`, so this machine needs `npm adduser --registry=https://registry.npmjs.org/`
+  before the final publish.
+- Next required release step: log in to npmjs.org, rerun `npm run
+  release:whoami`, then if `0.1.0` is confirmed as the first release, run
   `npm run release:publish`.
 
 ## Known Risks

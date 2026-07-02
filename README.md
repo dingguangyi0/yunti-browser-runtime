@@ -210,6 +210,13 @@ npm run release:dry-run
 `release:dry-run` 会先执行 `npm run check:metadata` 和 `npm run release:check`，
 再显式使用官方 npm registry，避免本机 registry mirror 影响发布预览。
 
+正式发布前先登录官方 npm registry：
+
+```bash
+npm adduser --registry=https://registry.npmjs.org/
+npm run release:whoami
+```
+
 真实浏览器 E2E smoke test 默认跳过；需要本机安装 Playwright / Chromium 后显式启用：
 
 ```bash

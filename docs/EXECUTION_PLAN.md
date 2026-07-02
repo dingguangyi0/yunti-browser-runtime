@@ -52,6 +52,7 @@
 | P4.14 | 已完成 | 公开文档相对链接门禁 |
 | P4.15 | 已完成 | npm 官方 registry 发布脚本 |
 | P4.16 | 已完成 | 正式发布脚本内置门禁 |
+| P4.17 | 已完成 | npm 登录预检门禁 |
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -1092,7 +1093,8 @@ skill 文档里的本地跳转都能指向实际文件。
 实现摘要：
 
 - `release:dry-run` 已改为内置执行 `npm run release:prepublish`。
-- `release:publish` 已改为内置执行 `npm run release:prepublish`。
+- `release:publish` 已改为内置执行 `npm run release:prepublish` 和
+  `npm run release:whoami`。
 - README 和 `docs/RELEASE.md` 已移除需要手动先跑 `release:prepublish` 的发布命令序列。
 
 ### 目标
@@ -1104,6 +1106,7 @@ release gate、npm package 内容检查和 extension zip 内容检查。
 
 - `package.json` 中 `release:dry-run` 包含 `npm run release:prepublish`。
 - `package.json` 中 `release:publish` 包含 `npm run release:prepublish`。
+- `package.json` 中 `release:publish` 包含 `npm run release:whoami`。
 - `npm run release:dry-run` 会先跑完整 prepublish gate，再生成官方 npm registry
   dry-run 预览。
 
@@ -1119,6 +1122,36 @@ release gate、npm package 内容检查和 extension zip 内容检查。
   contents 和 extension zip contents。
 - dry-run 输出显示 `Publishing to https://registry.npmjs.org/`，tarball 包含
   39 个文件。
+
+## P4.17 npm 登录预检门禁
+
+状态：已完成（2026-07-03）
+
+实现摘要：
+
+- 新增 `npm run release:whoami`，执行
+  `npm whoami --registry=https://registry.npmjs.org/`。
+- `npm run release:publish` 已串联 `npm run release:whoami`，在正式发布前先确认
+  当前机器已登录官方 npm registry。
+- README、`docs/RELEASE.md` 和项目状态已同步 npm 登录预检说明。
+
+### 目标
+
+让正式发布在缺少 npm 登录时以明确、可操作的错误提前停止，而不是进入 publish
+流程后才暴露认证问题。
+
+### 验收标准
+
+- `package.json` 中存在 `release:whoami`。
+- `release:publish` 在 `npm publish --registry=https://registry.npmjs.org/`
+  前执行 `npm run release:whoami`。
+- 未登录 npmjs.org 时，`npm run release:whoami` 返回非零退出码并提示登录。
+
+### 验收记录
+
+- `npm run release:whoami` 当前返回 `ENEEDAUTH`，说明本机尚未登录
+  `https://registry.npmjs.org/`。
+- `release:publish` 已内置登录预检；登录前不会进入正式 npm publish。
 
 ## 每阶段完成后的固定检查
 
@@ -1141,8 +1174,10 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P4.3-P4.16 已完成，当前发布前最后动作：
+P4.3-P4.17 已完成，当前发布前最后动作：
 
 - `npm run release:dry-run` 已通过内置发布前门禁和官方 npm registry 预览。
+- 先执行 `npm adduser --registry=https://registry.npmjs.org/` 完成 npm 登录。
+- 登录后执行 `npm run release:whoami` 确认认证状态。
 - 如确认要发布 `0.1.0`，执行 `npm run release:publish`。
 - 浏览器扩展如需上架商店，发布前还需重新审查 broad host permissions。

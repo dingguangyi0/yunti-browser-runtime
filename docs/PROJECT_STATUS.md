@@ -11,8 +11,9 @@ selector/value, uid/value, uid/text, and structured uid/selector failure
 diagnostics; contenteditable fill and uid-targeted scroll are covered; and
 scroll no-movement diagnostics now include directional `edgeHint`, structured
 `recoveryHint`, machine-readable `decision`, and executable `suggestedRetry`
-parameters. The next compatibility-preserving slice should continue into
-deeper scroll/select semantics.
+parameters. The next compatibility-preserving slice should add structured
+selector/uid fill failure diagnostics, then continue into deeper
+fill/scroll/select semantics.
 
 ## Current State
 

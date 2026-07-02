@@ -581,13 +581,20 @@ export function createToolDispatcher({
     }
     const point = await resolveSelectorCenter(tabId, selector)
     await mouseMove(tabId, point.x, point.y)
+    const roundedX = Math.round(point.x)
+    const roundedY = Math.round(point.y)
     return {
       hovered: true,
       selector,
-      x: Math.round(point.x),
-      y: Math.round(point.y),
+      x: roundedX,
+      y: roundedY,
       browserSessionId: session.browserSessionId,
       method: "selector",
+      action: "hover",
+      target: { selector, method: "selector", x: roundedX, y: roundedY },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Selector hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
     }
   }
   

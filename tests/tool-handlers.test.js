@@ -192,6 +192,52 @@ test("coordinate hover preserves compatibility fields with structured result", a
   }
 })
 
+test("selector hover preserves compatibility fields with structured result", async () => {
+  const harness = createDispatcherHarness({
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            ok: true,
+            x: 101.2,
+            y: 202.6,
+          },
+        },
+      },
+      {},
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-hover-selector",
+      tool: "yunti_hover",
+      arguments: { selector: "#menu" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      hovered: true,
+      selector: "#menu",
+      x: 101,
+      y: 203,
+      browserSessionId: "tab-1",
+      method: "selector",
+      action: "hover",
+      target: { selector: "#menu", method: "selector", x: 101, y: 203 },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Selector hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+    })
+    assert.deepEqual(
+      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
+      ["mouseMoved"]
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("dispatcher preserves current action result shapes", async () => {
   const harness = createDispatcherHarness({
     observations: [

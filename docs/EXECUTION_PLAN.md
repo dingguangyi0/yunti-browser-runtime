@@ -1773,6 +1773,18 @@ P6.1 真实浏览器闭环验证 runbook：
   通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
   npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
   因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
+- `extension/tool-handlers.js` 已为 selector fallback `yunti_hover` 结果增量追加
+  结构化字段：`action: "hover"`、`target`、`ok`、`recoverable`、`nextStepHint`，同时保留
+  `hovered`、`selector`、`x/y`、`method: "selector"`、`browserSessionId` 兼容字段；本切片不改
+  selector 定位、scrollIntoView 或 CDP mouse move 派发语义。
+- `tests/tool-handlers.test.js` 已新增 selector hover 断言，确保结构化字段不会替代或
+  破坏既有 selector fallback 兼容返回。
+- 最新 targeted 验证：`git diff --check` 通过；`node --test tests/tool-handlers.test.js`
+  通过 8 项。
+- 最新完整验证：`npm run release:check` 通过，覆盖 77 个 node:test 用例，其中 76 个
+  通过、1 个 real-browser smoke 按默认配置跳过；extension zip 内容检查通过，包含 13 个文件；
+  npm package 内容检查通过，包含 42 个文件；`YUNTI_E2E=1 npm run test:e2e` 在当前环境
+  因缺少 Playwright/Chromium 被跳过；token 残留检查无输出。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

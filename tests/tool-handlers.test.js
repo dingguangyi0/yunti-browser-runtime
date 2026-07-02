@@ -214,6 +214,11 @@ test("dispatcher preserves current action result shapes", async () => {
       method: "keyboard",
       value: "hi",
       browserSessionId: "tab-1",
+      action: "fill",
+      target: { uid: "yunti-input", method: "keyboard" },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
     })
 
     await harness.dispatcher.executeToolRequest(123, session, {

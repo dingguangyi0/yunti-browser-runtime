@@ -688,6 +688,7 @@ function dispatchPointerMouseSequence(element, x, y) {
 }
 
 function setEditableText(element, text, options = {}) {
+  assertEditableTarget(element)
   if (element.isContentEditable) {
     const next = options.replace ? text : `${element.textContent || ""}${text}`
     element.textContent = next
@@ -700,6 +701,31 @@ function setEditableText(element, text, options = {}) {
   }
   element.dispatchEvent(new Event("input", { bubbles: true }))
   element.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
+function assertEditableTarget(element) {
+  if (!element) throw new Error("No editable target is focused")
+  const style = getComputedStyle(element)
+  const rect = element.getBoundingClientRect()
+  const tag = element.tagName.toLowerCase()
+  const type = String(element.type || "").toLowerCase()
+  if (element.hidden || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0 || rect.width <= 0 || rect.height <= 0) {
+    throw new Error("Target element is hidden or has no size")
+  }
+  if (element.disabled || element.getAttribute("aria-disabled") === "true") {
+    throw new Error("Target element is disabled")
+  }
+  if (element.readOnly || element.getAttribute("aria-readonly") === "true") {
+    throw new Error("Target element is readonly")
+  }
+  if (element.isContentEditable) return
+  if ("value" in element) {
+    if (tag === "input" && ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"].includes(type)) {
+      throw new Error(`Target input type ${type} is not editable`)
+    }
+    return
+  }
+  throw new Error("Target element is not editable")
 }
 
 function setNativeValue(element, value) {

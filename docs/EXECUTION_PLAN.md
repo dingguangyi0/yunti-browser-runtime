@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry；当前下一刀：补齐 uid/selector fill 对不可编辑、隐藏、disabled/readonly 目标的结构化诊断 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry、uid/selector fill 不可编辑/隐藏/disabled/readonly 诊断；下一步继续收敛更深 select/fill/scroll 语义 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -82,9 +82,10 @@
   `recoveryHint`、机器可读 `decision` 和可执行 `suggestedRetry` 诊断。
 - P6.2 第一轮 action result 覆盖、select uid/text、contenteditable fill 和 scroll
   recovery diagnostics 已补齐；selector/uid fill 失败诊断和 `yunti_fill_form` 聚合诊断也已落地。
-  当前下一刀已明确为 uid/selector fill 的不可编辑、隐藏、disabled/readonly 目标诊断：失败时返回
-  `filled: false`、`ok: false`、`code`、`recoveryHint` 和 `nextStepHint`，并保留所有既有成功路径、
-  兼容字段与 CDP fallback。
+  uid/selector fill 的不可编辑、隐藏、disabled/readonly 目标诊断也已补齐：失败时返回
+  `filled: false`、`ok: false`、`code: "TARGET_NOT_EDITABLE"`、`recoveryHint` 和
+  `nextStepHint`，并保留所有既有成功路径、兼容字段与 CDP fallback。下一步继续进入更深的
+  select/fill/scroll 语义增强与真实浏览器闭环补验。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2080,6 +2081,21 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   `npm run release:check` 通过，覆盖 102 个 node:test 用例，其中 101 个通过、1 个
   real-browser smoke 按默认配置跳过；npm package 内容检查通过，包含 42 个文件；
   extension zip 内容检查通过，包含 13 个文件。
+- `yunti_fill` 不可编辑目标诊断已补齐：uid fill 会在派发键盘事件前检查目标是否隐藏、
+  disabled、readonly 或不是 input/textarea/select/contenteditable 等可编辑目标；selector
+  fill 的 content-script 路径也会在 `setEditableText` 前检查 hidden/no-size、disabled、
+  readonly 和不可编辑 input type。失败时返回或归类为 `code: "TARGET_NOT_EDITABLE"`，
+  透传 `filled: false`、`ok: false`、`recoverable: true`、`recoveryHint` 和
+  `nextStepHint`，uid 路径还会附带轻量 `element` 诊断元数据。本切片不改变成功 fill、
+  select、contenteditable 或 CDP fallback 兼容字段。
+- 最新 targeted 验证：`node --check extension/tool-handlers.js` 通过；
+  `node --check extension/content.js` 通过；`node --test tests/tool-handlers.test.js`
+  通过 34 项。
+- 最新 full 验证：`git diff --check` 通过；token 残留检查无输出；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，覆盖 104 个 node:test 用例，其中 103 个通过、1 个
+  real-browser smoke 按默认配置跳过；npm package 内容检查通过，包含 42 个文件；
+  extension zip 内容检查通过，包含 13 个文件。
 - `yunti_scroll` 已开始支持 fresh scrollable container uid：`yunti_observe_page` 返回的
   `scrollableContainers[]` 会进入当前 browserSessionId 最新 uid map；调用 `yunti_scroll`
   传 `uid` 时会解析容器中心点并复用既有 content-script coordinate/container scroll 路径。
@@ -2260,11 +2276,12 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
 - `0.2.0 Best Browser Automation Runtime` 的大版本计划已沉淀到
   `docs/NEXT_MAJOR_PLAN.md`。
-- 继续 P6.2 的小切片推进：下一刀建议补齐 uid/selector fill 的不可编辑、隐藏或 disabled
-  目标诊断，帮助 agent 区分“需要重新 observe/scroll/wait”还是“目标本身不可编辑”。
+- 继续 P6.2 的小切片推进：uid/selector fill 的不可编辑、隐藏、disabled/readonly
+  目标诊断已落地；下一刀建议继续收敛 select/fill/scroll 的更深语义，优先补真实浏览器闭环
+  或选项/字段状态观察的验证缺口。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
-  能力，只在失败结果里追加更具体的 `code`、`recoveryHint` 和验证提示。
-- 验证重点：新增 focused dispatcher 测试覆盖不可编辑或隐藏目标失败；继续执行
+  能力；新增诊断只在失败结果里追加更具体的 `code`、`recoveryHint`、`element` 摘要和验证提示。
+- 验证重点：继续执行
   `git diff --check`、token 残留检查、`YUNTI_E2E=1 npm run test:e2e` 和
   `npm run release:check`。
 - 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。

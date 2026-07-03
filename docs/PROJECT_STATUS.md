@@ -14,9 +14,10 @@ scroll no-movement diagnostics now include directional `edgeHint`, structured
 parameters; and selector/uid fill failures now return structured recovery
 diagnostics; aggregate `yunti_fill_form` results now preserve per-field
 structured fill failure diagnostics. The next compatibility-preserving slice
-is explicitly scoped to uid/selector fill diagnostics for non-editable, hidden,
-disabled, or readonly targets, while preserving existing successful fill/select/
-scroll behavior and compatibility fields.
+has completed uid/selector fill diagnostics for non-editable, hidden, disabled,
+or readonly targets while preserving existing successful fill/select/scroll
+behavior and compatibility fields. The next slice should continue deeper
+select/fill/scroll semantics or real-browser closure validation.
 
 ## Current State
 
@@ -515,6 +516,24 @@ scroll behavior and compatibility fields.
   cases total, 101 passed, and 1 real-browser smoke skipped by default; npm
   package contents validation passed with 42 files; extension zip contents
   validation passed with 13 files.
+- P6.2 non-editable fill diagnostics are complete. Uid fill now inspects the
+  resolved target before dispatching keyboard events and returns structured
+  `TARGET_NOT_EDITABLE` diagnostics for hidden/no-size, disabled, readonly, or
+  non-editable targets. Selector fill now checks editability in the content
+  script before mutating values. Failed results keep `filled: false`, `ok:
+  false`, `recoverable: true`, `code`, `recoveryHint`, and `nextStepHint`; uid
+  failures can also include a lightweight `element` diagnostic summary.
+- Latest P6.2 non-editable fill diagnostic targeted validation:
+  `node --check extension/tool-handlers.js` passed; `node --check
+  extension/content.js` passed; `node --test tests/tool-handlers.test.js`
+  passed 34 tests.
+- Latest P6.2 non-editable fill diagnostic full validation: `git diff
+  --check` passed; the token residue grep returned no matches; `YUNTI_E2E=1
+  npm run test:e2e` was executed but skipped because Playwright/Chromium is
+  not installed locally; `npm run release:check` passed with 104 node:test
+  cases total, 103 passed, and 1 real-browser smoke skipped by default; npm
+  package contents validation passed with 42 files; extension zip contents
+  validation passed with 13 files.
 - P6.2 deeper scroll semantics have started with fresh observed scrollable
   container uids. `yunti_observe_page` scrollableContainers now feed the current
   browserSessionId uid map, and `yunti_scroll` can resolve a container uid to
@@ -659,9 +678,10 @@ scroll behavior and compatibility fields.
   P6.1 validation gap until Playwright/Chromium is available locally.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   marking P6.1 fully closed.
-- Continue P6.2 in small compatibility-preserving slices: the next candidate is
-  deeper uid/selector fill diagnostics for non-editable, hidden, or disabled
-  targets, followed by deeper select/scroll semantics.
+- Continue P6.2 in small compatibility-preserving slices: uid/selector fill
+  diagnostics for non-editable, hidden, disabled, and readonly targets are
+  complete; the next candidates are deeper select/fill/scroll semantics and
+  real-browser closure validation when Playwright/Chromium is available.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

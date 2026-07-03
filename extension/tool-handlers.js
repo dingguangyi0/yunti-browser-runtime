@@ -637,22 +637,35 @@ export function createToolDispatcher({
             const el = document.elementFromPoint(${x}, ${y});
             if (!el) return 'not found';
             const tag = el.tagName.toLowerCase();
+            const rect = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            const type = String(el.type || '').toLowerCase();
+            const disabled = Boolean(el.disabled || el.getAttribute('aria-disabled') === 'true');
+            const readOnly = Boolean(el.readOnly || el.getAttribute('aria-readonly') === 'true');
+            const hidden = Boolean(el.hidden || style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0 || rect.width <= 0 || rect.height <= 0);
+            const valueEditable = tag === 'input' || tag === 'textarea';
+            const blockedInputType = tag === 'input' && ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(type);
+            const editable = el.isContentEditable || tag === 'select' || (valueEditable && !blockedInputType);
             if (tag === 'select') {
               const opts = Array.from(el.options);
-              return { tag: 'select', options: opts.map(o => ({ value: o.value, text: o.text.slice(0, 80) })), selectedIndex: el.selectedIndex };
+              return { tag: 'select', type, disabled, readOnly, hidden, editable, options: opts.map(o => ({ value: o.value, text: o.text.slice(0, 80) })), selectedIndex: el.selectedIndex };
             }
             const beforeText = el.isContentEditable ? String(el.textContent || '') : '';
             if (el.isContentEditable) {
               el.focus();
               el.textContent = '';
-            } else if (tag === 'input' || tag === 'textarea') {
+            } else if (valueEditable && !blockedInputType && !disabled && !readOnly && !hidden) {
               el.focus();
               el.select();
             }
             return {
               tag,
-              type: el.type,
+              type,
               contentEditable: el.isContentEditable,
+              disabled,
+              readOnly,
+              hidden,
+              editable,
               before: el.isContentEditable ? { textLength: beforeText.length } : undefined,
             };
           })()`,
@@ -665,6 +678,14 @@ export function createToolDispatcher({
           return buildUidFillFailureResult(session, uid, {
             code: "ELEMENT_NOT_FOUND",
             error: `No element found at uid ${uid} coordinates`,
+          })
+        }
+
+        if (elInfo?.hidden || elInfo?.disabled || elInfo?.readOnly || elInfo?.editable === false) {
+          return buildUidFillFailureResult(session, uid, {
+            code: "TARGET_NOT_EDITABLE",
+            error: buildFillEditabilityError(uid, elInfo),
+            element: summarizeFillTarget(elInfo),
           })
         }
   
@@ -826,6 +847,7 @@ export function createToolDispatcher({
     }
 
     return {
+      ...(fillResult && typeof fillResult === "object" ? fillResult : {}),
       filled: false,
       uid,
       browserSessionId: session.browserSessionId,
@@ -845,8 +867,41 @@ export function createToolDispatcher({
   function inferFillFailureCode(error, fallbackCode) {
     const message = String(error || "").toLowerCase()
     if (message.includes("not found") || message.includes("cannot resolve coordinates")) return "ELEMENT_NOT_FOUND"
-    if (message.includes("not editable") || message.includes("no editable target")) return "TARGET_NOT_EDITABLE"
+    if (
+      message.includes("not editable") ||
+      message.includes("no editable target") ||
+      message.includes("cannot accept text") ||
+      message.includes("disabled") ||
+      message.includes("read only") ||
+      message.includes("readonly") ||
+      message.includes("hidden") ||
+      message.includes("no size")
+    ) return "TARGET_NOT_EDITABLE"
     return fallbackCode
+  }
+
+  function buildFillEditabilityError(uid, elInfo = {}) {
+    const tag = elInfo?.tag || "unknown"
+    const type = elInfo?.type ? ` type=${elInfo.type}` : ""
+    const reasons = []
+    if (elInfo?.hidden) reasons.push("hidden or has no size")
+    if (elInfo?.disabled) reasons.push("disabled")
+    if (elInfo?.readOnly) reasons.push("readonly")
+    if (elInfo?.editable === false) reasons.push("not editable")
+    const reason = reasons.length ? reasons.join(", ") : "not editable"
+    return `Target at uid ${uid} is not editable (${tag}${type}: ${reason})`
+  }
+
+  function summarizeFillTarget(elInfo = {}) {
+    return {
+      tag: elInfo?.tag,
+      ...(elInfo?.type ? { type: elInfo.type } : {}),
+      ...(elInfo?.contentEditable !== undefined ? { contentEditable: Boolean(elInfo.contentEditable) } : {}),
+      ...(elInfo?.disabled !== undefined ? { disabled: Boolean(elInfo.disabled) } : {}),
+      ...(elInfo?.readOnly !== undefined ? { readOnly: Boolean(elInfo.readOnly) } : {}),
+      ...(elInfo?.hidden !== undefined ? { hidden: Boolean(elInfo.hidden) } : {}),
+      ...(elInfo?.editable !== undefined ? { editable: Boolean(elInfo.editable) } : {}),
+    }
   }
 
   async function scrollPage(tabId, session, args = {}) {

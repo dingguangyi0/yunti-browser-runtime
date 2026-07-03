@@ -110,6 +110,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   diagnostics with `code`, `ok: false`, `recoverable: true`, `recoveryHint`,
   and `nextStepHint`; follow `recoveryHint.nextAction` / `decision` before
   repeating the same fill.
+- Non-editable, hidden, disabled, or readonly fill targets return
+  `code: "TARGET_NOT_EDITABLE"` diagnostics instead of being treated as
+  successful fills; inspect the target or wait/unlock the field before retrying.
 - Select-option fill misses include `availableValues` / `availableTexts` when
   available, so inspect those options before retrying with `yunti_fill` or
   `yunti_select`.

@@ -1144,6 +1144,7 @@ export function toolUsageHints(args = {}) {
         "Coordinate-only fill is not supported; use uid or selector.",
         "Uid-targeted contenteditable fills now report method=contenteditable with before/after textLength summaries; still verify the rendered text after the action.",
         "Failed uid/selector fills may return structured filled=false diagnostics with ok=false, recoverable=true, code, recoveryHint, and nextStepHint instead of only a generic tool error.",
+        "Non-editable, hidden, disabled, or readonly fill targets should return TARGET_NOT_EDITABLE diagnostics instead of being treated as successful fills.",
         "When yunti_fill_form uses yunti_fill internally, failed per-field results may preserve code, recoveryHint, availableValues/availableTexts, and nextStepHint for field-level recovery.",
         "After filling, verify through yunti_observe_page, yunti_get_page_snapshot, or yunti_evaluate_script when exact field value matters.",
         "If the input is hidden, disabled, or no longer present, observe again, scroll, wait for rendering, or switch tabs before retrying.",

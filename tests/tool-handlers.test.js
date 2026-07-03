@@ -898,6 +898,136 @@ test("selector fill thrown failure returns structured recovery diagnostic", asyn
   }
 })
 
+test("selector fill non-editable failure returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_fill: () => {
+        throw new Error("Target element is disabled")
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-selector-disabled",
+      tool: "yunti_fill",
+      arguments: { selector: "#locked", value: "hello" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: false,
+      selector: "#locked",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { selector: "#locked", method: "selector" },
+      ok: false,
+      recoverable: true,
+      code: "TARGET_NOT_EDITABLE",
+      error: "Target element is disabled",
+      recoveryHint: {
+        reason: "selector-fill-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+        nextAction: "inspect-target-element",
+        decision: "inspect-editability-before-retry",
+        selector: "#locked",
+        message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
+      },
+      nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid fill non-editable target returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-non-editable",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-submit",
+            role: "button",
+            name: "Submit",
+            rect: { x: 30, y: 90, width: 120, height: 32 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "button",
+            type: "submit",
+            contentEditable: false,
+            disabled: true,
+            readOnly: false,
+            hidden: false,
+            editable: false,
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-button",
+      tool: "yunti_fill",
+      arguments: { uid: "yunti-submit", value: "hello" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: false,
+      uid: "yunti-submit",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { uid: "yunti-submit", method: "uid" },
+      ok: false,
+      recoverable: true,
+      code: "TARGET_NOT_EDITABLE",
+      error: "Target at uid yunti-submit is not editable (button type=submit: disabled, not editable)",
+      element: {
+        tag: "button",
+        type: "submit",
+        contentEditable: false,
+        disabled: true,
+        readOnly: false,
+        hidden: false,
+        editable: false,
+      },
+      recoveryHint: {
+        reason: "uid-fill-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+        nextAction: "inspect-target-element",
+        decision: "inspect-editability-before-retry",
+        uid: "yunti-submit",
+        message: "The uid fill could not be completed. Refresh observation if the uid may be stale, inspect whether the target is editable, or retry with selector fallback.",
+      },
+      nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
+    })
+    assert.equal(
+      harness.cdpCommands.some((command) => command.method === "Input.dispatchKeyEvent"),
+      false
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid fill select option miss returns structured recovery diagnostic", async () => {
   const harness = createDispatcherHarness({
     observations: [

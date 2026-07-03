@@ -735,6 +735,73 @@ test("scroll partial movement reports observe-before-continuing hint", async () 
   }
 })
 
+test("coordinate scroll document fallback reports recovery hint while remaining successful", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_scroll: {
+        scrolled: true,
+        deltaX: 0,
+        deltaY: 240,
+        target: "document",
+        coordinateTarget: {
+          x: 320,
+          y: 180,
+          found: false,
+        },
+        scrollContainerFound: false,
+        coordinateScrollFallback: "document",
+        before: { left: 0, top: 100 },
+        after: { left: 0, top: 340 },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-coordinate-scroll-fallback",
+      tool: "yunti_scroll",
+      arguments: { x: 320, y: 180, deltaY: 240 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      scrolled: true,
+      deltaX: 0,
+      deltaY: 240,
+      target: "document",
+      coordinateTarget: {
+        x: 320,
+        y: 180,
+        found: false,
+      },
+      scrollContainerFound: false,
+      coordinateScrollFallback: "document",
+      before: { left: 0, top: 100 },
+      after: { left: 0, top: 340 },
+      browserSessionId: "tab-1",
+      action: "scroll",
+      moved: true,
+      coordinateFallbackHint: {
+        reason: "coordinate-scroll-document-fallback",
+        nextAction: "observe-for-scrollable-container",
+        decision: "prefer-fresh-scrollable-container-uid",
+        recommendedTools: ["yunti_observe_page", "yunti_scroll"],
+        coordinateTarget: {
+          x: 320,
+          y: 180,
+          found: false,
+        },
+        message: "The coordinate scroll did not find a nested scrollable container and fell back to document scrolling. Observe again and choose a fresh scrollableContainers[] uid when a panel or sidebar was intended.",
+      },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Coordinate scroll fell back to document scrolling. Observe again, inspect scrollableContainers[], and prefer a fresh scrollable container uid if a nested panel was intended.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid scroll missing target returns structured recovery diagnostic", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

@@ -999,6 +999,7 @@ export function createToolDispatcher({
     const edgeHint = noMovement ? inferScrollEdgeHint(result.deltaX, result.deltaY) : undefined
     const recoveryHint = noMovement ? buildScrollRecoveryHint(session, uid, edgeHint, result) : undefined
     const partialMovement = moved === true ? buildScrollPartialMovementHint(result, scrollArgs) : undefined
+    const coordinateFallbackHint = !uid ? buildCoordinateScrollFallbackHint(result) : undefined
 
     return {
       ...result,
@@ -1011,15 +1012,30 @@ export function createToolDispatcher({
       ...(edgeHint ? { edgeHint } : {}),
       ...(recoveryHint ? { recoveryHint } : {}),
       ...(partialMovement ? { partialMovement } : {}),
+      ...(coordinateFallbackHint ? { coordinateFallbackHint } : {}),
       ok: !noMovement,
       recoverable: noMovement,
       nextStepHint: noMovement
         ? `Scroll dispatched but before/after positions did not change${edgeHint ? ` (${edgeHint})` : ""}. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.`
         : partialMovement
           ? `Scroll moved partially${partialMovement.edgeHint ? ` (${partialMovement.edgeHint})` : ""}. Observe again and compare scroll positions before repeating the same scroll.`
+        : coordinateFallbackHint
+          ? "Coordinate scroll fell back to document scrolling. Observe again, inspect scrollableContainers[], and prefer a fresh scrollable container uid if a nested panel was intended."
         : uid
           ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
           : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
+    }
+  }
+
+  function buildCoordinateScrollFallbackHint(result = {}) {
+    if (result.coordinateScrollFallback !== "document") return undefined
+    return {
+      reason: "coordinate-scroll-document-fallback",
+      nextAction: "observe-for-scrollable-container",
+      decision: "prefer-fresh-scrollable-container-uid",
+      recommendedTools: ["yunti_observe_page", "yunti_scroll"],
+      ...(result.coordinateTarget ? { coordinateTarget: result.coordinateTarget } : {}),
+      message: "The coordinate scroll did not find a nested scrollable container and fell back to document scrolling. Observe again and choose a fresh scrollableContainers[] uid when a panel or sidebar was intended.",
     }
   }
 

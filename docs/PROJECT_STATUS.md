@@ -35,6 +35,10 @@ Latest visible P6.2 status:
   provided, `yunti_scroll` can report `coordinateTarget`,
   `scrollContainerFound`, and `coordinateScrollFallback: "document"` so agents
   can detect document fallback instead of assuming a nested panel moved.
+- Completed: coordinate scroll document fallback recovery hints. Successful
+  document-fallback scrolls keep `ok: true` but can include
+  `coordinateFallbackHint` and a clearer `nextStepHint` pointing agents back to
+  `yunti_observe_page` and fresh `scrollableContainers[]` uids.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
@@ -718,6 +722,26 @@ Latest visible P6.2 status:
 - Latest P6.2 uid scroll missing-target targeted validation:
   `node --check extension/tool-handlers.js` passed; `node --test
   tests/tool-handlers.test.js` passed 39 tests.
+- P6.2 coordinate scroll hit/fallback diagnostics are complete. Coordinate
+  scrolls can now report `coordinateTarget`, `scrollContainerFound`, and
+  `coordinateScrollFallback: "document"` from the content script, so agents can
+  distinguish nested container hits from document fallback without changing the
+  existing scroll dispatch behavior.
+- P6.2 coordinate scroll document fallback recovery hints are complete. When
+  handler results include `coordinateScrollFallback: "document"`, successful
+  scrolls keep `ok: true` and `recoverable: false` while adding
+  `coordinateFallbackHint` plus a clearer `nextStepHint` to observe again and
+  choose a fresh `scrollableContainers[]` uid when a panel/sidebar was intended.
+- Latest P6.2 coordinate scroll fallback targeted validation:
+  `node --test tests/tool-handlers.test.js tests/bridge.test.js
+  tests/content-scroll.test.js` passed 107 tests.
+- Latest P6.2 coordinate scroll fallback full validation: `git diff --check`
+  passed; the token residue grep returned no matches; `YUNTI_E2E=1 npm run
+  test:e2e` was executed but skipped because Playwright/Chromium is not
+  installed locally; `npm run release:check` passed with 113 node:test cases
+  total, 112 passed, and 1 real-browser smoke skipped by default; npm package
+  contents validation passed with 42 files; extension zip contents validation
+  passed with 13 files.
 
 ## Decisions
 

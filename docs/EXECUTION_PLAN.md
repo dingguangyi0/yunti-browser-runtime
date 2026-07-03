@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 主路径、select/fill/scroll 结构化诊断；最新切片为 coordinate scroll 命中/回退诊断 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 主路径、select/fill/scroll 结构化诊断；最新切片为 coordinate scroll document fallback 恢复提示 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -78,7 +78,7 @@
     机器可读 `decision` 和可执行 `suggestedRetry`；
   - scroll partial movement 的 `partialMovement` 观察前置诊断；
   - uid scroll 缺失/过期/不可解析目标的结构化恢复诊断；
-  - coordinate scroll 命中元素、滚动容器和 document fallback 诊断；
+  - coordinate scroll 命中元素、滚动容器、document fallback 诊断和恢复提示；
   - uid/selector fill 不可编辑、隐藏、disabled、readonly 目标诊断；
   - uid fill 填后值保持验证与 `VALUE_NOT_APPLIED` 长度级诊断；
   - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
@@ -122,6 +122,11 @@
   `coordinateScrollFallback: "document"`，让 agent 区分坐标是否真正命中嵌套滚动容器，
   还是回退到 document 滚动。该切片只新增诊断字段，不改变既有 coordinate/document/uid
   scroll 行为。
+- P6.2 coordinate scroll document fallback 恢复提示已补齐：当 handler 收到
+  `coordinateScrollFallback: "document"` 时，成功结果保持 `ok: true` /
+  `recoverable: false`，并新增 `coordinateFallbackHint` 与更明确的 `nextStepHint`，
+  指向 `yunti_observe_page` 和 fresh `scrollableContainers[]` uid，避免 agent 误以为
+  nested panel 已经被滚动。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2234,6 +2239,23 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   用例，其中 95 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
   包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
   test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
+- `yunti_scroll` coordinate scroll 命中/回退诊断已补齐：当 content script 收到 `x` / `y`
+  时，会返回 `coordinateTarget`、`scrollContainerFound` 和必要时的
+  `coordinateScrollFallback: "document"`，用于区分坐标是否命中嵌套 scroll container，
+  还是回退到 document 滚动。本切片只新增诊断字段，不改变 coordinate/document/uid
+  scroll 派发行为。
+- `yunti_scroll` coordinate document fallback 恢复提示已补齐：当 handler 收到
+  `coordinateScrollFallback: "document"` 时，成功结果保持 `ok: true` /
+  `recoverable: false`，并新增 `coordinateFallbackHint` 与更明确的 `nextStepHint`，
+  引导 Agent 重新 observe 并优先选择 fresh `scrollableContainers[]` uid，避免误判 nested
+  panel 已经被滚动。
+- 最新 targeted 验证：`node --test tests/tool-handlers.test.js tests/bridge.test.js
+  tests/content-scroll.test.js` 通过 107 项。
+- 最新 full 验证：`git diff --check` 通过；token 残留检查无输出；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，覆盖 113 个 node:test 用例，其中 112 个通过、1 个
+  real-browser smoke 按默认配置跳过；npm package 内容检查通过，包含 42 个文件；
+  extension zip 内容检查通过，包含 13 个文件。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 

@@ -989,6 +989,7 @@ export function toolUsageHints(args = {}) {
       notes: [
         "Use this as the default page-operation refresh step once available.",
         "Returned uids are fresh for the latest observation in the current browserSessionId; observe again after navigation, DOM changes, or stale uid errors.",
+        "Input-like elements may include editable, fillable, readOnly, fillBlockReason, and select options[] summaries so agents can inspect field state before filling or selecting.",
         "Default balanced redaction hides credential-like values. Screenshots are separate and may still contain visible sensitive content.",
         "Use yunti_get_page_snapshot for lightweight route/title/text overview and yunti_take_snapshot for compatibility with older uid workflows.",
       ],

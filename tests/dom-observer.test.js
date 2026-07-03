@@ -13,8 +13,10 @@ class FakeElement {
     this.innerText = options.innerText || ""
     this.textContent = options.textContent || this.innerText || ""
     this.disabled = Boolean(options.disabled)
+    this.readOnly = Boolean(options.readOnly)
     this.checked = Boolean(options.checked)
     this.selected = Boolean(options.selected)
+    this.options = options.options || []
     this.isContentEditable = attrs.contenteditable === "true" || attrs.contenteditable === ""
     this.rect = options.rect || { x: 0, y: 0, width: 100, height: 24 }
     this.style = options.style || { display: "block", visibility: "visible", opacity: "1" }
@@ -162,10 +164,13 @@ test("DOM observer returns fresh uids, text tree, and balanced redaction", () =>
   assert.equal(observation.uidMapVersion, "observe-v1")
   assert.equal(observation.elements[0].uid, "yunti-1")
   assert.equal(observation.elements[0].name, "关键词")
+  assert.equal(observation.elements[0].editable, true)
+  assert.equal(observation.elements[0].fillable, true)
   assert.equal(observation.elements[1].valuePreview, "[REDACTED]")
   assert.equal(observation.elements[1].valueRedacted, true)
   assert.equal(observation.elements[2].valuePreview, "[REDACTED]")
   assert.equal(observation.elements[2].visible, false)
+  assert.equal(observation.elements[2].fillBlockReason, "hidden-or-not-visible")
   assert.match(observation.textTree, /\[yunti-1\]<input/)
   assert.match(observation.textTree, /\[yunti-4\]<button/)
   assert.equal(observation.redactions.mode, "balanced")
@@ -300,4 +305,54 @@ test("DOM observer handles redaction edge modes conservatively", () => {
   assert.equal(off.elements.find((element) => element.uid === "yunti-1").valuePreview, tokenValue.slice(0, 120))
   assert.equal(off.redactions.count, 0)
   assert.ok(off.warnings.some((warning) => /redaction is off/i.test(warning)))
+})
+
+test("DOM observer reports field fillability and select option summaries", () => {
+  const elements = [
+    new FakeElement("input", { id: "enabled", name: "enabled" }, {
+      value: "ready",
+      rect: { x: 20, y: 20, width: 220, height: 32 },
+    }),
+    new FakeElement("input", { id: "locked", name: "locked" }, {
+      value: "locked",
+      readOnly: true,
+      rect: { x: 20, y: 70, width: 220, height: 32 },
+    }),
+    new FakeElement("button", { type: "submit" }, {
+      innerText: "Submit",
+      rect: { x: 20, y: 120, width: 100, height: 32 },
+    }),
+    new FakeElement("select", { id: "plan", name: "plan" }, {
+      rect: { x: 20, y: 170, width: 220, height: 32 },
+      options: [
+        { value: "basic", text: "Basic", selected: true },
+        { value: "enterprise", text: "Enterprise" },
+      ],
+    }),
+  ]
+  const observer = loadObserver({
+    document: createDocument(elements),
+    location: new URL("https://example.test/form"),
+  })
+
+  const observation = observer.observePage()
+  const enabled = observation.elements.find((element) => element.name === "enabled")
+  const locked = observation.elements.find((element) => element.name === "locked")
+  const button = observation.elements.find((element) => element.name === "Submit")
+  const plan = observation.elements.find((element) => element.name === "plan")
+
+  assert.equal(enabled.editable, true)
+  assert.equal(enabled.fillable, true)
+  assert.equal(locked.readOnly, true)
+  assert.equal(locked.fillable, false)
+  assert.equal(locked.fillBlockReason, "readonly")
+  assert.equal(button.editable, false)
+  assert.equal(button.fillable, false)
+  assert.equal(button.fillBlockReason, "not-editable")
+  assert.equal(plan.editable, true)
+  assert.equal(plan.fillable, true)
+  assert.deepEqual(JSON.parse(JSON.stringify(plan.options)), [
+    { value: "basic", text: "Basic", selected: true, disabled: false, valueRedacted: false },
+    { value: "enterprise", text: "Enterprise", selected: false, disabled: false, valueRedacted: false },
+  ])
 })

@@ -136,6 +136,7 @@
     const valueInfo = getValuePreview(element, options.redaction, options.redactions)
     const rect = options.includeRects ? rectInfo(element) : undefined
     const scrollable = isScrollable(element)
+    const fieldState = getFieldState(element, options)
 
     return cleanObject({
       uid,
@@ -153,6 +154,10 @@
       visible: options.visible,
       disabled: Boolean(element.disabled || element.getAttribute("aria-disabled") === "true"),
       editable: isEditable(element),
+      readOnly: fieldState.readOnly,
+      fillable: fieldState.fillable,
+      fillBlockReason: fieldState.fillBlockReason,
+      options: fieldState.options,
       checked: "checked" in element ? Boolean(element.checked) : undefined,
       selected: "selected" in element ? Boolean(element.selected) : undefined,
       scrollable,
@@ -318,7 +323,65 @@
 
   function isEditable(element) {
     const tag = element.tagName.toLowerCase()
-    return element.isContentEditable || tag === "input" || tag === "textarea" || tag === "select"
+    if (element.isContentEditable) return true
+    if (tag === "select" || tag === "textarea") return true
+    if (tag !== "input") return false
+    return !isBlockedInputType(element)
+  }
+
+  function getFieldState(element, options) {
+    const tag = element.tagName.toLowerCase()
+    const disabled = Boolean(element.disabled || element.getAttribute("aria-disabled") === "true")
+    const readOnly = Boolean(element.readOnly || element.getAttribute("aria-readonly") === "true")
+    const editable = isEditable(element)
+    const visible = options.visible !== false
+    const fillable = Boolean(visible && editable && !disabled && !readOnly)
+    const optionsSummary = tag === "select" ? getSelectOptions(element, options) : undefined
+    return cleanObject({
+      readOnly,
+      fillable,
+      fillBlockReason: fillable ? undefined : getFillBlockReason({ element, visible, editable, disabled, readOnly }),
+      options: optionsSummary,
+    })
+  }
+
+  function getFillBlockReason({ element, visible, editable, disabled, readOnly }) {
+    if (!visible) return "hidden-or-not-visible"
+    if (disabled) return "disabled"
+    if (readOnly) return "readonly"
+    if (!editable && isBlockedInputType(element)) return "not-editable-input-type"
+    if (!editable) return "not-editable"
+    return undefined
+  }
+
+  function isBlockedInputType(element) {
+    if (element.tagName.toLowerCase() !== "input") return false
+    const type = String(element.getAttribute("type") || "text").toLowerCase()
+    return ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"].includes(type)
+  }
+
+  function getSelectOptions(element, options) {
+    const optionElements = Array.from(element.options || [])
+    if (!optionElements.length) return undefined
+    return optionElements.slice(0, 50).map((option) => {
+      const rawValue = String(option.value || "")
+      const text = compactText(option.text || option.textContent || "", 120)
+      const key = `select option ${element.getAttribute("name") || ""} ${element.getAttribute("id") || ""}`
+      let value = truncateText(rawValue, 120)
+      let valueRedacted = false
+      if (shouldRedact(key, rawValue, options.redaction)) {
+        recordRedaction(options.redactions, categoryFor(key, rawValue))
+        value = "[REDACTED]"
+        valueRedacted = true
+      }
+      return cleanObject({
+        value,
+        text,
+        selected: Boolean(option.selected),
+        disabled: Boolean(option.disabled),
+        valueRedacted,
+      })
+    })
   }
 
   function findLabel(element) {

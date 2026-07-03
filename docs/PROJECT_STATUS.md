@@ -11,9 +11,10 @@ selector/value, uid/value, uid/text, and structured uid/selector failure
 diagnostics; contenteditable fill and uid-targeted scroll are covered; and
 scroll no-movement diagnostics now include directional `edgeHint`, structured
 `recoveryHint`, machine-readable `decision`, and executable `suggestedRetry`
-parameters. The next compatibility-preserving slice should add structured
-selector/uid fill failure diagnostics, then continue into deeper
-fill/scroll/select semantics.
+parameters; and selector/uid fill failures now return structured recovery
+diagnostics. The next compatibility-preserving slice should let aggregate
+`yunti_fill_form` results preserve per-field structured fill failure
+diagnostics, then continue into deeper fill/scroll/select semantics.
 
 ## Current State
 
@@ -639,10 +640,10 @@ fill/scroll/select semantics.
 - Keep `observe -> click uid -> observe` real-browser closure as the remaining
   P6.1 validation gap until Playwright/Chromium is available locally.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
-  broadening into P6.2 action semantics.
-- Continue P6.2 in small compatibility-preserving slices: next candidates are
-  deeper fill/select/scroll semantics now that first-pass structured action
-  result coverage and select uid/text support are complete.
+  marking P6.1 fully closed.
+- Continue P6.2 in small compatibility-preserving slices: the next candidate is
+  `yunti_fill_form` aggregation preserving per-field structured fill failure
+  diagnostics, followed by deeper fill/select/scroll semantics.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

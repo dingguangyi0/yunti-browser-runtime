@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry 诊断；下一步补齐 fill 失败诊断，并继续收敛更深 fill/scroll/select 语义 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry 诊断；下一步让 fill_form 聚合吸收单字段结构化失败诊断，并继续收敛更深 fill/scroll/select 语义 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -77,12 +77,13 @@
   upload uid/selector path、coordinate drag、standalone `yunti_select` content-script
   passthrough、aggregate `yunti_fill_form` summary；`yunti_select` 也已补齐 selector/value、
   uid/value、uid/text 三条路径，并开始返回 uid 与 selector option miss / non-select target
-  的结构化失败诊断；更深语义已推进到 contenteditable fill、fresh
+  的结构化失败诊断；更深语义已推进到 contenteditable fill、selector/uid fill 失败诊断、fresh
   observed scroll container uid、scroll no-movement、directional `edgeHint`、结构化
   `recoveryHint`、机器可读 `decision` 和可执行 `suggestedRetry` 诊断。
 - P6.2 第一轮 action result 覆盖、select uid/text、contenteditable fill 和 scroll
-  recovery diagnostics 已补齐；下一步先补齐 selector/uid fill 失败诊断，再继续进入更深的
-  fill/scroll/select 语义增强，保留所有既有兼容字段与 CDP fallback。
+  recovery diagnostics 已补齐；selector/uid fill 失败诊断也已落地。下一步让
+  `yunti_fill_form` 聚合结果吸收单字段结构化失败诊断，再继续进入更深的 fill/scroll/select
+  语义增强，保留所有既有兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2246,6 +2247,13 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
 - `0.2.0 Best Browser Automation Runtime` 的大版本计划已沉淀到
   `docs/NEXT_MAJOR_PLAN.md`。
-- 下一步先完成 P6.1 文档契约确认，再开始 `yunti_observe_page` 代码实现。
+- 继续 P6.2 的小切片推进：下一刀建议让 `yunti_fill_form` 聚合结果吸收单字段
+  `yunti_fill` 的结构化失败诊断，而不是只返回 `{ ok: false, error }`。
+- 保持兼容：不改变 `yunti_fill_form` 的 `filled`、`failed`、`results`、`action`、
+  `target`、`ok`、`recoverable`、`nextStepHint` 既有字段，只在失败字段结果中追加
+  `code`、`recoveryHint`、`availableValues` / `availableTexts` 等已有单字段诊断。
+- 验证重点：新增 focused dispatcher 测试，确认 fill_form 能保留单字段失败恢复信息；
+  继续执行 `git diff --check`、token 残留检查、`YUNTI_E2E=1 npm run test:e2e` 和
+  `npm run release:check`。
 - 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
 - 后续版本开发前，先按 `docs/NEXT_MAJOR_PLAN.md` 拆阶段执行并更新本文档验收记录。

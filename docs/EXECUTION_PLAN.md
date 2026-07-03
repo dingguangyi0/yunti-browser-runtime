@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry、uid/selector fill 不可编辑/隐藏/disabled/readonly 诊断、observe 字段状态与 select 选中项提示、select disabled option 诊断；下一步继续收敛更深 select/fill/scroll 语义 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：结构化 action result 与更深 DOM action 语义持续小切片推进 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -68,6 +68,16 @@
 
 当前 0.2.0 推进快照（2026-07-03）：
 
+- P6.2 最新完成切片：
+  - action result 主路径覆盖；
+  - `yunti_select` selector/value、uid/value、uid/text；
+  - select uid/selector 失败诊断与 disabled option 诊断；
+  - contenteditable fill；
+  - selector/uid fill 失败诊断与 `yunti_fill_form` 聚合诊断；
+  - uid scroll、scroll no-movement、directional `edgeHint`、结构化 `recoveryHint`、
+    机器可读 `decision` 和可执行 `suggestedRetry`；
+  - uid/selector fill 不可编辑、隐藏、disabled、readonly 目标诊断；
+  - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
 - P6.1：`yunti_observe_page` schema、tool hints、bridge routing、content-script observer
   和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
   `observe -> click uid -> observe/verify` 真实浏览器闭环。

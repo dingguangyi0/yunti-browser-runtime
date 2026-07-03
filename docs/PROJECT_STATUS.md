@@ -4,22 +4,26 @@
 
 Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
-`docs/NEXT_MAJOR_PLAN.md`. Current implementation focus is P6.2 structured
-action results and deeper action semantics. Standalone `yunti_select` and
-aggregate `yunti_fill_form` are complete; `yunti_select` supports
-selector/value, uid/value, uid/text, and structured uid/selector failure
-diagnostics; contenteditable fill and uid-targeted scroll are covered; and
-scroll no-movement diagnostics now include directional `edgeHint`, structured
-`recoveryHint`, machine-readable `decision`, and executable `suggestedRetry`
-parameters; and selector/uid fill failures now return structured recovery
-diagnostics; aggregate `yunti_fill_form` results now preserve per-field
-structured fill failure diagnostics. The next compatibility-preserving slice
-has completed uid/selector fill diagnostics for non-editable, hidden, disabled,
-or readonly targets while preserving existing successful fill/select/scroll
-behavior and compatibility fields. Observation results now also expose field
-state and select selected-option hints for action planning, and select disabled
-option diagnostics are now structured. The next slice should continue deeper
-fill/scroll semantics or real-browser closure validation.
+`docs/NEXT_MAJOR_PLAN.md`.
+
+Current implementation focus: P6.2 structured action results and deeper action
+semantics.
+
+Latest visible P6.2 status:
+
+- Completed: action result main-path coverage, `yunti_select`
+  selector/value + uid/value + uid/text, select uid/selector failure
+  diagnostics, contenteditable fill, selector/uid fill failure diagnostics,
+  `yunti_fill_form` aggregation diagnostics, uid scroll, and scroll
+  no-movement recovery diagnostics.
+- Completed: uid/selector fill diagnostics for non-editable, hidden, disabled,
+  or readonly targets while preserving existing successful fill/select/scroll
+  behavior and compatibility fields.
+- Completed: `yunti_observe_page` field-state hints, select selected-option
+  hints, select `options[]` summaries, and structured disabled-option
+  diagnostics for `yunti_select`.
+- Next: continue deeper fill/scroll semantics or real-browser closure
+  validation.
 
 ## Current State
 

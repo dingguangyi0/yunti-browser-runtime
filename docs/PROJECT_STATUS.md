@@ -14,7 +14,9 @@ scroll no-movement diagnostics now include directional `edgeHint`, structured
 parameters; and selector/uid fill failures now return structured recovery
 diagnostics; aggregate `yunti_fill_form` results now preserve per-field
 structured fill failure diagnostics. The next compatibility-preserving slice
-should continue into deeper fill/select/scroll semantics.
+is explicitly scoped to uid/selector fill diagnostics for non-editable, hidden,
+disabled, or readonly targets, while preserving existing successful fill/select/
+scroll behavior and compatibility fields.
 
 ## Current State
 

@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry 诊断；下一步继续收敛更深 fill/select/scroll 语义 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry；当前下一刀：补齐 uid/selector fill 对不可编辑、隐藏、disabled/readonly 目标的结构化诊断 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -82,7 +82,9 @@
   `recoveryHint`、机器可读 `decision` 和可执行 `suggestedRetry` 诊断。
 - P6.2 第一轮 action result 覆盖、select uid/text、contenteditable fill 和 scroll
   recovery diagnostics 已补齐；selector/uid fill 失败诊断和 `yunti_fill_form` 聚合诊断也已落地。
-  下一步继续进入更深的 fill/select/scroll 语义增强，保留所有既有兼容字段与 CDP fallback。
+  当前下一刀已明确为 uid/selector fill 的不可编辑、隐藏、disabled/readonly 目标诊断：失败时返回
+  `filled: false`、`ok: false`、`code`、`recoveryHint` 和 `nextStepHint`，并保留所有既有成功路径、
+  兼容字段与 CDP fallback。
 
 ## P0.1 bridge token + CORS 收紧
 

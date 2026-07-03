@@ -735,6 +735,42 @@ test("scroll partial movement reports observe-before-continuing hint", async () 
   }
 })
 
+test("uid scroll missing target returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness()
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-missing-uid",
+      tool: "yunti_scroll",
+      arguments: { uid: "missing-scroll", deltaY: 320 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      scrolled: false,
+      uid: "missing-scroll",
+      browserSessionId: "tab-1",
+      action: "scroll",
+      target: { uid: "missing-scroll", method: "uid" },
+      ok: false,
+      recoverable: true,
+      code: "UID_NOT_FOUND",
+      error: "uid missing-scroll not found in the latest page uid map. Run yunti_observe_page or yunti_take_snapshot again before retrying.",
+      recoveryHint: {
+        reason: "uid-scroll-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_scroll"],
+        nextAction: "observe-again",
+        decision: "refresh-scrollable-container-uid-before-retry",
+        uid: "missing-scroll",
+        message: "The uid scroll could not resolve a current target. Refresh observation, choose a fresh scrollable container uid from scrollableContainers[], or use document/coordinate scroll fallback before retrying.",
+      },
+      nextStepHint: "Uid scroll failed. Observe again for a fresh scrollable container uid, inspect scrollableContainers[], or retry with document/coordinate fallback before repeating the same uid scroll.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid fill select path preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

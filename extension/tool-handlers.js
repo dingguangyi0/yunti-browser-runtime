@@ -965,7 +965,15 @@ export function createToolDispatcher({
     const uid = String(args.uid || "").trim()
     let scrollArgs = args
     if (uid) {
-      const { x, y } = await resolveUidCenter(tabId, session, uid)
+      let point
+      try {
+        point = await resolveUidCenter(tabId, session, uid)
+      } catch (error) {
+        return buildUidScrollFailureResult(session, uid, {
+          error: error?.message || "Uid scroll failed",
+        })
+      }
+      const { x, y } = point
       scrollArgs = { ...args, x, y }
     }
     const result = await chrome.tabs.sendMessage(tabId, {
@@ -1013,6 +1021,45 @@ export function createToolDispatcher({
           ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
           : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
     }
+  }
+
+  function buildUidScrollFailureResult(session, uid, scrollResult = {}) {
+    const error = scrollResult?.error || `Cannot scroll uid ${uid}`
+    const code = scrollResult?.code || inferScrollFailureCode(error)
+    const recoveryHint = {
+      reason: "uid-scroll-failed",
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_scroll"],
+      nextAction: "observe-again",
+      decision: "refresh-scrollable-container-uid-before-retry",
+      uid,
+      message: "The uid scroll could not resolve a current target. Refresh observation, choose a fresh scrollable container uid from scrollableContainers[], or use document/coordinate scroll fallback before retrying.",
+    }
+
+    return {
+      ...(scrollResult && typeof scrollResult === "object" ? scrollResult : {}),
+      scrolled: false,
+      uid,
+      browserSessionId: session.browserSessionId,
+      action: "scroll",
+      target: { uid, method: "uid" },
+      ok: false,
+      recoverable: true,
+      code,
+      error,
+      recoveryHint,
+      nextStepHint: "Uid scroll failed. Observe again for a fresh scrollable container uid, inspect scrollableContainers[], or retry with document/coordinate fallback before repeating the same uid scroll.",
+    }
+  }
+
+  function inferScrollFailureCode(error) {
+    const message = String(error || "").toLowerCase()
+    if (message.includes("not found") || message.includes("uid") && message.includes("latest page uid map")) {
+      return "UID_NOT_FOUND"
+    }
+    if (message.includes("cannot resolve coordinates") || message.includes("off-screen") || message.includes("hidden") || message.includes("stale")) {
+      return "UID_COORDINATES_UNAVAILABLE"
+    }
+    return "UID_SCROLL_FAILED"
   }
 
   function inferScrollEdgeHint(deltaX, deltaY) {

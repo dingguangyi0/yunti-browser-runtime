@@ -27,6 +27,10 @@ Latest visible P6.2 status:
   requested, results keep `ok: true` and include `partialMovement` with
   requested/actual deltas, affected axes, `edgeHint`, and
   `decision: "observe-before-continuing-scroll"`.
+- Completed: uid scroll missing/stale target diagnostics. When a scroll uid
+  cannot be resolved, `yunti_scroll` returns `scrolled: false`,
+  `UID_NOT_FOUND` or `UID_COORDINATES_UNAVAILABLE`, and recovery guidance to
+  refresh observation before retrying.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
@@ -701,6 +705,15 @@ Latest visible P6.2 status:
 - Latest P6.2 scroll partial-movement targeted validation:
   `node --check extension/tool-handlers.js` passed; `node --test
   tests/tool-handlers.test.js` passed 38 tests.
+- P6.2 uid scroll missing/stale target diagnostics are complete. Missing,
+  stale, hidden, or coordinate-unresolvable scroll uids now return structured
+  `scrolled: false`, `ok: false`, `recoverable: true`, `code`, `recoveryHint`,
+  and `nextStepHint` instead of only bubbling a generic dispatcher error.
+  Existing successful scroll, no-movement, and partial-movement paths are
+  preserved.
+- Latest P6.2 uid scroll missing-target targeted validation:
+  `node --check extension/tool-handlers.js` passed; `node --test
+  tests/tool-handlers.test.js` passed 39 tests.
 
 ## Decisions
 

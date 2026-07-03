@@ -158,6 +158,11 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   requested/actual delta summaries, affected axes, `edgeHint`,
   `decision: "observe-before-continuing-scroll"`, and `nextAction:
   "observe-again"`. Observe again before repeating the same scroll.
+- Uid scroll failures can return structured `scrolled: false` diagnostics such
+  as `code: "UID_NOT_FOUND"` or `code: "UID_COORDINATES_UNAVAILABLE"` with
+  `recoveryHint.decision: "refresh-scrollable-container-uid-before-retry"`.
+  Refresh observation and choose a fresh `scrollableContainers[]` uid before
+  repeating the same uid scroll.
 - After scrolling, observe again and compare document or container `before` /
   `after` positions before assuming the needed element is visible. Stop
   repeating the same scroll when `moved: false` appears; use `recoveryHint`,

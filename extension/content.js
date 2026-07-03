@@ -643,14 +643,15 @@ function selectElement(args) {
 function scrollPage(args) {
   const deltaX = Number.isFinite(Number(args.deltaX)) ? Number(args.deltaX) : 0
   const deltaY = Number.isFinite(Number(args.deltaY)) ? Number(args.deltaY) : 600
+  const hasCoordinateTarget = Number.isFinite(Number(args.x)) && Number.isFinite(Number(args.y))
+  const coordinateX = hasCoordinateTarget ? clamp(Number(args.x), 0, Math.max(0, window.innerWidth - 1)) : undefined
+  const coordinateY = hasCoordinateTarget ? clamp(Number(args.y), 0, Math.max(0, window.innerHeight - 1)) : undefined
   const coordinateTarget =
-    Number.isFinite(Number(args.x)) && Number.isFinite(Number(args.y))
-      ? document.elementFromPoint(
-          clamp(Number(args.x), 0, Math.max(0, window.innerWidth - 1)),
-          clamp(Number(args.y), 0, Math.max(0, window.innerHeight - 1))
-        )
+    hasCoordinateTarget
+      ? document.elementFromPoint(coordinateX, coordinateY)
       : null
-  const target = findScrollableAncestor(coordinateTarget) || document.scrollingElement || document.documentElement
+  const scrollableAncestor = findScrollableAncestor(coordinateTarget)
+  const target = scrollableAncestor || document.scrollingElement || document.documentElement
   const before = getScrollPosition(target)
   target.scrollBy({ left: deltaX, top: deltaY, behavior: "auto" })
   const after = getScrollPosition(target)
@@ -659,6 +660,18 @@ function scrollPage(args) {
     deltaX,
     deltaY,
     target: target === document.scrollingElement ? "document" : describeElement(target),
+    ...(hasCoordinateTarget
+      ? {
+          coordinateTarget: {
+            x: Math.round(coordinateX),
+            y: Math.round(coordinateY),
+            found: Boolean(coordinateTarget),
+            ...(coordinateTarget ? { element: describeElement(coordinateTarget) } : {}),
+          },
+          scrollContainerFound: Boolean(scrollableAncestor),
+          ...(scrollableAncestor ? {} : { coordinateScrollFallback: "document" }),
+        }
+      : {}),
     before,
     after,
   }

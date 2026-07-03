@@ -31,6 +31,10 @@ Latest visible P6.2 status:
   cannot be resolved, `yunti_scroll` returns `scrolled: false`,
   `UID_NOT_FOUND` or `UID_COORDINATES_UNAVAILABLE`, and recovery guidance to
   refresh observation before retrying.
+- Completed: coordinate scroll hit/fallback diagnostics. When `x` / `y` is
+  provided, `yunti_scroll` can report `coordinateTarget`,
+  `scrollContainerFound`, and `coordinateScrollFallback: "document"` so agents
+  can detect document fallback instead of assuming a nested panel moved.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.

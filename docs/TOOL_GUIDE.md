@@ -142,6 +142,10 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   compatible.
 - Uid scroll preserves the existing `target` compatibility field and adds
   `uid`, `method: "uid"`, and `scrollTarget` for structured interpretation.
+- Coordinate scroll results may include `coordinateTarget`,
+  `scrollContainerFound`, and `coordinateScrollFallback: "document"`. Use these
+  fields to tell whether the coordinate actually hit a nested scrollable
+  container or fell back to document scrolling.
 - When `before` / `after` positions are comparable, scroll results include
   `moved`; if positions do not change, the result reports
   `code: "NO_SCROLL_MOVEMENT"`, `ok: false`, and `recoverable: true`.

@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：结构化 action result 与更深 DOM action 语义持续小切片推进 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 主路径、select/fill/scroll 结构化诊断；最新切片为 coordinate scroll 命中/回退诊断 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -78,6 +78,7 @@
     机器可读 `decision` 和可执行 `suggestedRetry`；
   - scroll partial movement 的 `partialMovement` 观察前置诊断；
   - uid scroll 缺失/过期/不可解析目标的结构化恢复诊断；
+  - coordinate scroll 命中元素、滚动容器和 document fallback 诊断；
   - uid/selector fill 不可编辑、隐藏、disabled、readonly 目标诊断；
   - uid fill 填后值保持验证与 `VALUE_NOT_APPLIED` 长度级诊断；
   - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
@@ -116,6 +117,11 @@
   `code: "UID_NOT_FOUND"` 或 `code: "UID_COORDINATES_UNAVAILABLE"`、`recoveryHint` 和
   `nextStepHint`，提示重新 observe 并从 `scrollableContainers[]` 选择 fresh uid，或使用
   document/coordinate fallback；既有成功 scroll、no-movement 和 partialMovement 路径保持兼容。
+- P6.2 coordinate scroll 命中/回退诊断已补齐：当传入 `x` / `y` 时，content script 会返回
+  `coordinateTarget`、`scrollContainerFound` 和必要时的
+  `coordinateScrollFallback: "document"`，让 agent 区分坐标是否真正命中嵌套滚动容器，
+  还是回退到 document 滚动。该切片只新增诊断字段，不改变既有 coordinate/document/uid
+  scroll 行为。
 
 ## P0.1 bridge token + CORS 收紧
 

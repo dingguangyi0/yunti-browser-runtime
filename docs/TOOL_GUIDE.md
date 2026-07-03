@@ -119,6 +119,12 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Non-editable, hidden, disabled, or readonly fill targets return
   `code: "TARGET_NOT_EDITABLE"` diagnostics instead of being treated as
   successful fills; inspect the target or wait/unlock the field before retrying.
+- Uid keyboard/contenteditable fills verify the post-fill value when possible.
+  If the value does not remain, `yunti_fill` returns
+  `code: "VALUE_NOT_APPLIED"` with `expectedValueLength`, `actualValueLength`,
+  `recoveryHint`, and `nextStepHint` instead of exposing the raw field value.
+  Inspect whether the target is framework-controlled, masked, or needs
+  `yunti_type_text` / `yunti_press_key` semantics before retrying.
 - Select-option fill misses include `availableValues` / `availableTexts` when
   available, so inspect those options before retrying with `yunti_fill` or
   `yunti_select`.

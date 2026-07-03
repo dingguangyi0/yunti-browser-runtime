@@ -1718,6 +1718,19 @@ test("fill form preserves aggregate fields with structured result", async () => 
       {},
       {},
       {},
+      {
+        result: {
+          value: {
+            found: true,
+            tag: "input",
+            type: "text",
+            contentEditable: false,
+            valueMatches: true,
+            valueLength: 3,
+            expectedLength: 3,
+          },
+        },
+      },
       {},
       {},
       {
@@ -1817,6 +1830,108 @@ test("fill form preserves aggregate fields with structured result", async () => 
       ok: false,
       recoverable: true,
       nextStepHint: "Form fill partially failed. Inspect per-field results, observe again for fresh uids, or retry failed fields with selector fallback.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid fill reports value-not-applied when field value does not remain", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-controlled-input",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-controlled",
+            role: "textbox",
+            name: "Controlled",
+            rect: { x: 30, y: 90, width: 180, height: 28 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "input",
+            type: "text",
+            contentEditable: false,
+            disabled: false,
+            readOnly: false,
+            hidden: false,
+            editable: true,
+          },
+        },
+      },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {
+        result: {
+          value: {
+            found: true,
+            tag: "input",
+            type: "text",
+            contentEditable: false,
+            valueMatches: false,
+            valueLength: 0,
+            expectedLength: 5,
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-controlled",
+      tool: "yunti_fill",
+      arguments: { uid: "yunti-controlled", value: "hello" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: false,
+      uid: "yunti-controlled",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { uid: "yunti-controlled", method: "uid" },
+      ok: false,
+      recoverable: true,
+      code: "VALUE_NOT_APPLIED",
+      error: "Filled value did not remain on uid yunti-controlled",
+      method: "keyboard",
+      expectedValueLength: 5,
+      actualValueLength: 0,
+      after: { textLength: 0 },
+      element: {
+        tag: "input",
+        type: "text",
+        contentEditable: false,
+      },
+      recoveryHint: {
+        reason: "uid-fill-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+        nextAction: "verify-field-state",
+        decision: "inspect-controlled-or-masked-field-before-retry",
+        uid: "yunti-controlled",
+        message: "The fill dispatched, but the field value did not remain afterward. Inspect whether the target is framework-controlled, masked, or requires typing/press_key semantics before retrying.",
+      },
+      nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
     })
   } finally {
     harness.restore()

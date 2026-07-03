@@ -19,11 +19,14 @@ Latest visible P6.2 status:
 - Completed: uid/selector fill diagnostics for non-editable, hidden, disabled,
   or readonly targets while preserving existing successful fill/select/scroll
   behavior and compatibility fields.
+- Completed: uid fill post-value verification for keyboard/contenteditable
+  paths. When the value does not remain, `yunti_fill` returns
+  `VALUE_NOT_APPLIED` with length-only diagnostics and recovery guidance instead
+  of echoing the raw field value.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
-- Next: continue deeper fill/scroll semantics or real-browser closure
-  validation.
+- Next: continue scroll semantics or real-browser closure validation.
 
 ## Current State
 
@@ -675,6 +678,16 @@ Latest visible P6.2 status:
   with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but skipped
   because Playwright/Chromium is not installed locally; the token residue grep
   returned no matches.
+- P6.2 uid fill post-value verification is complete. Keyboard/contenteditable
+  fill paths now perform a lightweight post-dispatch value check when possible.
+  If the target value does not remain, `yunti_fill` returns structured
+  `filled: false`, `ok: false`, `code: "VALUE_NOT_APPLIED"`,
+  `expectedValueLength`, `actualValueLength`, `recoveryHint`, and
+  `nextStepHint` diagnostics without echoing the raw field value. Existing
+  successful fill/select/scroll compatibility fields are preserved.
+- Latest P6.2 uid fill post-value verification targeted validation:
+  `node --check extension/tool-handlers.js` passed; `node --test
+  tests/tool-handlers.test.js` passed 37 tests.
 
 ## Decisions
 

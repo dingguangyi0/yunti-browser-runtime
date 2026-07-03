@@ -77,6 +77,7 @@
   - uid scroll、scroll no-movement、directional `edgeHint`、结构化 `recoveryHint`、
     机器可读 `decision` 和可执行 `suggestedRetry`；
   - uid/selector fill 不可编辑、隐藏、disabled、readonly 目标诊断；
+  - uid fill 填后值保持验证与 `VALUE_NOT_APPLIED` 长度级诊断；
   - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
 - P6.1：`yunti_observe_page` schema、tool hints、bridge routing、content-script observer
   和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
@@ -98,6 +99,11 @@
   select/fill/scroll 语义增强与真实浏览器闭环补验。`yunti_observe_page` 也开始为字段类元素
   暴露 `editable`、`fillable`、`readOnly`、`fillBlockReason`、select 当前选中项摘要和
   `options[]` 摘要，让 agent 在填表或选择前先判断字段状态。
+- P6.2 uid fill 的填后验证已补齐：keyboard/contenteditable 路径会在派发输入后尽量读取
+  目标字段的长度级状态；如果页面框架、mask 或受控状态导致值没有保持，返回
+  `filled: false`、`ok: false`、`code: "VALUE_NOT_APPLIED"`、`expectedValueLength`、
+  `actualValueLength`、`recoveryHint.decision: "inspect-controlled-or-masked-field-before-retry"`
+  和 `nextStepHint`。该诊断不回传实际字段内容，只回传长度摘要；既有成功路径和兼容字段保持不变。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2323,8 +2329,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   `docs/NEXT_MAJOR_PLAN.md`。
 - 继续 P6.2 的小切片推进：uid/selector fill 的不可编辑、隐藏、disabled/readonly
   目标诊断已落地，observe 字段状态、select 选中项提示和 select disabled option
-  诊断也已补齐；下一刀建议继续收敛 fill/scroll 的更深语义，优先补真实浏览器闭环或
-  controlled input 验证缺口。
+  诊断也已补齐，uid fill 填后值保持验证也已补齐；下一刀建议继续收敛 scroll 的更深语义
+  或补真实浏览器闭环。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

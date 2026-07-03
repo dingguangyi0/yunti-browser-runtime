@@ -739,7 +739,59 @@ export function createToolDispatcher({
         }
         const method = elInfo?.contentEditable ? "contenteditable" : "keyboard"
         const before = elInfo?.before
-        const after = elInfo?.contentEditable ? { textLength: text.length } : undefined
+        await delayCdp(50)
+        const verification = await chromeDebuggerSendCommand(
+          { tabId },
+          "Runtime.evaluate",
+          {
+            expression: `(() => {
+              const el = document.elementFromPoint(${x}, ${y});
+              if (!el) return { found: false };
+              const tag = el.tagName.toLowerCase();
+              const type = String(el.type || '').toLowerCase();
+              const expected = ${JSON.stringify(text)};
+              const actual = el.isContentEditable
+                ? String(el.textContent || '')
+                : (tag === 'input' || tag === 'textarea')
+                  ? String(el.value || '')
+                  : undefined;
+              if (actual === undefined) {
+                return { found: true, tag, type, contentEditable: el.isContentEditable };
+              }
+              return {
+                found: true,
+                tag,
+                type,
+                contentEditable: el.isContentEditable,
+                valueMatches: actual === expected,
+                valueLength: actual.length,
+                expectedLength: expected.length,
+              };
+            })()`,
+            returnByValue: true,
+          }
+        )
+        const verificationInfo = verification?.result?.value
+        const verifiedAfter = verificationInfo?.found && Number.isFinite(Number(verificationInfo.valueLength))
+          ? { textLength: Number(verificationInfo.valueLength) }
+          : undefined
+        const after = verifiedAfter || (elInfo?.contentEditable ? { textLength: text.length } : undefined)
+        if (verificationInfo?.found && verificationInfo.valueMatches === false) {
+          return buildUidFillFailureResult(session, uid, {
+            code: "VALUE_NOT_APPLIED",
+            error: `Filled value did not remain on uid ${uid}`,
+            method,
+            expectedValueLength: Number(verificationInfo.expectedLength),
+            actualValueLength: Number(verificationInfo.valueLength),
+            ...(before ? { before } : {}),
+            after,
+            element: summarizeFillTarget({
+              tag: verificationInfo.tag,
+              type: verificationInfo.type,
+              contentEditable: verificationInfo.contentEditable,
+            }),
+          })
+        }
         return {
           filled: true,
           uid,
@@ -844,6 +896,10 @@ export function createToolDispatcher({
     } else if (code === "OPTION_NOT_FOUND") {
       recoveryHint.nextAction = "inspect-available-options"
       recoveryHint.decision = "inspect-options-before-retry"
+    } else if (code === "VALUE_NOT_APPLIED") {
+      recoveryHint.nextAction = "verify-field-state"
+      recoveryHint.decision = "inspect-controlled-or-masked-field-before-retry"
+      recoveryHint.message = "The fill dispatched, but the field value did not remain afterward. Inspect whether the target is framework-controlled, masked, or requires typing/press_key semantics before retrying."
     }
 
     return {
@@ -867,6 +923,7 @@ export function createToolDispatcher({
   function inferFillFailureCode(error, fallbackCode) {
     const message = String(error || "").toLowerCase()
     if (message.includes("not found") || message.includes("cannot resolve coordinates")) return "ELEMENT_NOT_FOUND"
+    if (message.includes("did not remain") || message.includes("did not stick") || message.includes("not applied")) return "VALUE_NOT_APPLIED"
     if (
       message.includes("not editable") ||
       message.includes("no editable target") ||

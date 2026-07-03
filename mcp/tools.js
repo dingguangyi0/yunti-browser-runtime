@@ -1146,6 +1146,7 @@ export function toolUsageHints(args = {}) {
         "Uid-targeted contenteditable fills now report method=contenteditable with before/after textLength summaries; still verify the rendered text after the action.",
         "Failed uid/selector fills may return structured filled=false diagnostics with ok=false, recoverable=true, code, recoveryHint, and nextStepHint instead of only a generic tool error.",
         "Non-editable, hidden, disabled, or readonly fill targets should return TARGET_NOT_EDITABLE diagnostics instead of being treated as successful fills.",
+        "Uid keyboard/contenteditable fills verify the post-fill value when possible; if the value does not remain, they return VALUE_NOT_APPLIED with expectedValueLength/actualValueLength instead of exposing the raw field value.",
         "When yunti_fill_form uses yunti_fill internally, failed per-field results may preserve code, recoveryHint, availableValues/availableTexts, and nextStepHint for field-level recovery.",
         "After filling, verify through yunti_observe_page, yunti_get_page_snapshot, or yunti_evaluate_script when exact field value matters.",
         "If the input is hidden, disabled, or no longer present, observe again, scroll, wait for rendering, or switch tabs before retrying.",
@@ -1157,7 +1158,7 @@ export function toolUsageHints(args = {}) {
         "Batch fill partial failure: inspect each yunti_fill_form results[] item; failed fields may carry the same structured recovery details as yunti_fill.",
         "Field not editable: check disabled/editable fields from the observation, then wait, scroll, or ask the user if the control is gated.",
         "Select option not found: inspect availableValues / availableTexts, then retry with an available option value/text or use yunti_select.",
-        "Value did not stick: verify whether the target is contenteditable, masked, controlled by framework state, or requires typing/press_key semantics.",
+        "VALUE_NOT_APPLIED / value did not stick: inspect whether the target is contenteditable, masked, controlled by framework state, or requires typing/press_key semantics before retrying.",
         "Wrong page: refresh targets with yunti_list_browser_targets and route the fill through the intended browserSessionId.",
       ],
       commonMistakes: [

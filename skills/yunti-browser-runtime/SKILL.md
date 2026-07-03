@@ -87,6 +87,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Selector-based fill remains compatible and may return content-script-shaped fields such as `element` or `valueLength`.
 - Uid and selector fill failures may return structured `filled: false` diagnostics with `code`, `ok: false`, `recoverable: true`, `recoveryHint`, and `nextStepHint`; follow `recoveryHint.nextAction` / `decision` before repeating the same fill.
 - Non-editable, hidden, disabled, or readonly fill targets may return `code: "TARGET_NOT_EDITABLE"`; inspect the target, wait/unlock the field, or choose a different editable uid/selector before retrying.
+- Uid keyboard/contenteditable fills may return `code: "VALUE_NOT_APPLIED"` when the post-fill value does not remain. Use the length-only diagnostics (`expectedValueLength`, `actualValueLength`) and `recoveryHint.decision` to inspect controlled/masked fields before retrying; raw field values are not echoed in this diagnostic.
 - Select-option fill misses may include `availableValues` / `availableTexts`; inspect those options before retrying with `yunti_fill` or `yunti_select`.
 - `yunti_fill_form` preserves per-field compatibility results and may carry the same structured failure details on failed `results[]` items, including `code`, `recoveryHint`, `availableValues` / `availableTexts`, and `nextStepHint`.
 

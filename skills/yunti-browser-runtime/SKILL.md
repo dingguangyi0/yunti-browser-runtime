@@ -102,7 +102,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 
 - Current `yunti_select` runtime behavior supports selector/value, uid/value, and uid/visible text.
 - Use `text` with a fresh uid when the user-facing option label is clearer than the option value; selector path remains selector/value compatible.
-- Uid and selector option misses plus non-select targets return structured `selected: false` diagnostics with `code`, `matchMode`, `targetOption`, and `recoveryHint`; option misses include `availableValues` / `availableTexts` when available.
+- Uid and selector option misses, disabled options, plus non-select targets return structured `selected: false` diagnostics with `code`, `matchMode`, `targetOption`, and `recoveryHint`; option misses include `availableValues` / `availableTexts` when available, and disabled-option failures can include `disabledValue` / `disabledText`.
 - Before retrying a failed select, inspect available options with observe, snapshot, evaluate, a stable selector, or `recoveryHint.decision` instead of blindly repeating it.
 
 ## Safety

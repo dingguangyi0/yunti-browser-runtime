@@ -1193,6 +1193,72 @@ test("selector select value miss returns structured recovery diagnostic", async 
   }
 })
 
+test("selector select disabled option returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_select: {
+        selected: false,
+        element: "select#plan",
+        value: "basic",
+        code: "OPTION_DISABLED",
+        error: "Option value is disabled",
+        disabledValue: "enterprise",
+        disabledText: "Enterprise",
+        options: [
+          { value: "basic", text: "Basic", disabled: false, selected: true },
+          { value: "enterprise", text: "Enterprise", disabled: true, selected: false },
+        ],
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-selector-disabled",
+      tool: "yunti_select",
+      arguments: { selector: "#plan", value: "enterprise" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: false,
+      element: "select#plan",
+      value: "basic",
+      code: "OPTION_DISABLED",
+      error: "Option value is disabled",
+      disabledValue: "enterprise",
+      disabledText: "Enterprise",
+      options: [
+        { value: "basic", text: "Basic", disabled: false, selected: true },
+        { value: "enterprise", text: "Enterprise", disabled: true, selected: false },
+      ],
+      selector: "#plan",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { selector: "#plan", method: "selector" },
+      ok: false,
+      recoverable: true,
+      matchMode: "value",
+      targetOption: "enterprise",
+      recoveryHint: {
+        reason: "selector-select-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+        nextAction: "inspect-available-options",
+        decision: "choose-enabled-option-or-unlock-field",
+        selector: "#plan",
+        matchMode: "value",
+        targetOption: "enterprise",
+        disabledValue: "enterprise",
+        disabledText: "Enterprise",
+        message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
+      },
+      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("selector select thrown failure returns structured recovery diagnostic", async () => {
   const harness = createDispatcherHarness({
     contentToolResponses: {
@@ -1447,6 +1513,91 @@ test("uid select option miss returns structured recovery diagnostic", async () =
         targetOption: "Enterprise",
         availableValues: ["free", "pro"],
         availableTexts: ["Free", "Pro"],
+        message: "The select option could not be matched. Inspect available options before retrying, refresh observation if the uid may be stale, or use selector/value fallback.",
+      },
+      nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid select disabled option returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select-disabled",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-plan",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 20, y: 30, width: 120, height: 24 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            ok: false,
+            code: "OPTION_DISABLED",
+            error: "Option text is disabled",
+            disabledValue: "enterprise",
+            disabledText: "Enterprise",
+            availableValues: ["free", "enterprise"],
+            availableTexts: ["Free", "Enterprise"],
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-select-uid-disabled",
+      tool: "yunti_select",
+      arguments: { uid: "yunti-plan", text: "Enterprise" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      selected: false,
+      uid: "yunti-plan",
+      browserSessionId: "tab-1",
+      action: "select",
+      target: { uid: "yunti-plan", method: "uid.text" },
+      ok: false,
+      recoverable: true,
+      code: "OPTION_DISABLED",
+      error: "Option text is disabled",
+      matchMode: "text",
+      targetOption: "Enterprise",
+      disabledValue: "enterprise",
+      disabledText: "Enterprise",
+      availableValues: ["free", "enterprise"],
+      availableTexts: ["Free", "Enterprise"],
+      recoveryHint: {
+        reason: "uid-select-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+        nextAction: "inspect-available-options",
+        decision: "choose-enabled-option-or-unlock-field",
+        uid: "yunti-plan",
+        matchMode: "text",
+        targetOption: "Enterprise",
+        availableValues: ["free", "enterprise"],
+        availableTexts: ["Free", "Enterprise"],
+        disabledValue: "enterprise",
+        disabledText: "Enterprise",
         message: "The select option could not be matched. Inspect available options before retrying, refresh observation if the uid may be stale, or use selector/value fallback.",
       },
       nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",

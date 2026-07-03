@@ -614,7 +614,27 @@ function pressKey(args) {
 function selectElement(args) {
   const element = mustFind(args.selector)
   if (!(element instanceof HTMLSelectElement)) throw new Error("Target is not a select element")
-  element.value = String(args.value ?? "")
+  const value = String(args.value ?? "")
+  const options = Array.from(element.options)
+  const option = options.find((item) => item.value === value)
+  if (option?.disabled) {
+    return {
+      selected: false,
+      element: describeElement(element),
+      value: element.value,
+      code: "OPTION_DISABLED",
+      error: "Option value is disabled",
+      disabledValue: option.value,
+      disabledText: option.text.trim(),
+      options: options.slice(0, 50).map((item) => ({
+        value: item.value,
+        text: item.text.trim(),
+        disabled: Boolean(item.disabled),
+        selected: Boolean(item.selected),
+      })),
+    }
+  }
+  element.value = value
   element.dispatchEvent(new Event("input", { bubbles: true }))
   element.dispatchEvent(new Event("change", { bubbles: true }))
   return { selected: true, element: describeElement(element), value: element.value }

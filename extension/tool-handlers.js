@@ -1068,6 +1068,17 @@ export function createToolDispatcher({
                 availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
               };
             }
+            if (option.disabled) {
+              return {
+                ok: false,
+                code: "OPTION_DISABLED",
+                error: ${JSON.stringify(matchMode)} === "text" ? "Option text is disabled" : "Option value is disabled",
+                disabledValue: option.value,
+                disabledText: option.text.trim(),
+                availableValues: options.map((item) => item.value).slice(0, 50),
+                availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
+              };
+            }
             el.value = option.value;
             el.dispatchEvent(new Event("change", { bubbles: true }));
             el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1122,6 +1133,19 @@ export function createToolDispatcher({
     }
 
     const requestedValue = String(args.value ?? "")
+    const disabledOption = Array.isArray(result.options)
+      ? result.options.find((option) => String(option?.value ?? "") === requestedValue && option.disabled === true)
+      : undefined
+    if (requestedValue && disabledOption) {
+      return buildSelectorSelectFailureResult(session, selector, requestedValue, {
+        ...result,
+        selected: false,
+        code: "OPTION_DISABLED",
+        error: "Option value is disabled",
+        disabledValue: String(disabledOption.value ?? ""),
+        disabledText: String(disabledOption.text ?? ""),
+      })
+    }
     if (requestedValue && String(result.value ?? "") !== requestedValue) {
       return buildSelectorSelectFailureResult(session, selector, requestedValue, {
         ...result,
@@ -1146,18 +1170,22 @@ export function createToolDispatcher({
   function buildSelectorSelectFailureResult(session, selector, targetOption, selectResult = {}) {
     const availableValues = Array.isArray(selectResult?.availableValues) ? selectResult.availableValues : undefined
     const availableTexts = Array.isArray(selectResult?.availableTexts) ? selectResult.availableTexts : undefined
+    const disabledValue = selectResult?.disabledValue !== undefined ? String(selectResult.disabledValue) : undefined
+    const disabledText = selectResult?.disabledText !== undefined ? String(selectResult.disabledText) : undefined
     const code = selectResult?.code || (selectResult?.selected === false ? "SELECTOR_SELECT_FAILED" : "SELECTOR_SELECT_FAILED")
     const error = selectResult?.error || "Selector select failed"
     const recoveryHint = {
       reason: "selector-select-failed",
       recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
-      nextAction: code === "OPTION_NOT_FOUND" ? "inspect-available-options" : "inspect-target-element",
-      decision: code === "OPTION_NOT_FOUND" ? "inspect-options-before-retry" : "use-select-element-or-uid-fallback",
+      nextAction: code === "OPTION_NOT_FOUND" || code === "OPTION_DISABLED" ? "inspect-available-options" : "inspect-target-element",
+      decision: code === "OPTION_DISABLED" ? "choose-enabled-option-or-unlock-field" : code === "OPTION_NOT_FOUND" ? "inspect-options-before-retry" : "use-select-element-or-uid-fallback",
       selector,
       matchMode: "value",
       targetOption: String(targetOption ?? ""),
       ...(availableValues ? { availableValues } : {}),
       ...(availableTexts ? { availableTexts } : {}),
+      ...(disabledValue ? { disabledValue } : {}),
+      ...(disabledText ? { disabledText } : {}),
       message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
     }
 
@@ -1184,16 +1212,20 @@ export function createToolDispatcher({
   function buildUidSelectFailureResult(session, uid, matchMode, targetOption, selectResult = {}) {
     const availableValues = Array.isArray(selectResult.availableValues) ? selectResult.availableValues : undefined
     const availableTexts = Array.isArray(selectResult.availableTexts) ? selectResult.availableTexts : undefined
+    const disabledValue = selectResult?.disabledValue !== undefined ? String(selectResult.disabledValue) : undefined
+    const disabledText = selectResult?.disabledText !== undefined ? String(selectResult.disabledText) : undefined
     const recoveryHint = {
       reason: "uid-select-failed",
       recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
       nextAction: "inspect-available-options",
-      decision: "inspect-options-before-retry",
+      decision: selectResult.code === "OPTION_DISABLED" ? "choose-enabled-option-or-unlock-field" : "inspect-options-before-retry",
       uid,
       matchMode,
       targetOption,
       ...(availableValues ? { availableValues } : {}),
       ...(availableTexts ? { availableTexts } : {}),
+      ...(disabledValue ? { disabledValue } : {}),
+      ...(disabledText ? { disabledText } : {}),
       message: "The select option could not be matched. Inspect available options before retrying, refresh observation if the uid may be stale, or use selector/value fallback.",
     }
 
@@ -1219,6 +1251,8 @@ export function createToolDispatcher({
       targetOption,
       ...(availableValues ? { availableValues } : {}),
       ...(availableTexts ? { availableTexts } : {}),
+      ...(disabledValue ? { disabledValue } : {}),
+      ...(disabledText ? { disabledText } : {}),
       recoveryHint,
       nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",
     }

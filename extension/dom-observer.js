@@ -157,6 +157,10 @@
       readOnly: fieldState.readOnly,
       fillable: fieldState.fillable,
       fillBlockReason: fieldState.fillBlockReason,
+      selectedIndex: fieldState.selectedIndex,
+      selectedValue: fieldState.selectedValue,
+      selectedValueRedacted: fieldState.selectedValueRedacted,
+      selectedText: fieldState.selectedText,
       options: fieldState.options,
       checked: "checked" in element ? Boolean(element.checked) : undefined,
       selected: "selected" in element ? Boolean(element.selected) : undefined,
@@ -337,10 +341,12 @@
     const visible = options.visible !== false
     const fillable = Boolean(visible && editable && !disabled && !readOnly)
     const optionsSummary = tag === "select" ? getSelectOptions(element, options) : undefined
+    const selectedSummary = tag === "select" ? getSelectedOptionSummary(element, options) : {}
     return cleanObject({
       readOnly,
       fillable,
       fillBlockReason: fillable ? undefined : getFillBlockReason({ element, visible, editable, disabled, readOnly }),
+      ...selectedSummary,
       options: optionsSummary,
     })
   }
@@ -381,6 +387,30 @@
         disabled: Boolean(option.disabled),
         valueRedacted,
       })
+    })
+  }
+
+  function getSelectedOptionSummary(element, options) {
+    const optionElements = Array.from(element.options || [])
+    const explicitSelectedIndex = Number.isFinite(Number(element.selectedIndex)) ? Number(element.selectedIndex) : -1
+    const inferredSelectedIndex = optionElements.findIndex((option) => option.selected)
+    const selectedIndex = explicitSelectedIndex >= 0 ? explicitSelectedIndex : inferredSelectedIndex
+    const selectedOption = optionElements[selectedIndex] || optionElements.find((option) => option.selected)
+    const rawValue = String(element.value || selectedOption?.value || "")
+    const selectedText = compactText(selectedOption?.text || selectedOption?.textContent || "", 120)
+    const key = `select selected ${element.getAttribute("name") || ""} ${element.getAttribute("id") || ""}`
+    let selectedValue = rawValue ? truncateText(rawValue, 120) : ""
+    let selectedValueRedacted = false
+    if (rawValue && shouldRedact(key, rawValue, options.redaction)) {
+      recordRedaction(options.redactions, categoryFor(key, rawValue))
+      selectedValue = "[REDACTED]"
+      selectedValueRedacted = true
+    }
+    return cleanObject({
+      selectedIndex,
+      selectedValue,
+      selectedValueRedacted,
+      selectedText,
     })
   }
 

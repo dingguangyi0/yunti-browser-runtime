@@ -22,7 +22,8 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - `yunti_observe_page`: P6.1 observe-first page operation contract with fresh
   uids, compact text tree, scroll metadata, and DOM redaction metadata.
   Element entries may include `editable`, `fillable`, `readOnly`,
-  `fillBlockReason`, and select `options[]` summaries for action planning.
+  `fillBlockReason`, select `selectedIndex` / `selectedValue` /
+  `selectedText`, and `options[]` summaries for action planning.
 - `yunti_get_page_snapshot`: lightweight page state and visible context.
 - `yunti_take_snapshot`: element-oriented snapshot for uid-based actions.
 - `yunti_click`, `yunti_fill`, `yunti_hover`: common DOM actions.
@@ -102,7 +103,8 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Prefer a fresh `uid` from `yunti_observe_page` or `yunti_take_snapshot` when
   filling inputs, textareas, selects, or contenteditable targets.
 - Before filling, inspect observation fields such as `fillable`, `readOnly`,
-  `disabled`, `fillBlockReason`, and select `options[]` when present.
+  `disabled`, `fillBlockReason`, and select `selectedValue` / `selectedText`
+  / `options[]` when present.
 - Uid-targeted contenteditable fills now return `method: "contenteditable"` and
   include `before` / `after` text length summaries when available.
 - Treat contenteditable results as dispatch evidence, not final proof. Verify

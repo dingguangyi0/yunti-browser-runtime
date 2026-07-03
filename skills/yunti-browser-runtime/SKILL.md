@@ -25,7 +25,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 
 - Use `yunti_get_page_snapshot` for lightweight page text, title, URL, selected text, and page state.
 - Once available in the connected runtime, use `yunti_observe_page` as the normal page-operation refresh step, then act by fresh uid and observe again to verify.
-- Observation elements may expose `editable`, `fillable`, `readOnly`, `fillBlockReason`, and select `options[]`; inspect those before filling or selecting when field state matters.
+- Observation elements may expose `editable`, `fillable`, `readOnly`, `fillBlockReason`, select `selectedIndex` / `selectedValue` / `selectedText`, and `options[]`; inspect those before filling or selecting when field state matters.
 - Use `yunti_take_snapshot` as the compatibility path before uid-based clicks, fills, or hovers.
 - Use `yunti_click`, `yunti_fill`, `yunti_hover`, `yunti_press_key`, and `yunti_type_text` for normal page actions.
 - Use `yunti_take_screenshot` for visual verification.
@@ -81,7 +81,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 ## Fill Guidance
 
 - Prefer a fresh `uid` from `yunti_observe_page` or `yunti_take_snapshot` when filling inputs, textareas, selects, or contenteditable targets.
-- Before filling, inspect observation fields such as `fillable`, `readOnly`, `disabled`, `fillBlockReason`, and select `options[]` when available.
+- Before filling, inspect observation fields such as `fillable`, `readOnly`, `disabled`, `fillBlockReason`, and select `selectedValue` / `selectedText` / `options[]` when available.
 - Uid-targeted contenteditable fills return `method: "contenteditable"` and may include `before` / `after` text length summaries.
 - Treat contenteditable fill results as dispatch evidence, then verify with observe, snapshot, evaluate `textContent`, or a page-specific assertion when exact editor state matters.
 - Selector-based fill remains compatible and may return content-script-shaped fields such as `element` or `valueLength`.

@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry、uid/selector fill 不可编辑/隐藏/disabled/readonly 诊断、observe 字段状态提示；下一步继续收敛更深 select/fill/scroll 语义 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 覆盖、select uid/text、select uid/selector 失败诊断、contenteditable fill、selector/uid fill 失败诊断、fill_form 聚合诊断、uid scroll、scroll no-movement/edgeHint/recoveryHint/decision/suggestedRetry、uid/selector fill 不可编辑/隐藏/disabled/readonly 诊断、observe 字段状态与 select 选中项提示；下一步继续收敛更深 select/fill/scroll 语义 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -86,8 +86,8 @@
   `filled: false`、`ok: false`、`code: "TARGET_NOT_EDITABLE"`、`recoveryHint` 和
   `nextStepHint`，并保留所有既有成功路径、兼容字段与 CDP fallback。下一步继续进入更深的
   select/fill/scroll 语义增强与真实浏览器闭环补验。`yunti_observe_page` 也开始为字段类元素
-  暴露 `editable`、`fillable`、`readOnly`、`fillBlockReason` 和 select `options[]` 摘要，
-  让 agent 在填表或选择前先判断字段状态。
+  暴露 `editable`、`fillable`、`readOnly`、`fillBlockReason`、select 当前选中项摘要和
+  `options[]` 摘要，让 agent 在填表或选择前先判断字段状态。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2111,6 +2111,13 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   `npm run release:check` 通过，覆盖 105 个 node:test 用例，其中 104 个通过、1 个
   real-browser smoke 按默认配置跳过；npm package 内容检查通过，包含 42 个文件；
   extension zip 内容检查通过，包含 13 个文件。
+- `yunti_observe_page` select 当前状态提示已补齐：select 元素现在可追加
+  `selectedIndex`、`selectedValue`、`selectedValueRedacted` 和 `selectedText`，并保留
+  已有 `options[]` 摘要。Agent 可以先读取当前选中项，再决定是否需要调用
+  `yunti_select`，避免重复选择或盲目试错。本切片只追加观察元数据，不改变
+  `yunti_select` 执行路径、uid 生命周期或 redaction 默认值。
+- 最新 targeted 验证：`node --check extension/dom-observer.js` 通过；
+  `node --test tests/dom-observer.test.js` 通过 5 项。
 - `yunti_scroll` 已开始支持 fresh scrollable container uid：`yunti_observe_page` 返回的
   `scrollableContainers[]` 会进入当前 browserSessionId 最新 uid map；调用 `yunti_scroll`
   传 `uid` 时会解析容器中心点并复用既有 content-script coordinate/container scroll 路径。
@@ -2292,8 +2299,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - `0.2.0 Best Browser Automation Runtime` 的大版本计划已沉淀到
   `docs/NEXT_MAJOR_PLAN.md`。
 - 继续 P6.2 的小切片推进：uid/selector fill 的不可编辑、隐藏、disabled/readonly
-  目标诊断已落地，observe 字段状态提示也已补齐；下一刀建议继续收敛 select/fill/scroll
-  的更深语义，优先补真实浏览器闭环或更细的 select option / controlled input 验证缺口。
+  目标诊断已落地，observe 字段状态和 select 选中项提示也已补齐；下一刀建议继续收敛
+  select/fill/scroll 的更深语义，优先补真实浏览器闭环或 controlled input 验证缺口。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

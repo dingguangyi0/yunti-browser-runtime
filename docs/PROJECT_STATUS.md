@@ -17,8 +17,9 @@ structured fill failure diagnostics. The next compatibility-preserving slice
 has completed uid/selector fill diagnostics for non-editable, hidden, disabled,
 or readonly targets while preserving existing successful fill/select/scroll
 behavior and compatibility fields. Observation results now also expose field
-state hints for action planning. The next slice should continue deeper
-select/fill/scroll semantics or real-browser closure validation.
+state and select selected-option hints for action planning. The next slice
+should continue deeper select/fill/scroll semantics or real-browser closure
+validation.
 
 ## Current State
 
@@ -552,6 +553,15 @@ select/fill/scroll semantics or real-browser closure validation.
   passed, and 1 real-browser smoke skipped by default; npm package contents
   validation passed with 42 files; extension zip contents validation passed
   with 13 files.
+- P6.2 observe select-state hints are complete. Select elements can now expose
+  `selectedIndex`, `selectedValue`, `selectedValueRedacted`, and `selectedText`
+  alongside `options[]`, so agents can inspect the current selection before
+  deciding whether to call `yunti_select`. This is additive observe metadata
+  only; `yunti_select` execution, uid lifecycle, and default balanced redaction
+  remain unchanged.
+- Latest P6.2 observe select-state targeted validation:
+  `node --check extension/dom-observer.js` passed; `node --test
+  tests/dom-observer.test.js` passed 5 tests.
 - P6.2 deeper scroll semantics have started with fresh observed scrollable
   container uids. `yunti_observe_page` scrollableContainers now feed the current
   browserSessionId uid map, and `yunti_scroll` can resolve a container uid to
@@ -698,9 +708,9 @@ select/fill/scroll semantics or real-browser closure validation.
   marking P6.1 fully closed.
 - Continue P6.2 in small compatibility-preserving slices: uid/selector fill
   diagnostics for non-editable, hidden, disabled, and readonly targets are
-  complete, and observe field-state hints are complete; the next candidates are
-  deeper select/fill/scroll semantics and real-browser closure validation when
-  Playwright/Chromium is available.
+  complete, and observe field-state plus select-state hints are complete; the
+  next candidates are deeper select/fill/scroll semantics and real-browser
+  closure validation when Playwright/Chromium is available.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

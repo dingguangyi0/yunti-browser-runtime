@@ -323,6 +323,8 @@ test("DOM observer reports field fillability and select option summaries", () =>
       rect: { x: 20, y: 120, width: 100, height: 32 },
     }),
     new FakeElement("select", { id: "plan", name: "plan" }, {
+      value: "basic",
+      selectedIndex: 0,
       rect: { x: 20, y: 170, width: 220, height: 32 },
       options: [
         { value: "basic", text: "Basic", selected: true },
@@ -351,6 +353,10 @@ test("DOM observer reports field fillability and select option summaries", () =>
   assert.equal(button.fillBlockReason, "not-editable")
   assert.equal(plan.editable, true)
   assert.equal(plan.fillable, true)
+  assert.equal(plan.selectedIndex, 0)
+  assert.equal(plan.selectedValue, "basic")
+  assert.equal(plan.selectedValueRedacted, false)
+  assert.equal(plan.selectedText, "Basic")
   assert.deepEqual(JSON.parse(JSON.stringify(plan.options)), [
     { value: "basic", text: "Basic", selected: true, disabled: false, valueRedacted: false },
     { value: "enterprise", text: "Enterprise", selected: false, disabled: false, valueRedacted: false },

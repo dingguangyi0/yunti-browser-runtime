@@ -650,6 +650,7 @@ test("mcp usage hints include action recovery guidance", async () => {
   assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /verify through yunti_observe_page/)
   assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /fresh editable uid/)
   assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /contenteditable/)
+  assert.match(fillPayload.tools.yunti_fill.recovery.join("\n"), /yunti_wait_for/)
 
   const scrollResponse = await handleJsonRpc({
     jsonrpc: "2.0",
@@ -671,6 +672,7 @@ test("mcp usage hints include action recovery guidance", async () => {
   assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /fresh scrollable container uid/)
   assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /edgeHint/)
   assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /recoveryHint/)
+  assert.match(scrollPayload.tools.yunti_scroll.recovery.join("\n"), /yunti_wait_for/)
   assert.match(scrollPayload.tools.yunti_scroll.commonMistakes.join("\n"), /moved=false/)
   assert.match(scrollPayload.tools.yunti_scroll.commonMistakes.join("\n"), /edgeHint/)
   assert.match(scrollPayload.tools.yunti_scroll.commonMistakes.join("\n"), /recoveryHint/)
@@ -688,6 +690,8 @@ test("mcp usage hints include action recovery guidance", async () => {
   assert.equal(workflowResponse.result.isError, undefined)
   const workflowPayload = JSON.parse(workflowResponse.result.content[0].text)
   assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /observe -> act by fresh uid -> observe\/verify/)
+  assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /yunti_wait_for/)
+  assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /fresh uid/)
   assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /blind retries/)
   assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /coordinate fallbacks/)
 })

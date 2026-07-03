@@ -78,6 +78,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   `yunti_scroll` before falling back to coordinates.
 - If the page is loading or changing, wait or observe again instead of blindly
   repeating the same action.
+- For async UI transitions, use `yunti_wait_for` for expected text, selector, or
+  page state, then call `yunti_observe_page` and continue with a fresh uid
+  instead of reusing an old target.
 - If the target tab is uncertain, call `yunti_list_browser_targets` and route
   follow-up work through the intended `browserSessionId`.
 
@@ -116,6 +119,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   diagnostics with `code`, `ok: false`, `recoverable: true`, `recoveryHint`,
   and `nextStepHint`; follow `recoveryHint.nextAction` / `decision` before
   repeating the same fill.
+- If a field appears after async rendering or validation, wait for the expected
+  text/selector/state with `yunti_wait_for`, observe again, and fill with a
+  fresh editable uid.
 - Non-editable, hidden, disabled, or readonly fill targets return
   `code: "TARGET_NOT_EDITABLE"` diagnostics instead of being treated as
   successful fills; inspect the target or wait/unlock the field before retrying.
@@ -174,6 +180,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   repeating the same scroll when `moved: false` appears; use `recoveryHint`,
   `decision`, `edgeHint`, and `suggestedRetry` to choose a different container,
   direction, or recovery path.
+- If scrolling depends on newly loaded content, wait for the expected
+  text/selector/state with `yunti_wait_for`, observe again, and choose a fresh
+  `scrollableContainers[]` uid before continuing.
 
 ## Select Guidance
 
@@ -189,6 +198,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Before retrying a failed select, inspect available options with observe,
   snapshot, evaluate, a stable selector, or `recoveryHint.decision` instead of
   blindly repeating it.
+- If select options are populated asynchronously, use `yunti_wait_for` for the
+  expected option text or form state, then observe again and select with a fresh
+  uid/value or uid/text.
 
 ## Safety Rules
 

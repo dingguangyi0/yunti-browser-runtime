@@ -39,6 +39,10 @@ Latest visible P6.2 status:
   document-fallback scrolls keep `ok: true` but can include
   `coordinateFallbackHint` and a clearer `nextStepHint` pointing agents back to
   `yunti_observe_page` and fresh `scrollableContainers[]` uids.
+- Completed: wait-observe recovery guidance for async UI transitions. Tool
+  usage hints, Tool Guide, and the packaged skill now tell agents to use
+  `yunti_wait_for`, then `yunti_observe_page`, then fresh uids for async
+  fill/select/scroll recovery instead of reusing old targets.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
@@ -742,6 +746,19 @@ Latest visible P6.2 status:
   total, 112 passed, and 1 real-browser smoke skipped by default; npm package
   contents validation passed with 42 files; extension zip contents validation
   passed with 13 files.
+- P6.2 wait-observe recovery guidance is complete for tool guidance surfaces.
+  `yunti_get_tool_usage_hints`, `docs/TOOL_GUIDE.md`, and the packaged skill now
+  tell agents to recover from async rendering, validation, option population, or
+  newly loaded content by calling `yunti_wait_for`, observing again, and using a
+  fresh uid for fill/select/scroll continuation.
+- Latest P6.2 wait-observe guidance targeted validation: `node --test
+  tests/bridge.test.js` passed 65 tests.
+- Latest P6.2 wait-observe guidance full validation: `git diff --check` passed;
+  the token residue grep returned no matches; `YUNTI_E2E=1 npm run test:e2e`
+  was executed but skipped because Playwright/Chromium is not installed locally;
+  `npm run release:check` passed with 113 node:test cases total, 112 passed, and
+  1 real-browser smoke skipped by default; npm package contents validation
+  passed with 42 files; extension zip contents validation passed with 13 files.
 
 ## Decisions
 

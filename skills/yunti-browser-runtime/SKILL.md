@@ -69,6 +69,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - If a uid is stale or missing, call `yunti_observe_page` again and retry with a fresh uid.
 - If an element may be outside the viewport, use observe scroll hints and `yunti_scroll` before falling back to coordinates.
 - If the page is loading or changing, wait or observe again instead of blindly repeating the same action.
+- For async UI transitions, use `yunti_wait_for` for expected text, selector, or page state, then call `yunti_observe_page` and continue with a fresh uid instead of reusing an old target.
 - If the target tab is uncertain, call `yunti_list_browser_targets` and continue with the intended `browserSessionId`.
 
 ## Action Results
@@ -86,6 +87,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Treat contenteditable fill results as dispatch evidence, then verify with observe, snapshot, evaluate `textContent`, or a page-specific assertion when exact editor state matters.
 - Selector-based fill remains compatible and may return content-script-shaped fields such as `element` or `valueLength`.
 - Uid and selector fill failures may return structured `filled: false` diagnostics with `code`, `ok: false`, `recoverable: true`, `recoveryHint`, and `nextStepHint`; follow `recoveryHint.nextAction` / `decision` before repeating the same fill.
+- If a field appears after async rendering or validation, wait with `yunti_wait_for`, observe again, and fill with a fresh editable uid.
 - Non-editable, hidden, disabled, or readonly fill targets may return `code: "TARGET_NOT_EDITABLE"`; inspect the target, wait/unlock the field, or choose a different editable uid/selector before retrying.
 - Uid keyboard/contenteditable fills may return `code: "VALUE_NOT_APPLIED"` when the post-fill value does not remain. Use the length-only diagnostics (`expectedValueLength`, `actualValueLength`) and `recoveryHint.decision` to inspect controlled/masked fields before retrying; raw field values are not echoed in this diagnostic.
 - Select-option fill misses may include `availableValues` / `availableTexts`; inspect those options before retrying with `yunti_fill` or `yunti_select`.
@@ -101,6 +103,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - If scroll moves less than requested, results may keep `ok: true` and include `partialMovement` with requested/actual deltas, axes, `edgeHint`, `decision: "observe-before-continuing-scroll"`, and `nextAction: "observe-again"`; observe again before repeating the same scroll.
 - Uid scroll failures may return structured `scrolled: false` diagnostics with `code` such as `UID_NOT_FOUND` or `UID_COORDINATES_UNAVAILABLE`, plus `recoveryHint.decision: "refresh-scrollable-container-uid-before-retry"`; refresh observation and choose a fresh `scrollableContainers[]` uid before retrying.
 - After scrolling, observe again and compare document or container `before` / `after` positions before assuming the needed element is visible. Stop repeating the same scroll when `moved: false` appears; use `recoveryHint`, `decision`, `edgeHint`, and `suggestedRetry` to choose a different container, direction, or recovery path.
+- If scrolling depends on newly loaded content, use `yunti_wait_for`, observe again, and choose a fresh `scrollableContainers[]` uid before continuing.
 
 ## Select Guidance
 
@@ -108,6 +111,7 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - Use `text` with a fresh uid when the user-facing option label is clearer than the option value; selector path remains selector/value compatible.
 - Uid and selector option misses, disabled options, plus non-select targets return structured `selected: false` diagnostics with `code`, `matchMode`, `targetOption`, and `recoveryHint`; option misses include `availableValues` / `availableTexts` when available, and disabled-option failures can include `disabledValue` / `disabledText`.
 - Before retrying a failed select, inspect available options with observe, snapshot, evaluate, a stable selector, or `recoveryHint.decision` instead of blindly repeating it.
+- If select options are populated asynchronously, wait with `yunti_wait_for`, observe again, and select with a fresh uid/value or uid/text.
 
 ## Safety
 

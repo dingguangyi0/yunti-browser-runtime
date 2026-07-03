@@ -60,7 +60,7 @@
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
 | P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 主路径、select/fill/scroll 结构化诊断；最新切片为 coordinate scroll document fallback 恢复提示 | 稳定 DOM action 层与结构化 action result |
+| P6.2 | 进行中：已完成 action result 主路径、select/fill/scroll 结构化诊断；最新切片为 wait -> observe -> fresh uid 恢复指导 | 稳定 DOM action 层与结构化 action result |
 | P6.3 | 计划中 | Agent 工作流契约 |
 | P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
 | P6.5 | 计划中 | 可选本地运行时控制台 |
@@ -79,6 +79,7 @@
   - scroll partial movement 的 `partialMovement` 观察前置诊断；
   - uid scroll 缺失/过期/不可解析目标的结构化恢复诊断；
   - coordinate scroll 命中元素、滚动容器、document fallback 诊断和恢复提示；
+  - fill/select/scroll 异步 UI 的 `wait -> observe -> fresh uid` 恢复指导；
   - uid/selector fill 不可编辑、隐藏、disabled、readonly 目标诊断；
   - uid fill 填后值保持验证与 `VALUE_NOT_APPLIED` 长度级诊断；
   - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
@@ -127,6 +128,10 @@
   `recoverable: false`，并新增 `coordinateFallbackHint` 与更明确的 `nextStepHint`，
   指向 `yunti_observe_page` 和 fresh `scrollableContainers[]` uid，避免 agent 误以为
   nested panel 已经被滚动。
+- P6.2 wait-observe 恢复指导已补齐：`yunti_get_tool_usage_hints`、Tool Guide 和 skill
+  现在明确要求异步渲染、校验、option 加载或新内容加载时，先用 `yunti_wait_for`
+  等待预期 text/selector/state，再调用 `yunti_observe_page`，最后用 fresh uid 继续
+  fill/select/scroll，而不是复用旧 uid 或盲目重复同一动作。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2251,6 +2256,17 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   panel 已经被滚动。
 - 最新 targeted 验证：`node --test tests/tool-handlers.test.js tests/bridge.test.js
   tests/content-scroll.test.js` 通过 107 项。
+- 最新 full 验证：`git diff --check` 通过；token 残留检查无输出；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，覆盖 113 个 node:test 用例，其中 112 个通过、1 个
+  real-browser smoke 按默认配置跳过；npm package 内容检查通过，包含 42 个文件；
+  extension zip 内容检查通过，包含 13 个文件。
+- `yunti_get_tool_usage_hints` wait-observe 恢复指导已补齐：action recovery workflow
+  和 fill/select/scroll 的工具级 recovery 都明确建议，在异步 UI transition、表单校验、
+  option 异步加载或内容继续加载时，使用 `yunti_wait_for` 等待预期 text/selector/state，
+  然后重新 `yunti_observe_page` 并用 fresh uid 继续。本切片只更新 agent guidance
+  和测试，不改变 runtime action 行为。
+- 最新 targeted 验证：`node --test tests/bridge.test.js` 通过 65 项。
 - 最新 full 验证：`git diff --check` 通过；token 残留检查无输出；
   `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；
   `npm run release:check` 通过，覆盖 113 个 node:test 用例，其中 112 个通过、1 个

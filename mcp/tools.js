@@ -1144,6 +1144,7 @@ export function toolUsageHints(args = {}) {
         "Coordinate-only fill is not supported; use uid or selector.",
         "Uid-targeted contenteditable fills now report method=contenteditable with before/after textLength summaries; still verify the rendered text after the action.",
         "Failed uid/selector fills may return structured filled=false diagnostics with ok=false, recoverable=true, code, recoveryHint, and nextStepHint instead of only a generic tool error.",
+        "When yunti_fill_form uses yunti_fill internally, failed per-field results may preserve code, recoveryHint, availableValues/availableTexts, and nextStepHint for field-level recovery.",
         "After filling, verify through yunti_observe_page, yunti_get_page_snapshot, or yunti_evaluate_script when exact field value matters.",
         "If the input is hidden, disabled, or no longer present, observe again, scroll, wait for rendering, or switch tabs before retrying.",
         "Current results are compatibility-shaped and may include filled, uid, selector, method, value/valueLength, before/after, code, recoveryHint, and browserSessionId; P6.2 will converge action outputs toward action, target, ok/code, recoverable, nextStepHint, and richer before/after summaries.",
@@ -1151,6 +1152,7 @@ export function toolUsageHints(args = {}) {
       recovery: [
         "Stale or missing uid: call yunti_observe_page again and use a fresh editable uid.",
         "Structured fill failure: follow recoveryHint.nextAction / recoveryHint.decision before retrying the same fill.",
+        "Batch fill partial failure: inspect each yunti_fill_form results[] item; failed fields may carry the same structured recovery details as yunti_fill.",
         "Field not editable: check disabled/editable fields from the observation, then wait, scroll, or ask the user if the control is gated.",
         "Select option not found: inspect availableValues / availableTexts, then retry with an available option value/text or use yunti_select.",
         "Value did not stick: verify whether the target is contenteditable, masked, controlled by framework state, or requires typing/press_key semantics.",

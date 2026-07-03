@@ -1413,7 +1413,43 @@ test("fill form preserves aggregate fields with structured result", async () => 
             name: "Name",
             rect: { x: 20, y: 30, width: 120, height: 24 },
           },
+          {
+            uid: "yunti-plan",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 40, y: 70, width: 140, height: 28 },
+          },
         ],
+      },
+    ],
+    cdpResponses: [
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "input",
+            type: "text",
+            contentEditable: false,
+          },
+        },
+      },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "select",
+            options: [
+              { value: "basic", text: "Basic" },
+              { value: "pro", text: "Pro" },
+            ],
+            selectedIndex: 0,
+          },
+        },
       },
     ],
     contentToolResponses: {
@@ -1440,6 +1476,7 @@ test("fill form preserves aggregate fields with structured result", async () => 
       arguments: {
         fields: [
           { uid: "yunti-name", value: "Ada" },
+          { uid: "yunti-plan", value: "Enterprise" },
           { selector: "#email", value: "ada@test.dev" },
           { selector: "#missing", value: "nope" },
         ],
@@ -1448,18 +1485,53 @@ test("fill form preserves aggregate fields with structured result", async () => 
 
     assert.deepEqual(harness.posted.at(-1).result, {
       filled: 2,
-      failed: 1,
+      failed: 2,
       results: [
         { uid: "yunti-name", selector: undefined, ok: true },
+        {
+          uid: "yunti-plan",
+          selector: undefined,
+          ok: false,
+          code: "OPTION_NOT_FOUND",
+          error: "Option 'Enterprise' not found in select at uid yunti-plan",
+          recoveryHint: {
+            reason: "uid-fill-failed",
+            recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+            nextAction: "inspect-available-options",
+            decision: "inspect-options-before-retry",
+            uid: "yunti-plan",
+            availableValues: ["basic", "pro"],
+            availableTexts: ["Basic", "Pro"],
+            message: "The uid fill could not be completed. Refresh observation if the uid may be stale, inspect whether the target is editable, or retry with selector fallback.",
+          },
+          availableValues: ["basic", "pro"],
+          availableTexts: ["Basic", "Pro"],
+          nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
+        },
         { uid: undefined, selector: "#email", ok: true },
-        { uid: undefined, selector: "#missing", ok: false, error: "selector not found" },
+        {
+          uid: undefined,
+          selector: "#missing",
+          ok: false,
+          code: "ELEMENT_NOT_FOUND",
+          error: "selector not found",
+          recoveryHint: {
+            reason: "selector-fill-failed",
+            recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+            nextAction: "observe-again",
+            decision: "refresh-observation-or-selector-before-retry",
+            selector: "#missing",
+            message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
+          },
+          nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
+        },
       ],
       browserSessionId: "tab-1",
       action: "fill_form",
       target: {
-        fieldCount: 3,
+        fieldCount: 4,
         filled: 2,
-        failed: 1,
+        failed: 2,
       },
       ok: false,
       recoverable: true,

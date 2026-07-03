@@ -113,6 +113,10 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Select-option fill misses include `availableValues` / `availableTexts` when
   available, so inspect those options before retrying with `yunti_fill` or
   `yunti_select`.
+- `yunti_fill_form` preserves per-field compatibility results and can carry the
+  same structured failure details on failed `results[]` items, including
+  `code`, `recoveryHint`, `availableValues` / `availableTexts`, and
+  `nextStepHint`.
 
 ## Scroll Guidance
 

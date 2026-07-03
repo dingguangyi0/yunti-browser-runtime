@@ -12,9 +12,9 @@ diagnostics; contenteditable fill and uid-targeted scroll are covered; and
 scroll no-movement diagnostics now include directional `edgeHint`, structured
 `recoveryHint`, machine-readable `decision`, and executable `suggestedRetry`
 parameters; and selector/uid fill failures now return structured recovery
-diagnostics. The next compatibility-preserving slice should let aggregate
-`yunti_fill_form` results preserve per-field structured fill failure
-diagnostics, then continue into deeper fill/scroll/select semantics.
+diagnostics; aggregate `yunti_fill_form` results now preserve per-field
+structured fill failure diagnostics. The next compatibility-preserving slice
+should continue into deeper fill/select/scroll semantics.
 
 ## Current State
 
@@ -497,6 +497,22 @@ diagnostics, then continue into deeper fill/scroll/select semantics.
   total, 101 passed, and 1 real-browser smoke skipped by default; npm package
   contents validation passed with 42 files; extension zip contents validation
   passed with 13 files.
+- P6.2 fill_form aggregation now preserves per-field structured fill failure
+  diagnostics. Aggregate results keep existing `filled`, `failed`, `results`,
+  `action: "fill_form"`, `target`, `ok`, `recoverable`, and `nextStepHint`
+  fields, while failed `results[]` items can carry `code`, `recoveryHint`,
+  `availableValues` / `availableTexts`, and field-level `nextStepHint` from
+  `yunti_fill`.
+- Latest P6.2 fill_form diagnostic aggregation targeted validation:
+  `node --check extension/tool-handlers.js` passed; `node --test
+  tests/tool-handlers.test.js` passed 32 tests.
+- Latest P6.2 fill_form diagnostic aggregation full validation: `git diff
+  --check` passed; the token residue grep returned no matches; `YUNTI_E2E=1
+  npm run test:e2e` was executed but skipped because Playwright/Chromium is
+  not installed locally; `npm run release:check` passed with 102 node:test
+  cases total, 101 passed, and 1 real-browser smoke skipped by default; npm
+  package contents validation passed with 42 files; extension zip contents
+  validation passed with 13 files.
 - P6.2 deeper scroll semantics have started with fresh observed scrollable
   container uids. `yunti_observe_page` scrollableContainers now feed the current
   browserSessionId uid map, and `yunti_scroll` can resolve a container uid to
@@ -642,8 +658,8 @@ diagnostics, then continue into deeper fill/scroll/select semantics.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   marking P6.1 fully closed.
 - Continue P6.2 in small compatibility-preserving slices: the next candidate is
-  `yunti_fill_form` aggregation preserving per-field structured fill failure
-  diagnostics, followed by deeper fill/select/scroll semantics.
+  deeper uid/selector fill diagnostics for non-editable, hidden, or disabled
+  targets, followed by deeper select/scroll semantics.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

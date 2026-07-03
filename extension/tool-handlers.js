@@ -1338,17 +1338,16 @@ export function createToolDispatcher({
     for (const field of fields) {
       try {
         const uid = String(field.uid || "").trim()
+        let fieldResult
         if (uid) {
-          await fillByUid(tabId, session, { uid, value: String(field.value || "") })
+          fieldResult = await fillByUid(tabId, session, { uid, value: String(field.value || "") })
         } else {
-          await chrome.tabs.sendMessage(tabId, {
-            type: "yunti_execute_tool",
-            tool: "yunti_fill",
-            arguments: { selector: field.selector, value: field.value },
-          })
+          fieldResult = await fillByUid(tabId, session, { selector: field.selector, value: field.value })
         }
-        filled++
-        results.push({ uid: field.uid, selector: field.selector, ok: true })
+        const normalized = buildFillFormFieldResult(field, fieldResult)
+        if (normalized.ok) filled++
+        else failed++
+        results.push(normalized)
       } catch (err) {
         failed++
         results.push({ uid: field.uid, selector: field.selector, ok: false, error: err?.message || String(err) })
@@ -1372,6 +1371,27 @@ export function createToolDispatcher({
         ? "Form fill dispatched. Observe again, read page state, or evaluate field values to verify the intended changes."
         : "Form fill partially failed. Inspect per-field results, observe again for fresh uids, or retry failed fields with selector fallback.",
     }
+  }
+
+  function buildFillFormFieldResult(field, fieldResult = {}) {
+    const ok = Boolean(fieldResult?.filled || fieldResult?.ok === true)
+    if (ok) return { uid: field.uid, selector: field.selector, ok: true }
+
+    const diagnostics = fieldResult && typeof fieldResult === "object" ? fieldResult : {}
+    const preservedKeys = [
+      "code",
+      "error",
+      "recoveryHint",
+      "availableValues",
+      "availableTexts",
+      "nextStepHint",
+    ]
+    const result = { uid: field.uid, selector: field.selector, ok: false }
+    for (const key of preservedKeys) {
+      if (diagnostics[key] !== undefined) result[key] = diagnostics[key]
+    }
+    if (!result.error) result.error = "fill failed"
+    return result
   }
   
   async function waitForCondition(tabId, session, args = {}) {

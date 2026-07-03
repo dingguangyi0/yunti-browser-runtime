@@ -682,6 +682,59 @@ test("uid scroll no movement includes observed container recovery metadata", asy
   }
 })
 
+test("scroll partial movement reports observe-before-continuing hint", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_scroll: {
+        scrolled: true,
+        deltaX: 0,
+        deltaY: 600,
+        target: "document",
+        before: { left: 0, top: 900 },
+        after: { left: 0, top: 1200 },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-scroll-partial",
+      tool: "yunti_scroll",
+      arguments: { deltaY: 600 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      scrolled: true,
+      deltaX: 0,
+      deltaY: 600,
+      target: "document",
+      before: { left: 0, top: 900 },
+      after: { left: 0, top: 1200 },
+      browserSessionId: "tab-1",
+      action: "scroll",
+      moved: true,
+      partialMovement: {
+        reason: "partial-scroll-movement",
+        axes: ["vertical"],
+        requestedDeltaX: 0,
+        requestedDeltaY: 600,
+        actualDeltaX: 0,
+        actualDeltaY: 300,
+        edgeHint: "possible-bottom-edge",
+        nextAction: "observe-again",
+        decision: "observe-before-continuing-scroll",
+        message: "The scroll position changed, but less than the requested delta. Observe again before repeating the same scroll to verify whether the target container hit an edge or a different container should be used.",
+      },
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Scroll moved partially (possible-bottom-edge). Observe again and compare scroll positions before repeating the same scroll.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("uid fill select path preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness({
     observations: [

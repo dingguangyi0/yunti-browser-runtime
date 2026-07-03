@@ -23,6 +23,10 @@ Latest visible P6.2 status:
   paths. When the value does not remain, `yunti_fill` returns
   `VALUE_NOT_APPLIED` with length-only diagnostics and recovery guidance instead
   of echoing the raw field value.
+- Completed: scroll partial-movement diagnostics. When a scroll moves less than
+  requested, results keep `ok: true` and include `partialMovement` with
+  requested/actual deltas, affected axes, `edgeHint`, and
+  `decision: "observe-before-continuing-scroll"`.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
@@ -688,6 +692,15 @@ Latest visible P6.2 status:
 - Latest P6.2 uid fill post-value verification targeted validation:
   `node --check extension/tool-handlers.js` passed; `node --test
   tests/tool-handlers.test.js` passed 37 tests.
+- P6.2 scroll partial-movement diagnostics are complete. When comparable
+  `before` / `after` positions show movement that is smaller than the requested
+  `deltaX` / `deltaY`, `yunti_scroll` keeps the action successful but adds a
+  structured `partialMovement` hint with requested/actual deltas, affected axes,
+  `edgeHint`, `nextAction: "observe-again"`, and
+  `decision: "observe-before-continuing-scroll"`.
+- Latest P6.2 scroll partial-movement targeted validation:
+  `node --check extension/tool-handlers.js` passed; `node --test
+  tests/tool-handlers.test.js` passed 38 tests.
 
 ## Decisions
 

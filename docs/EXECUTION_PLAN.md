@@ -76,6 +76,7 @@
   - selector/uid fill 失败诊断与 `yunti_fill_form` 聚合诊断；
   - uid scroll、scroll no-movement、directional `edgeHint`、结构化 `recoveryHint`、
     机器可读 `decision` 和可执行 `suggestedRetry`；
+  - scroll partial movement 的 `partialMovement` 观察前置诊断；
   - uid/selector fill 不可编辑、隐藏、disabled、readonly 目标诊断；
   - uid fill 填后值保持验证与 `VALUE_NOT_APPLIED` 长度级诊断；
   - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
@@ -104,6 +105,11 @@
   `filled: false`、`ok: false`、`code: "VALUE_NOT_APPLIED"`、`expectedValueLength`、
   `actualValueLength`、`recoveryHint.decision: "inspect-controlled-or-masked-field-before-retry"`
   和 `nextStepHint`。该诊断不回传实际字段内容，只回传长度摘要；既有成功路径和兼容字段保持不变。
+- P6.2 scroll partial movement 诊断已补齐：当 `before` / `after` 可比较且 scroll
+  实际移动距离小于请求 `deltaX` / `deltaY` 时，结果保持 `ok: true`，并新增
+  `partialMovement`，包含 requested/actual delta、affected axes、`edgeHint`、
+  `decision: "observe-before-continuing-scroll"` 和 `nextAction: "observe-again"`。
+  该诊断用于提示 agent 先重新 observe 和比较滚动位置，再决定是否继续滚同一容器。
 
 ## P0.1 bridge token + CORS 收紧
 
@@ -2329,8 +2335,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   `docs/NEXT_MAJOR_PLAN.md`。
 - 继续 P6.2 的小切片推进：uid/selector fill 的不可编辑、隐藏、disabled/readonly
   目标诊断已落地，observe 字段状态、select 选中项提示和 select disabled option
-  诊断也已补齐，uid fill 填后值保持验证也已补齐；下一刀建议继续收敛 scroll 的更深语义
-  或补真实浏览器闭环。
+  诊断也已补齐，uid fill 填后值保持验证和 scroll partial movement 诊断也已补齐；
+  下一刀建议继续收敛 scroll 的更深语义或补真实浏览器闭环。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

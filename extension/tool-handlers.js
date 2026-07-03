@@ -990,6 +990,7 @@ export function createToolDispatcher({
     const noMovement = moved === false
     const edgeHint = noMovement ? inferScrollEdgeHint(result.deltaX, result.deltaY) : undefined
     const recoveryHint = noMovement ? buildScrollRecoveryHint(session, uid, edgeHint, result) : undefined
+    const partialMovement = moved === true ? buildScrollPartialMovementHint(result, scrollArgs) : undefined
 
     return {
       ...result,
@@ -1001,10 +1002,13 @@ export function createToolDispatcher({
       ...(noMovement ? { code: "NO_SCROLL_MOVEMENT" } : {}),
       ...(edgeHint ? { edgeHint } : {}),
       ...(recoveryHint ? { recoveryHint } : {}),
+      ...(partialMovement ? { partialMovement } : {}),
       ok: !noMovement,
       recoverable: noMovement,
       nextStepHint: noMovement
         ? `Scroll dispatched but before/after positions did not change${edgeHint ? ` (${edgeHint})` : ""}. Observe again, inspect scroll boundaries, try the nearest scrollable container uid, or stop repeating the same scroll.`
+        : partialMovement
+          ? `Scroll moved partially${partialMovement.edgeHint ? ` (${partialMovement.edgeHint})` : ""}. Observe again and compare scroll positions before repeating the same scroll.`
         : uid
           ? "Uid-targeted scroll dispatched. Observe again or read page state to verify the intended container position."
           : "Scroll dispatched. Observe again or read page state to verify the intended viewport or container position.",
@@ -1019,6 +1023,48 @@ export function createToolDispatcher({
     if (Number.isFinite(x) && x > 0) return "possible-right-edge"
     if (Number.isFinite(x) && x < 0) return "possible-left-edge"
     return "no-delta"
+  }
+
+  function buildScrollPartialMovementHint(result = {}, args = {}) {
+    const beforeLeft = Number(result.before?.left)
+    const beforeTop = Number(result.before?.top)
+    const afterLeft = Number(result.after?.left)
+    const afterTop = Number(result.after?.top)
+    if (
+      !Number.isFinite(beforeLeft) ||
+      !Number.isFinite(beforeTop) ||
+      !Number.isFinite(afterLeft) ||
+      !Number.isFinite(afterTop)
+    ) return undefined
+
+    const requestedDeltaX = Number(result.deltaX ?? args.deltaX ?? 0)
+    const requestedDeltaY = Number(result.deltaY ?? args.deltaY ?? 0)
+    const actualDeltaX = afterLeft - beforeLeft
+    const actualDeltaY = afterTop - beforeTop
+    const axes = []
+    if (isPartialScrollMovement(requestedDeltaX, actualDeltaX)) axes.push("horizontal")
+    if (isPartialScrollMovement(requestedDeltaY, actualDeltaY)) axes.push("vertical")
+    if (!axes.length) return undefined
+
+    return {
+      reason: "partial-scroll-movement",
+      axes,
+      requestedDeltaX,
+      requestedDeltaY,
+      actualDeltaX,
+      actualDeltaY,
+      edgeHint: inferScrollEdgeHint(requestedDeltaX, requestedDeltaY),
+      nextAction: "observe-again",
+      decision: "observe-before-continuing-scroll",
+      message: "The scroll position changed, but less than the requested delta. Observe again before repeating the same scroll to verify whether the target container hit an edge or a different container should be used.",
+    }
+  }
+
+  function isPartialScrollMovement(requestedDelta, actualDelta) {
+    if (!Number.isFinite(requestedDelta) || !Number.isFinite(actualDelta)) return false
+    if (requestedDelta === 0 || actualDelta === 0) return false
+    if (Math.sign(requestedDelta) !== Math.sign(actualDelta)) return false
+    return Math.abs(actualDelta) < Math.abs(requestedDelta)
   }
 
   function buildScrollRecoveryHint(session, uid, edgeHint, result = {}) {

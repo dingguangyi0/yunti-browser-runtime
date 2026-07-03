@@ -154,6 +154,10 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   used. When the attempted direction is clear, `recoveryHint.suggestedRetry`
   also provides a one-shot opposite `deltaX` / `deltaY` to try before switching
   container or stopping.
+- Partial movement results keep `ok: true` and add `partialMovement` with
+  requested/actual delta summaries, affected axes, `edgeHint`,
+  `decision: "observe-before-continuing-scroll"`, and `nextAction:
+  "observe-again"`. Observe again before repeating the same scroll.
 - After scrolling, observe again and compare document or container `before` /
   `after` positions before assuming the needed element is visible. Stop
   repeating the same scroll when `moved: false` appears; use `recoveryHint`,

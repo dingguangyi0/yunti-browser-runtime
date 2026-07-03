@@ -625,116 +625,139 @@ export function createToolDispatcher({
     const uid = String(args.uid || "").trim()
     const value = String(args.value)
     if (uid) {
-      const { x, y } = await resolveUidCenter(tabId, session, uid)
-      await mouseClick(tabId, x, y, 1)
-      await delayCdp(100)
-      // Clear existing value
-      const elements = await chromeDebuggerSendCommand(
-        { tabId },
-        "Runtime.evaluate",
-        { expression: `(() => {
-          const el = document.elementFromPoint(${x}, ${y});
-          if (!el) return 'not found';
-          const tag = el.tagName.toLowerCase();
-          if (tag === 'select') {
-            const opts = Array.from(el.options);
-            return { tag: 'select', options: opts.map(o => ({ value: o.value, text: o.text.slice(0, 80) })), selectedIndex: el.selectedIndex };
+      try {
+        const { x, y } = await resolveUidCenter(tabId, session, uid)
+        await mouseClick(tabId, x, y, 1)
+        await delayCdp(100)
+        // Clear existing value
+        const elements = await chromeDebuggerSendCommand(
+          { tabId },
+          "Runtime.evaluate",
+          { expression: `(() => {
+            const el = document.elementFromPoint(${x}, ${y});
+            if (!el) return 'not found';
+            const tag = el.tagName.toLowerCase();
+            if (tag === 'select') {
+              const opts = Array.from(el.options);
+              return { tag: 'select', options: opts.map(o => ({ value: o.value, text: o.text.slice(0, 80) })), selectedIndex: el.selectedIndex };
+            }
+            const beforeText = el.isContentEditable ? String(el.textContent || '') : '';
+            if (el.isContentEditable) {
+              el.focus();
+              el.textContent = '';
+            } else if (tag === 'input' || tag === 'textarea') {
+              el.focus();
+              el.select();
+            }
+            return {
+              tag,
+              type: el.type,
+              contentEditable: el.isContentEditable,
+              before: el.isContentEditable ? { textLength: beforeText.length } : undefined,
+            };
+          })()`,
+            returnByValue: true,
           }
-          const beforeText = el.isContentEditable ? String(el.textContent || '') : '';
-          if (el.isContentEditable) {
-            el.focus();
-            el.textContent = '';
-          } else if (tag === 'input' || tag === 'textarea') {
-            el.focus();
-            el.select();
-          }
-          return {
-            tag,
-            type: el.type,
-            contentEditable: el.isContentEditable,
-            before: el.isContentEditable ? { textLength: beforeText.length } : undefined,
-          };
-        })()`,
-          returnByValue: true,
-        }
-      )
-      const elInfo = elements?.result?.value
-  
-      if (elInfo === "not found") throw new Error(`No element found at uid ${uid} coordinates`)
-  
-      // Handle select element
-      if (elInfo?.tag === "select") {
-        const targetOption = elInfo.options?.find(
-          o => o.value === value || o.text === value
         )
-        if (targetOption) {
+        const elInfo = elements?.result?.value
+
+        if (elInfo === "not found") {
+          return buildUidFillFailureResult(session, uid, {
+            code: "ELEMENT_NOT_FOUND",
+            error: `No element found at uid ${uid} coordinates`,
+          })
+        }
+  
+        // Handle select element
+        if (elInfo?.tag === "select") {
+          const targetOption = elInfo.options?.find(
+            o => o.value === value || o.text === value
+          )
+          if (targetOption) {
+            await chromeDebuggerSendCommand(
+              { tabId },
+              "Runtime.evaluate",
+              {
+                expression: `(() => {
+                  const el = document.elementFromPoint(${x}, ${y});
+                  if (el) el.value = ${JSON.stringify(targetOption.value)};
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                })()`,
+              }
+            )
+            return {
+              filled: true,
+              uid,
+              method: "select",
+              value: targetOption.value,
+              browserSessionId: session.browserSessionId,
+              action: "fill",
+              target: { uid, method: "select" },
+              ok: true,
+              recoverable: false,
+              nextStepHint: "Select value dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
+            }
+          }
+          return buildUidFillFailureResult(session, uid, {
+            code: "OPTION_NOT_FOUND",
+            error: `Option '${value}' not found in select at uid ${uid}`,
+            availableValues: elInfo.options?.map((option) => option.value).slice(0, 50),
+            availableTexts: elInfo.options?.map((option) => option.text).slice(0, 50),
+          })
+        }
+  
+        // Type text via CDP Input.dispatchKeyEvent
+        const text = value
+        for (const char of text) {
           await chromeDebuggerSendCommand(
             { tabId },
-            "Runtime.evaluate",
-            {
-              expression: `(() => {
-                const el = document.elementFromPoint(${x}, ${y});
-                if (el) el.value = ${JSON.stringify(targetOption.value)};
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-              })()`,
-            }
+            "Input.dispatchKeyEvent",
+            { type: "char", text: char, unmodifiedText: char }
           )
-          return {
-            filled: true,
-            uid,
-            method: "select",
-            value: targetOption.value,
-            browserSessionId: session.browserSessionId,
-            action: "fill",
-            target: { uid, method: "select" },
-            ok: true,
-            recoverable: false,
-            nextStepHint: "Select value dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
-          }
         }
-        throw new Error(`Option '${value}' not found in select at uid ${uid}. Use yunti_take_snapshot to inspect the select element or pass an available option value/text.`)
-      }
-  
-      // Type text via CDP Input.dispatchKeyEvent
-      const text = value
-      for (const char of text) {
-        await chromeDebuggerSendCommand(
-          { tabId },
-          "Input.dispatchKeyEvent",
-          { type: "char", text: char, unmodifiedText: char }
-        )
-      }
-      const method = elInfo?.contentEditable ? "contenteditable" : "keyboard"
-      const before = elInfo?.before
-      const after = elInfo?.contentEditable ? { textLength: text.length } : undefined
-      return {
-        filled: true,
-        uid,
-        method,
-        value: text,
-        ...(before ? { before } : {}),
-        ...(after ? { after } : {}),
-        browserSessionId: session.browserSessionId,
-        action: "fill",
-        target: { uid, method },
-        ok: true,
-        recoverable: false,
-        nextStepHint: elInfo?.contentEditable
-          ? "Contenteditable fill dispatched. Observe again, read page text, or evaluate textContent to verify the intended change."
-          : "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
-      }
+        const method = elInfo?.contentEditable ? "contenteditable" : "keyboard"
+        const before = elInfo?.before
+        const after = elInfo?.contentEditable ? { textLength: text.length } : undefined
+        return {
+          filled: true,
+          uid,
+          method,
+          value: text,
+          ...(before ? { before } : {}),
+          ...(after ? { after } : {}),
+          browserSessionId: session.browserSessionId,
+          action: "fill",
+          target: { uid, method },
+          ok: true,
+          recoverable: false,
+          nextStepHint: elInfo?.contentEditable
+            ? "Contenteditable fill dispatched. Observe again, read page text, or evaluate textContent to verify the intended change."
+            : "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+        }
+    } catch (error) {
+      return buildUidFillFailureResult(session, uid, {
+        error: error?.message || "Uid fill failed",
+      })
+    }
     }
   
     const selector = String(args.selector || "").trim()
-    const result = await chrome.tabs.sendMessage(tabId, {
-      type: "yunti_execute_tool",
-      tool: "yunti_fill",
-      arguments: args,
-    })
+    let result
+    try {
+      result = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_fill",
+        arguments: args,
+      })
+    } catch (error) {
+      return buildSelectorFillFailureResult(session, selector, {
+        error: error?.message || "Selector fill failed",
+      })
+    }
 
     if (!result || typeof result !== "object" || result.filled !== true) {
-      return result
+      return buildSelectorFillFailureResult(session, selector, result)
     }
 
     return {
@@ -748,6 +771,82 @@ export function createToolDispatcher({
       recoverable: false,
       nextStepHint: "Selector fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
     }
+  }
+
+  function buildSelectorFillFailureResult(session, selector, fillResult = {}) {
+    const error = fillResult?.error || "Selector fill failed"
+    const code = fillResult?.code || inferFillFailureCode(error, "SELECTOR_FILL_FAILED")
+    const recoveryHint = {
+      reason: "selector-fill-failed",
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+      nextAction: code === "ELEMENT_NOT_FOUND" ? "observe-again" : "inspect-target-element",
+      decision: code === "ELEMENT_NOT_FOUND" ? "refresh-observation-or-selector-before-retry" : "inspect-editability-before-retry",
+      selector,
+      message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
+    }
+
+    return {
+      ...(fillResult && typeof fillResult === "object" ? fillResult : {}),
+      filled: false,
+      selector,
+      browserSessionId: session.browserSessionId,
+      action: "fill",
+      target: { selector, method: "selector" },
+      ok: false,
+      recoverable: true,
+      code,
+      error,
+      recoveryHint,
+      nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
+    }
+  }
+
+  function buildUidFillFailureResult(session, uid, fillResult = {}) {
+    const availableValues = Array.isArray(fillResult?.availableValues) ? fillResult.availableValues : undefined
+    const availableTexts = Array.isArray(fillResult?.availableTexts) ? fillResult.availableTexts : undefined
+    const error = fillResult?.error || `Cannot fill uid ${uid}`
+    const code = fillResult?.code || inferFillFailureCode(error, "UID_FILL_FAILED")
+    const recoveryHint = {
+      reason: "uid-fill-failed",
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+      nextAction: "inspect-target-element",
+      decision: "inspect-editability-before-retry",
+      uid,
+      ...(availableValues ? { availableValues } : {}),
+      ...(availableTexts ? { availableTexts } : {}),
+      message: "The uid fill could not be completed. Refresh observation if the uid may be stale, inspect whether the target is editable, or retry with selector fallback.",
+    }
+
+    if (code === "ELEMENT_NOT_FOUND") {
+      recoveryHint.nextAction = "observe-again"
+      recoveryHint.decision = "refresh-observation-before-retry"
+    } else if (code === "OPTION_NOT_FOUND") {
+      recoveryHint.nextAction = "inspect-available-options"
+      recoveryHint.decision = "inspect-options-before-retry"
+    }
+
+    return {
+      filled: false,
+      uid,
+      browserSessionId: session.browserSessionId,
+      action: "fill",
+      target: { uid, method: "uid" },
+      ok: false,
+      recoverable: true,
+      code,
+      error,
+      ...(availableValues ? { availableValues } : {}),
+      ...(availableTexts ? { availableTexts } : {}),
+      recoveryHint,
+      nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
+    }
+  }
+
+  function inferFillFailureCode(error, fallbackCode) {
+    const message = String(error || "").toLowerCase()
+    if (message.includes("not found") || message.includes("cannot resolve coordinates")) return "ELEMENT_NOT_FOUND"
+    if (message.includes("not editable") || message.includes("no editable target")) return "TARGET_NOT_EDITABLE"
+    return fallbackCode
   }
 
   async function scrollPage(tabId, session, args = {}) {

@@ -480,6 +480,22 @@ fill/scroll/select semantics.
   passed with 13 files; `YUNTI_E2E=1 npm run test:e2e` was executed but
   skipped because Playwright/Chromium is not installed locally; the token
   residue grep returned no matches.
+- P6.2 fill failure diagnostics have started. Selector fill thrown failures and
+  uid select option misses now return structured `filled: false` diagnostics
+  with `ok: false`, `recoverable: true`, `code`, `recoveryHint`, and
+  `nextStepHint`, while preserving successful fill compatibility fields and
+  dispatch semantics. Uid select option misses include `availableValues` /
+  `availableTexts` when the page exposes them.
+- Latest P6.2 fill failure diagnostic targeted validation:
+  `node --check extension/tool-handlers.js` passed; `node --test
+  tests/tool-handlers.test.js` passed 32 tests.
+- Latest P6.2 fill failure diagnostic full validation: `git diff --check`
+  passed; the token residue grep returned no matches; `YUNTI_E2E=1 npm run
+  test:e2e` was executed but skipped because Playwright/Chromium is not
+  installed locally; `npm run release:check` passed with 102 node:test cases
+  total, 101 passed, and 1 real-browser smoke skipped by default; npm package
+  contents validation passed with 42 files; extension zip contents validation
+  passed with 13 files.
 - P6.2 deeper scroll semantics have started with fresh observed scrollable
   container uids. `yunti_observe_page` scrollableContainers now feed the current
   browserSessionId uid map, and `yunti_scroll` can resolve a container uid to

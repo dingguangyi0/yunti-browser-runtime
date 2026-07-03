@@ -106,6 +106,13 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   when exact editor state matters.
 - Selector-based fill remains compatible and may return content-script-shaped
   fields such as `element` or `valueLength`.
+- Uid and selector fill failures can return structured `filled: false`
+  diagnostics with `code`, `ok: false`, `recoverable: true`, `recoveryHint`,
+  and `nextStepHint`; follow `recoveryHint.nextAction` / `decision` before
+  repeating the same fill.
+- Select-option fill misses include `availableValues` / `availableTexts` when
+  available, so inspect those options before retrying with `yunti_fill` or
+  `yunti_select`.
 
 ## Scroll Guidance
 

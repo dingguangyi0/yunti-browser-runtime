@@ -856,6 +856,126 @@ test("selector fill preserves content result with structured result", async () =
   }
 })
 
+test("selector fill thrown failure returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_fill: () => {
+        throw new Error("Element not found: #missing")
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-selector-missing",
+      tool: "yunti_fill",
+      arguments: { selector: "#missing", value: "hello" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: false,
+      selector: "#missing",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { selector: "#missing", method: "selector" },
+      ok: false,
+      recoverable: true,
+      code: "ELEMENT_NOT_FOUND",
+      error: "Element not found: #missing",
+      recoveryHint: {
+        reason: "selector-fill-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+        nextAction: "observe-again",
+        decision: "refresh-observation-or-selector-before-retry",
+        selector: "#missing",
+        message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
+      },
+      nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
+test("uid fill select option miss returns structured recovery diagnostic", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-select",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        elements: [
+          {
+            uid: "yunti-select",
+            role: "combobox",
+            name: "Plan",
+            rect: { x: 30, y: 90, width: 160, height: 30 },
+          },
+        ],
+      },
+    ],
+    cdpResponses: [
+      {},
+      {},
+      {
+        result: {
+          value: {
+            tag: "select",
+            options: [
+              { value: "basic", text: "Basic" },
+              { value: "pro", text: "Pro" },
+            ],
+            selectedIndex: 0,
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe",
+      tool: "yunti_observe_page",
+      arguments: { redaction: "balanced" },
+    })
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-select-miss",
+      tool: "yunti_fill",
+      arguments: { uid: "yunti-select", value: "Enterprise" },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      filled: false,
+      uid: "yunti-select",
+      browserSessionId: "tab-1",
+      action: "fill",
+      target: { uid: "yunti-select", method: "uid" },
+      ok: false,
+      recoverable: true,
+      code: "OPTION_NOT_FOUND",
+      error: "Option 'Enterprise' not found in select at uid yunti-select",
+      availableValues: ["basic", "pro"],
+      availableTexts: ["Basic", "Pro"],
+      recoveryHint: {
+        reason: "uid-fill-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+        nextAction: "inspect-available-options",
+        decision: "inspect-options-before-retry",
+        uid: "yunti-select",
+        availableValues: ["basic", "pro"],
+        availableTexts: ["Basic", "Pro"],
+        message: "The uid fill could not be completed. Refresh observation if the uid may be stale, inspect whether the target is editable, or retry with selector fallback.",
+      },
+      nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("selector select preserves content result with structured result", async () => {
   const harness = createDispatcherHarness({
     contentToolResponses: {

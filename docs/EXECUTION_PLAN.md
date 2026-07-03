@@ -2054,6 +2054,18 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
   用例，其中 91 个通过、1 个 real-browser smoke 按默认配置跳过；npm package 内容检查通过，
   包含 42 个文件；extension zip 内容检查通过，包含 13 个文件；`YUNTI_E2E=1 npm run
   test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；token 残留检查无输出。
+- `yunti_fill` 失败路径开始返回结构化恢复诊断：selector 抛错和 uid select option miss
+  不再只依赖外层通用 error，而是返回 `filled: false`、`ok: false`、`recoverable: true`、
+  `code`、`recoveryHint` 和 `nextStepHint`。select option miss 会附带
+  `availableValues` / `availableTexts`，帮助 agent 先检查可选项再重试。本切片保持所有成功
+  fill 兼容字段与派发语义不变。
+- 最新 targeted 验证：`node --check extension/tool-handlers.js` 通过；
+  `node --test tests/tool-handlers.test.js` 通过 32 项。
+- 最新 full 验证：`git diff --check` 通过；token 残留检查无输出；
+  `YUNTI_E2E=1 npm run test:e2e` 已执行但因本地缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，覆盖 102 个 node:test 用例，其中 101 个通过、1 个
+  real-browser smoke 按默认配置跳过；npm package 内容检查通过，包含 42 个文件；
+  extension zip 内容检查通过，包含 13 个文件。
 - `yunti_scroll` 已开始支持 fresh scrollable container uid：`yunti_observe_page` 返回的
   `scrollableContainers[]` 会进入当前 browserSessionId 最新 uid map；调用 `yunti_scroll`
   传 `uid` 时会解析容器中心点并复用既有 content-script coordinate/container scroll 路径。

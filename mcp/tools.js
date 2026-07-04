@@ -777,7 +777,7 @@ export const TOOLS = [
   {
     name: "yunti_wait_for",
     description:
-      "Wait for a condition to be met on the page: text appears, a selector becomes visible, the URL changes, or the DOM/network becomes idle. Returns when the condition is met or times out.",
+      "Wait for a condition to be met on the page: text appears, a selector becomes visible, or the URL changes. Returns compatibility fields such as found/text/selector/waitedMs plus structured action fields when available.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1095,6 +1095,30 @@ export function toolUsageHints(args = {}) {
       ],
       commonMistakes: ["Use id, not title."],
     },
+    yunti_wait_for: {
+      purpose: "Wait for expected text, a visible selector, or a URL substring before observing and continuing with fresh uids.",
+      required: [],
+      recommended: ["browserSessionId", "text or selector or urlContains", "timeoutMs"],
+      notes: [
+        "Use this when the page is rendering asynchronously, loading select options, validating a field, navigating, or appending scroll content.",
+        "At least one of text, selector, or urlContains is required.",
+        "Successful results preserve compatibility fields such as found, text, selector, condition, value, waitedMs, and browserSessionId.",
+        "P6.2.6 structured fields are additive: action=wait_for, target, ok, recoverable, and nextStepHint.",
+        "Timeout results return found=false, ok=false, recoverable=true, code=WAIT_TIMEOUT, recoveryHint, and nextStepHint.",
+        "After a successful wait, call yunti_observe_page before using uids for newly rendered content.",
+      ],
+      recovery: [
+        "WAIT_TIMEOUT: observe the current page, inspect whether the expected condition changed, or adjust text/selector/urlContains before retrying.",
+        "Async form/select work: wait for the expected text/selector/state, observe again, then fill/select with a fresh uid.",
+        "Async scroll work: wait for the next expected text/selector, observe again, then choose a fresh scrollable container uid.",
+        "Wrong tab or stale route: refresh targets with yunti_list_browser_targets and route through the intended browserSessionId.",
+      ],
+      commonMistakes: [
+        "Do not treat WAIT_TIMEOUT as proof the task failed; inspect the page state before deciding.",
+        "Do not keep repeating the same wait condition without observing or adjusting it.",
+        "Do not reuse old uids after waiting for new async content; observe again first.",
+      ],
+    },
     yunti_click: {
       purpose: "Click by observe/snapshot uid, CSS selector, or viewport coordinates.",
       required: [],
@@ -1230,7 +1254,7 @@ export function toolUsageHints(args = {}) {
     },
   }
   const topicMap = {
-    browser: ["yunti_observe_page", "yunti_get_page_snapshot", "yunti_list_browser_targets", "yunti_list_pages"],
+    browser: ["yunti_observe_page", "yunti_wait_for", "yunti_get_page_snapshot", "yunti_list_browser_targets", "yunti_list_pages"],
     cdp: ["yunti_cdp_send_command", "yunti_evaluate_script"],
     tabs: ["yunti_new_page", "yunti_close_page", "yunti_select_page", "yunti_list_browser_targets"],
     memory: ["yunti_get_learning_memory", "yunti_remember_learning", "yunti_forget_learning_memory"],
@@ -1252,7 +1276,7 @@ export function toolUsageHints(args = {}) {
     }
   }
   return {
-    version: "2026-07-02",
+    version: "2026-07-04",
     coreRules: [
       "Every browser-facing yunti_* tool call requires userId.",
       "browserSessionId is the current user's browser route; tabId and targetId are selectors, not permissions.",
@@ -1292,12 +1316,12 @@ export function toolUsageHints(args = {}) {
         "If an action fails with a stale or missing uid, refresh with yunti_observe_page before retrying.",
         "If the element may be outside the viewport, use observe scroll hints and yunti_scroll before falling back to coordinates.",
         "If the page is loading or changing, use yunti_wait_for or observe again instead of blind retries.",
-        "For async UI transitions, use yunti_wait_for for expected text/selector/state, then yunti_observe_page, then continue with a fresh uid instead of reusing the old target.",
+        "For async UI transitions, use yunti_wait_for for expected text/selector/state, read ok/code/nextStepHint, then yunti_observe_page, then continue with a fresh uid instead of reusing the old target.",
         "If the target tab is uncertain, call yunti_list_browser_targets and switch to the intended browserSessionId.",
         "Use selector or coordinate fallbacks only as recovery/debugging paths, not as the default when fresh uids are available.",
       ],
       actionResultContract: [
-        "Current action outputs are compatibility-shaped: click/hover/fill/scroll may return clicked, hovered, filled, scrolled, uid, selector, x/y, method, valueLength, before/after, and browserSessionId depending on the tool path.",
+        "Current action outputs are compatibility-shaped: click/hover/fill/scroll/wait may return clicked, hovered, filled, scrolled, found, uid, selector, x/y, method, valueLength, waitedMs, before/after, and browserSessionId depending on the tool path.",
         "P6.2 target shape should be additive and structured: action, browserSessionId, target, ok, code, recoverable, nextStepHint, and before/after summaries where useful.",
         "Do not remove existing success booleans or selector/coordinate fields while converging on the structured result contract.",
         "Treat successful dispatch as transport/action execution evidence, then verify page state with yunti_observe_page, yunti_get_page_snapshot, yunti_evaluate_script, screenshot, or CDP when the workflow needs proof.",

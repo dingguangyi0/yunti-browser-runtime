@@ -1992,6 +1992,85 @@ test("fill form preserves aggregate fields with structured result", async () => 
   }
 })
 
+test("wait_for selector success returns structured result fields", async () => {
+  const harness = createDispatcherHarness({
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            found: "selector",
+            selector: "#ready",
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-wait-selector",
+      tool: "yunti_wait_for",
+      arguments: { selector: "#ready", timeoutMs: 1000 },
+    })
+
+    const result = harness.posted.at(-1).result
+    assert.equal(result.found, "selector")
+    assert.equal(result.selector, "#ready")
+    assert.equal(result.condition, "selector")
+    assert.equal(result.browserSessionId, "tab-1")
+    assert.equal(result.action, "wait_for")
+    assert.deepEqual(result.target, { selector: "#ready", timeoutMs: 1000 })
+    assert.equal(result.ok, true)
+    assert.equal(result.recoverable, false)
+    assert.match(result.nextStepHint, /yunti_observe_page/)
+    assert.equal(harness.cdpCommands.at(-1).method, "Runtime.evaluate")
+  } finally {
+    harness.restore()
+  }
+})
+
+test("wait_for timeout returns structured recovery diagnostics", async () => {
+  const harness = createDispatcherHarness()
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+  const originalNow = Date.now
+  let now = 1000
+  Date.now = () => {
+    now += 250
+    return now
+  }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-wait-timeout",
+      tool: "yunti_wait_for",
+      arguments: { text: "Loaded", timeoutMs: 100 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      found: false,
+      waitedMs: 100,
+      browserSessionId: "tab-1",
+      action: "wait_for",
+      target: { text: "Loaded", timeoutMs: 100 },
+      ok: false,
+      recoverable: true,
+      code: "WAIT_TIMEOUT",
+      recoveryHint: {
+        reason: "condition-not-met-before-timeout",
+        recommendedTools: ["yunti_observe_page", "yunti_get_page_snapshot", "yunti_take_screenshot"],
+        nextAction: "observe-or-adjust-condition",
+        decision: "observe-before-retry",
+        message: "The expected text, selector, or URL state did not appear before the timeout. Observe the page or adjust the wait condition before repeating the same wait.",
+      },
+      nextStepHint: "Wait timed out. Observe the current page, inspect whether the condition changed, or adjust the wait target before retrying.",
+    })
+  } finally {
+    Date.now = originalNow
+    harness.restore()
+  }
+})
+
 test("uid fill reports value-not-applied when field value does not remain", async () => {
   const harness = createDispatcherHarness({
     observations: [

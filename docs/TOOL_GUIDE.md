@@ -26,6 +26,8 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   `selectedText`, and `options[]` summaries for action planning.
 - `yunti_get_page_snapshot`: lightweight page state and visible context.
 - `yunti_take_snapshot`: element-oriented snapshot for uid-based actions.
+- `yunti_wait_for`: wait for async text, selector, or URL state before
+  observing again and continuing with fresh uids.
 - `yunti_click`, `yunti_fill`, `yunti_hover`: common DOM actions.
 - `yunti_cdp_send_command`: low-level CDP access routed through the extension.
 - `yunti_get_network_log`, `yunti_list_network_requests`: sanitized network
@@ -81,6 +83,9 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - For async UI transitions, use `yunti_wait_for` for expected text, selector, or
   page state, then call `yunti_observe_page` and continue with a fresh uid
   instead of reusing an old target.
+- Read `yunti_wait_for` structured fields when present: `ok: true` means the
+  wait condition matched; `code: "WAIT_TIMEOUT"` means inspect or adjust the
+  condition before repeating the same wait.
 - If the target tab is uncertain, call `yunti_list_browser_targets` and route
   follow-up work through the intended `browserSessionId`.
 
@@ -89,8 +94,8 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
 - Current action results remain compatibility-shaped and may include fields such
   as `clicked`, `hovered`, `filled`, `selected`, `scrolled`, `typed`, `pressed`,
   `uploaded`, `dragged`, aggregate counts like `failed`, per-field `results`,
-  `uid`, `selector`, `x`, `y`, `method`, `valueLength`, `before`, `after`, and
-  `browserSessionId`.
+  wait fields like `found` / `waitedMs`, `uid`, `selector`, `x`, `y`, `method`,
+  `valueLength`, `before`, `after`, and `browserSessionId`.
 - P6.2 structured action result fields are being introduced additively. Agents
   should prefer `action`, `target`, `ok`, `recoverable`, and `nextStepHint` when
   present, while still preserving and reading compatibility fields. `code` and
@@ -100,6 +105,22 @@ errors include a reason and recovery hint; do not keep retrying an expired id.
   proof.
 - Compatibility fields must remain available while structured result fields are
   introduced.
+
+## Wait Guidance
+
+- Use `yunti_wait_for` when async rendering, navigation, validation, dynamic
+  select options, or infinite-scroll content needs time to appear.
+- Provide at least one of `text`, `selector`, or `urlContains`; set
+  `timeoutMs` only when the default is too short or too long.
+- Successful waits preserve compatibility fields such as `found`, `text`,
+  `selector`, `condition`, `value`, `waitedMs`, and `browserSessionId`, and may
+  include `action: "wait_for"`, `target`, `ok: true`, `recoverable: false`, and
+  `nextStepHint`.
+- Timeout waits return `found: false`, `ok: false`, `recoverable: true`,
+  `code: "WAIT_TIMEOUT"`, `recoveryHint`, and `nextStepHint`.
+- After a successful wait, call `yunti_observe_page` again and use fresh uids
+  for newly rendered elements. After a timeout, observe or inspect current page
+  state before changing the wait condition or retrying.
 
 ## Fill Guidance
 

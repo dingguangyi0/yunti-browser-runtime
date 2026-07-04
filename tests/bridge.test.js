@@ -547,7 +547,7 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
 
   assert.equal(fillResponse.result.isError, undefined)
   const fillPayload = JSON.parse(fillResponse.result.content[0].text)
-  assert.equal(fillPayload.version, "2026-07-02")
+  assert.equal(fillPayload.version, "2026-07-04")
   assert.equal(fillPayload.tools.yunti_fill.schema.required.includes("value"), true)
   assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /Coordinate-only fill is not supported/)
 
@@ -565,6 +565,24 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
   const cdpPayload = JSON.parse(cdpResponse.result.content[0].text)
   assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /params must be an object/)
   assert.match(cdpPayload.tools.yunti_cdp_send_command.commonMistakes.join("\n"), /Target.closeTarget/)
+})
+
+test("mcp usage hints document wait_for structured timeout recovery", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_wait_for" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  assert.match(payload.tools.yunti_wait_for.notes.join("\n"), /WAIT_TIMEOUT/)
+  assert.match(payload.tools.yunti_wait_for.recovery.join("\n"), /observe the current page/)
+  assert.match(payload.tools.yunti_wait_for.commonMistakes.join("\n"), /reuse old uids/)
 })
 
 test("mcp usage hints document select uid value and text paths", async () => {

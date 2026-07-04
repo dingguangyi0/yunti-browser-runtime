@@ -70,14 +70,23 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 - If an element may be outside the viewport, use observe scroll hints and `yunti_scroll` before falling back to coordinates.
 - If the page is loading or changing, wait or observe again instead of blindly repeating the same action.
 - For async UI transitions, use `yunti_wait_for` for expected text, selector, or page state, then call `yunti_observe_page` and continue with a fresh uid instead of reusing an old target.
+- Read `yunti_wait_for` structured fields when present: `ok: true` means the condition matched; `code: "WAIT_TIMEOUT"` means observe or adjust the condition before repeating the same wait.
 - If the target tab is uncertain, call `yunti_list_browser_targets` and continue with the intended `browserSessionId`.
 
 ## Action Results
 
-- Current action results may use compatibility fields such as `clicked`, `hovered`, `filled`, `selected`, `scrolled`, `typed`, `pressed`, `uploaded`, `dragged`, aggregate counts like `failed`, per-field `results`, `uid`, `selector`, coordinates, `method`, `valueLength`, `before`, `after`, and `browserSessionId`.
+- Current action results may use compatibility fields such as `clicked`, `hovered`, `filled`, `selected`, `scrolled`, `typed`, `pressed`, `uploaded`, `dragged`, aggregate counts like `failed`, per-field `results`, wait fields like `found` / `waitedMs`, `uid`, `selector`, coordinates, `method`, `valueLength`, `before`, `after`, and `browserSessionId`.
 - Structured P6.2 fields are additive when present: prefer `action`, `target`, `ok`, `recoverable`, and `nextStepHint`, while still reading existing compatibility fields.
 - Treat action results as execution evidence, then verify page state when the task depends on the result.
 - Do not require agents to abandon existing result fields while structured action results are being introduced.
+
+## Wait Guidance
+
+- Use `yunti_wait_for` when async rendering, navigation, validation, dynamic select options, or infinite-scroll content needs time to appear.
+- Provide at least one of `text`, `selector`, or `urlContains`; set `timeoutMs` only when the default is not appropriate.
+- Successful waits preserve compatibility fields such as `found`, `text`, `selector`, `condition`, `value`, `waitedMs`, and `browserSessionId`, and may include `action: "wait_for"`, `target`, `ok: true`, `recoverable: false`, and `nextStepHint`.
+- Timeout waits return `found: false`, `ok: false`, `recoverable: true`, `code: "WAIT_TIMEOUT"`, `recoveryHint`, and `nextStepHint`.
+- After a successful wait, call `yunti_observe_page` again and use fresh uids for newly rendered elements. After a timeout, observe or inspect current page state before changing the wait condition or retrying.
 
 ## Fill Guidance
 

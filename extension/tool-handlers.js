@@ -1668,7 +1668,12 @@ export function createToolDispatcher({
       if (urlContains) {
         const tab = await chrome.tabs.get(tabId)
         if (tab.url && tab.url.includes(urlContains)) {
-          return { found: true, condition: "urlContains", value: urlContains, waitedMs: Date.now() - startTime, browserSessionId: session.browserSessionId }
+          return buildWaitForSuccess(
+            session,
+            { text, selector, urlContains, timeoutMs },
+            { found: true, condition: "urlContains", value: urlContains },
+            Date.now() - startTime
+          )
         }
       }
   
@@ -1684,16 +1689,72 @@ export function createToolDispatcher({
           "Runtime.evaluate",
           { expression, returnByValue: true }
         )
-  
+
         if (result?.result?.value) {
-          return { found: true, ...result.result.value, waitedMs: Date.now() - startTime, browserSessionId: session.browserSessionId }
+          return buildWaitForSuccess(
+            session,
+            { text, selector, urlContains, timeoutMs },
+            result.result.value,
+            Date.now() - startTime
+          )
         }
       }
   
       await delayCdp(200)
     }
   
-    return { found: false, waitedMs: timeoutMs, browserSessionId: session.browserSessionId }
+    return buildWaitForTimeout(session, { text, selector, urlContains, timeoutMs }, timeoutMs)
+  }
+
+  function buildWaitForTarget({ text, selector, urlContains, timeoutMs } = {}) {
+    const target = {}
+    if (text) target.text = text
+    if (selector) target.selector = selector
+    if (urlContains) target.urlContains = urlContains
+    if (timeoutMs !== undefined) target.timeoutMs = timeoutMs
+    return target
+  }
+
+  function buildWaitForSuccess(session, args, match = {}, waitedMs = 0) {
+    const condition = typeof match.condition === "string"
+      ? match.condition
+      : match.found === "selector" || match.found === "text"
+        ? match.found
+        : undefined
+    const result = {
+      found: true,
+      ...match,
+      waitedMs,
+      browserSessionId: session.browserSessionId,
+      action: "wait_for",
+      target: buildWaitForTarget(args),
+      ok: true,
+      recoverable: false,
+      nextStepHint: "Wait condition matched. Call yunti_observe_page and continue with a fresh uid before acting on newly rendered content.",
+    }
+    if (condition && result.condition === undefined) result.condition = condition
+    return result
+  }
+
+  function buildWaitForTimeout(session, args, waitedMs) {
+    return {
+      found: false,
+      waitedMs,
+      browserSessionId: session.browserSessionId,
+      action: "wait_for",
+      target: buildWaitForTarget(args),
+      ok: false,
+      recoverable: true,
+      code: "WAIT_TIMEOUT",
+      recoveryHint: {
+        reason: "condition-not-met-before-timeout",
+        recommendedTools: ["yunti_observe_page", "yunti_get_page_snapshot", "yunti_take_screenshot"],
+        nextAction: "observe-or-adjust-condition",
+        decision: "observe-before-retry",
+        message: "The expected text, selector, or URL state did not appear before the timeout. Observe the page or adjust the wait condition before repeating the same wait.",
+      },
+      nextStepHint: "Wait timed out. Observe the current page, inspect whether the condition changed, or adjust the wait target before retrying.",
+    }
   }
   
   async function handleDialog(tabId, session, args = {}) {

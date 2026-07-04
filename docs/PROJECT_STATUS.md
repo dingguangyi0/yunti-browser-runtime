@@ -6,10 +6,38 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.2 structured action results and deeper action
-semantics.
+Current implementation focus: P6.2.7 structured action result coverage audit
+and real-browser closure readiness.
 
-Latest visible P6.2 status:
+Latest visible 0.2.0 phase split:
+
+- P6.1.1 completed: `yunti_observe_page` schema, tool hints, and bridge
+  routing.
+- P6.1.2 completed: content-script DOM observer, compact text tree, field
+  state hints, scroll metadata, and minimum redaction.
+- P6.1.3 completed: fresh observe uids feed existing click/hover/fill uid
+  actions while preserving the snapshot compatibility path.
+- P6.1.4 pending: real-browser `observe -> click uid -> observe/verify`
+  closure validation. Current environment still lacks Playwright/Chromium.
+- P6.2.1 completed: additive structured action result contract and main action
+  path coverage.
+- P6.2.2 completed: `yunti_select` uid/selector/value/text semantics and
+  structured failure diagnostics.
+- P6.2.3 completed: `yunti_fill` / `yunti_fill_form` field-state,
+  contenteditable, failure aggregation, and post-fill value retention
+  diagnostics.
+- P6.2.4 completed: `yunti_scroll` uid, coordinate, no-movement, partial
+  movement, missing-target, and document-fallback diagnostics.
+- P6.2.5 completed: async UI recovery guidance for
+  `yunti_wait_for -> yunti_observe_page -> fresh uid`.
+- P6.2.6 completed: `yunti_wait_for` now preserves compatibility fields such
+  as `found`, `text`, `selector`, `condition`, `value`, and `waitedMs` while
+  adding `action: "wait_for"`, `target`, `ok`, `recoverable`, `nextStepHint`,
+  and timeout diagnostics with `code: "WAIT_TIMEOUT"` plus `recoveryHint`.
+- P6.2.7 next: audit structured action result coverage across success and main
+  failure paths, then prepare the real-browser closure validation entry point.
+
+Latest detailed P6.2 status:
 
 - Completed: action result main-path coverage, `yunti_select`
   selector/value + uid/value + uid/text, select uid/selector failure
@@ -43,10 +71,23 @@ Latest visible P6.2 status:
   usage hints, Tool Guide, and the packaged skill now tell agents to use
   `yunti_wait_for`, then `yunti_observe_page`, then fresh uids for async
   fill/select/scroll recovery instead of reusing old targets.
+- Completed: structured `yunti_wait_for` results. Successful waits now include
+  `action: "wait_for"`, `target`, `ok: true`, `recoverable: false`, and
+  `nextStepHint`; timeout waits return `found: false`, `ok: false`,
+  `recoverable: true`, `code: "WAIT_TIMEOUT"`, `recoveryHint`, and
+  `nextStepHint`.
+- Latest P6.2.6 validation: `git diff --check` passed; token residue grep
+  returned no matches; `node --test tests/tool-handlers.test.js` passed 42
+  tests; `node --test tests/bridge.test.js` passed 66 tests; `YUNTI_E2E=1 npm
+  run test:e2e` skipped because Playwright/Chromium is not installed in the
+  current environment; `npm run release:check` passed with 116 node:test cases
+  total, 115 passing and 1 default real-browser smoke skipped, plus npm package
+  and extension zip content checks.
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
-- Next: continue scroll semantics or real-browser closure validation.
+- Next: implement P6.2.7 coverage audit and real-browser closure readiness,
+  keeping the same status/documentation discipline.
 
 ## Current State
 
@@ -811,12 +852,16 @@ Latest visible P6.2 status:
   P6.1 validation gap until Playwright/Chromium is available locally.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   marking P6.1 fully closed.
-- Continue P6.2 in small compatibility-preserving slices: uid/selector fill
-  diagnostics for non-editable, hidden, disabled, and readonly targets are
-  complete, observe field-state plus select-state hints are complete, and
-  select disabled-option diagnostics are complete; the next candidates are
-  deeper fill/scroll semantics and real-browser closure validation when
-  Playwright/Chromium is available.
+- Continue P6.2 in small compatibility-preserving slices. Current completed
+  subphases are P6.2.1 action result coverage, P6.2.2 select semantics, P6.2.3
+  fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
+  guidance, and P6.2.6 structured `yunti_wait_for` results. The next anchored
+  slice is P6.2.7: audit structured action result coverage and prepare the
+  real-browser closure validation entry point.
+- For the next coding slice, update all affected guidance surfaces in one
+  commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
+  `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this
+  status file.
 - P4.1 release-readiness docs and permission review is complete.
 - P4.2 Agent integration examples are complete.
 - P4.3 npm publishing URL confirmation is complete with the GitHub repository

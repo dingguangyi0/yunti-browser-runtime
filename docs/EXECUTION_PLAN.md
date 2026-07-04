@@ -59,14 +59,24 @@
 | P5.2 | 已完成 | 扩展 popup 与安装引导简化 |
 | P5.3 | 已完成 | 扩展首屏零配置 |
 | P6.0 | 已完成 | 0.2.0 产品方向护栏 |
-| P6.1 | 基本实现，待真实浏览器闭环补验 | Agent 友好的页面观察与 uid action 兼容 |
-| P6.2 | 进行中：已完成 action result 主路径、select/fill/scroll 结构化诊断；最新切片为 wait -> observe -> fresh uid 恢复指导 | 稳定 DOM action 层与结构化 action result |
-| P6.3 | 计划中 | Agent 工作流契约 |
-| P6.4 | 计划中 | DOM 脱敏与页面内容策略 |
-| P6.5 | 计划中 | 可选本地运行时控制台 |
-| P6.6 | 计划中 | 浏览器扩展分发准备 |
+| P6.1.1 | 已完成 | `yunti_observe_page` schema、tool hints、bridge routing |
+| P6.1.2 | 已完成 | content-script DOM observer、文本树、字段状态、scroll 元数据、最小脱敏 |
+| P6.1.3 | 已完成 | fresh observe uid 兼容现有 click/hover/fill action |
+| P6.1.4 | 待补验 | 真实浏览器 `observe -> click uid -> observe/verify` 闭环 |
+| P6.2.1 | 已完成 | action result 兼容契约与主要 action 主路径结构化字段 |
+| P6.2.2 | 已完成 | `yunti_select` uid/selector/value/text 语义与失败诊断 |
+| P6.2.3 | 已完成 | `yunti_fill` / `yunti_fill_form` 字段状态、contenteditable、值保持诊断 |
+| P6.2.4 | 已完成 | `yunti_scroll` uid/coordinate/no-movement/partial/fallback 诊断 |
+| P6.2.5 | 已完成 | 异步 UI 的 `wait -> observe -> fresh uid` 恢复指导 |
+| P6.2.6 | 已完成 | `yunti_wait_for` 自身结构化 action result 与恢复语义 |
+| P6.2.7 | 下一步 | 结构化 action result 覆盖审计与真实浏览器闭环补验准备 |
+| P6.3.1 | 计划中 | Agent 默认工作流契约与可复制提示词 |
+| P6.3.2 | 计划中 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
+| P6.4.1 | 计划中 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
+| P6.5.1 | 计划中 | 可选本地运行时控制台 |
+| P6.6.1 | 计划中 | 浏览器扩展分发准备 |
 
-当前 0.2.0 推进快照（2026-07-03）：
+当前 0.2.0 推进快照（2026-07-04）：
 
 - P6.2 最新完成切片：
   - action result 主路径覆盖；
@@ -132,6 +142,50 @@
   现在明确要求异步渲染、校验、option 加载或新内容加载时，先用 `yunti_wait_for`
   等待预期 text/selector/state，再调用 `yunti_observe_page`，最后用 fresh uid 继续
   fill/select/scroll，而不是复用旧 uid 或盲目重复同一动作。
+- P6.2.6 已完成：`yunti_wait_for` 自身现在补齐结构化返回字段，保留既有
+  `found`、`text`、`selector`、`condition`、`value`、`waitedMs` 等兼容字段，同时新增
+  `action: "wait_for"`、`target`、`ok`、`recoverable`、`nextStepHint`；超时返回
+  `code: "WAIT_TIMEOUT"` 和 `recoveryHint`，让等待工具也能自然接入
+  `wait -> observe -> fresh uid` 恢复闭环。
+- P6.2.6 最新验证：`git diff --check` 通过；token 残留检查无输出；
+  `node --test tests/tool-handlers.test.js` 通过 42 个用例；
+  `node --test tests/bridge.test.js` 通过 66 个用例；`YUNTI_E2E=1 npm run test:e2e`
+  因当前环境缺少 Playwright/Chromium 跳过；`npm run release:check` 通过，覆盖
+  116 个 node:test 用例，其中 115 个通过、1 个真实浏览器 smoke 默认跳过，并完成 npm
+  package 与 extension zip 内容检查。
+- 下一个稳定推进切片固定为 P6.2.7：重新审计结构化 action result 覆盖面，确认
+  wait/click/hover/fill/select/scroll/type/press/upload/drag/fill_form 的成功和主要失败路径
+  都有可读的 `ok` / `code` / `recoverable` / `nextStepHint`，并整理真实浏览器闭环补验入口。
+
+## 压缩上下文恢复锚点
+
+如果上下文被压缩或切换线程，新的 agent 应先读取：
+
+1. `docs/PROJECT_STATUS.md` 顶部的 `Current Phase` 和 `Open Work`。
+2. 本文档的 `阶段总览`、`当前 0.2.0 推进快照` 和对应 P6 小节。
+3. `docs/NEXT_MAJOR_PLAN.md` 的 `Yunti-First Principle`。
+
+恢复后按以下节奏继续：
+
+1. 只做一个兼容优先的小切片。
+2. 先更新 `docs/EXECUTION_PLAN.md` 和 `docs/PROJECT_STATUS.md` 的目标与状态。
+3. 如果工具行为、schema、usage hint 或 agent 引导变化，同步更新
+   `mcp/tools.js`、`docs/TOOL_GUIDE.md` 和 `skills/yunti-browser-runtime/SKILL.md`。
+4. 每个切片保留既有兼容字段，不移除 CDP、截图、network、console、upload、tab control
+   等 Yunti 自身能力。
+5. 验证后再提交，并记录 skipped E2E 是否只是环境限制。
+
+当前下一步提示词：
+
+```text
+继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
+docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
+当前锚点是 P6.2.7：审计结构化 action result 覆盖面，并准备真实浏览器闭环补验。
+保留现有兼容字段，必要时更新 mcp/tools.js、docs/TOOL_GUIDE.md、
+skills/yunti-browser-runtime/SKILL.md、docs/EXECUTION_PLAN.md 和 docs/PROJECT_STATUS.md，
+并运行规定门禁。不要把项目改成 Page Agent 克隆，保持 Yunti local-first、
+MCP-native、真实 Chrome/Edge、细粒度 yunti_* 工具的特色。
+```
 
 ## P0.1 bridge token + CORS 收紧
 

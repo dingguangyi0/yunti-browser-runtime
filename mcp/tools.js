@@ -206,7 +206,7 @@ export const TOOLS = [
   {
     name: "yunti_remember_learning",
     description:
-      "Store an auditable Yunti learning memory such as an API pattern, workflow step, selector, field mapping, or gotcha. Do not store secrets or raw cookies.",
+      "Store an auditable Yunti learning memory such as an API pattern, workflow step, selector, field mapping, or gotcha. Memory input is sanitized before storage, but agents should still avoid storing secrets, raw cookies, or personal data.",
     inputSchema: {
       type: "object",
       required: ["title", "detail"],
@@ -228,7 +228,7 @@ export const TOOLS = [
   },
   {
     name: "yunti_get_learning_memory",
-    description: "Search auditable Yunti learning memories recorded by agents.",
+    description: "Search sanitized auditable Yunti learning memories recorded by agents.",
     inputSchema: {
       type: "object",
       properties: {
@@ -399,7 +399,7 @@ export const TOOLS = [
   {
     name: "yunti_get_cdp_events",
     description:
-      "Read raw low-level browser protocol events forwarded by the browser extension for the active tab. First internal version does not redact event payloads.",
+      "Read raw low-level browser protocol events forwarded by the browser extension for the active tab. This diagnostic stream intentionally does not redact event payloads; clear it after debugging.",
     inputSchema: {
       type: "object",
       properties: {
@@ -414,7 +414,7 @@ export const TOOLS = [
   {
     name: "yunti_clear_cdp_events",
     description:
-      "Clear raw CDP events for the active tab, a selected session, or all sessions.",
+      "Clear raw CDP diagnostic events for the active tab, a selected session, or all sessions.",
     inputSchema: {
       type: "object",
       properties: {
@@ -582,7 +582,7 @@ export const TOOLS = [
   {
     name: "yunti_list_console_messages",
     description:
-      "List console messages (console.log, console.error, console.warn, etc.) captured from the active browser page via CDP Runtime/Log events. Supports filtering by level and pagination.",
+      "List sanitized console messages (console.log, console.error, console.warn, etc.) captured from the active browser page via CDP Runtime/Log events. Supports filtering by level and pagination.",
     inputSchema: {
       type: "object",
       properties: {
@@ -598,7 +598,7 @@ export const TOOLS = [
   {
     name: "yunti_get_console_message",
     description:
-      "Get a single console message by its msgid from yunti_list_console_messages. Returns full detail including stack trace.",
+      "Get a single sanitized console message by its msgid from yunti_list_console_messages. Returns detail including stack trace.",
     inputSchema: {
       type: "object",
       required: ["msgId"],
@@ -1095,6 +1095,20 @@ export function toolUsageHints(args = {}) {
         "If the returned deleted count is 0, refresh the memory list and retry with an existing id.",
       ],
       commonMistakes: ["Use id, not title."],
+    },
+    yunti_remember_learning: {
+      purpose: "Persist a sanitized local learning memory for future agent runs.",
+      required: ["title", "detail"],
+      recommended: ["kind", "tags", "confidence", "source"],
+      notes: [
+        "Learning memory sanitizes likely secrets and PII-like text before writing to disk.",
+        "Do not intentionally store raw cookies, authorization headers, tokens, passwords, private keys, payment data, or personal contact details.",
+        "Use relatedNetworkEventIds to reference sanitized network observations instead of copying raw payloads into memory.",
+      ],
+      commonMistakes: [
+        "Do not use learning memory as task history or a transcript store.",
+        "Do not store raw CDP event payloads in memory.",
+      ],
     },
     yunti_wait_for: {
       purpose: "Wait for expected text, a visible selector, or a URL substring before observing and continuing with fresh uids.",

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { yuntiMemoryDir, yuntiMemoryFile } from "../lib/runtime-paths.js"
-import { clampNumber, redactLikelySecrets, truncateText } from "./redaction.js"
+import { clampNumber, redactLikelySensitiveText, truncateText } from "./redaction.js"
 
 const MAX_MEMORY_ITEMS = 500
 const DEFAULT_ROUTE_USER_ID = process.env.YUNTI_BROWSER_USER_ID || "local"
@@ -47,13 +47,13 @@ function sanitizeMemoryInput(args = {}) {
   return {
     id: randomUUID(),
     kind: truncateText(args.kind || "other", 80),
-    title: redactLikelySecrets(truncateText(args.title, 300)),
-    detail: redactLikelySecrets(truncateText(args.detail, 4000)),
+    title: redactLikelySensitiveText(args.title, 300),
+    detail: redactLikelySensitiveText(args.detail, 4000),
     tags: Array.isArray(args.tags)
-      ? args.tags.map((x) => truncateText(x, 80)).filter(Boolean).slice(0, 20)
+      ? args.tags.map((x) => redactLikelySensitiveText(x, 80)).filter(Boolean).slice(0, 20)
       : [],
     confidence: clampNumber(args.confidence ?? 0.5, 0, 1, 0.5),
-    source: redactLikelySecrets(truncateText(args.source || "", 500)),
+    source: redactLikelySensitiveText(args.source || "", 500),
     relatedNetworkEventIds: Array.isArray(args.relatedNetworkEventIds)
       ? args.relatedNetworkEventIds.map((x) => Number(x)).filter(Number.isFinite).slice(0, 50)
       : [],

@@ -928,6 +928,68 @@ test("learning memory can be written and searched", async () => {
   }
 })
 
+test("learning memory redacts secrets and PII-like values before storage", async () => {
+  const previousHome = process.env.YUNTI_HOME
+  const previousDataDir = process.env.YUNTI_BROWSER_DATA_DIR
+  const tempDir = await import("node:fs/promises").then((fs) =>
+    fs.mkdtemp(new URL("yunti-memory-redaction-test-", "file:///tmp/"))
+  )
+  process.env.YUNTI_HOME = tempDir
+  delete process.env.YUNTI_BROWSER_DATA_DIR
+  try {
+    const bearer = "Bearer abcdefghijklmnopqrstuvwxyz1234567890"
+    const jwt = "eyJaaaaaaaaaaa.bbbbbbbbbbbbb.ccccccccccccc"
+    const card = "4111 1111 1111 1111"
+    const email = "jane.doe@example.com"
+    const phone = "+1 (415) 555-1234"
+    const address = "123 Market Street"
+    const privateKey = "-----BEGIN PRIVATE KEY-----\\nabc123\\n-----END PRIVATE KEY-----"
+    const response = await handleJsonRpc(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "yunti_remember_learning",
+          arguments: {
+            userId: "u1",
+            kind: "workflow",
+            title: `Login contact ${email}`,
+            detail: `Use ${bearer}, jwt ${jwt}, card ${card}, phone ${phone}, address ${address}, ${privateKey}`,
+            source: `https://example.test/callback?token=secret-value&email=${email}`,
+            tags: ["login", email],
+          },
+        },
+      },
+      { mode: "owner", hub: new BridgeHub() }
+    )
+
+    assert.equal(response.result.isError, undefined)
+    const memory = response.result.structuredContent.memory
+    const serialized = JSON.stringify(memory)
+    assert.equal(serialized.includes("abcdefghijklmnopqrstuvwxyz1234567890"), false)
+    assert.equal(serialized.includes(jwt), false)
+    assert.equal(serialized.includes(card), false)
+    assert.equal(serialized.includes(email), false)
+    assert.equal(serialized.includes(phone), false)
+    assert.equal(serialized.includes(address), false)
+    assert.equal(serialized.includes("abc123"), false)
+    assert.match(memory.detail, /Bearer \[REDACTED\]/)
+    assert.match(memory.detail, /\[REDACTED_JWT\]/)
+    assert.match(memory.detail, /\[REDACTED_PAYMENT_CARD\]/)
+    assert.match(memory.detail, /\[REDACTED_PHONE\]/)
+    assert.match(memory.detail, /\[REDACTED_ADDRESS\]/)
+    assert.match(memory.title, /\[REDACTED_EMAIL\]/)
+    assert.match(memory.source, /token=\[REDACTED\]/)
+    assert.ok(memory.tags.includes("[REDACTED_EMAIL]"))
+  } finally {
+    if (previousHome === undefined) delete process.env.YUNTI_HOME
+    else process.env.YUNTI_HOME = previousHome
+    if (previousDataDir === undefined) delete process.env.YUNTI_BROWSER_DATA_DIR
+    else process.env.YUNTI_BROWSER_DATA_DIR = previousDataDir
+  }
+})
+
 test("learning memory uses the default local user scope", async () => {
   const previousHome = process.env.YUNTI_HOME
   const previousDataDir = process.env.YUNTI_BROWSER_DATA_DIR
@@ -1288,6 +1350,33 @@ test("console messages are cached and listable by session", async () => {
   assert.equal(errors.returned, 1)
   assert.equal(errors.events[0].text, "TypeError: x is undefined")
   assert.equal(errors.events[0].url, "https://app.example.test/app.js")
+})
+
+test("console diagnostics redact secrets before caching", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const bearer = "Bearer abcdefghijklmnopqrstuvwxyz1234567890"
+  const card = "4111 1111 1111 1111"
+  const email = "jane.doe@example.com"
+
+  hub.recordConsoleEvent({
+    browserSessionId: "tab-1",
+    level: "error",
+    text: `failed auth ${bearer} card ${card}`,
+    stackTrace: `at login (${email})`,
+    args: [`email=${email}`, `authorization: ${bearer}`],
+    source: "console-api",
+  })
+
+  const msg = hub.listConsoleMessages({ browserSessionId: "tab-1", userId: "u1" }).events[0]
+  const serialized = JSON.stringify(msg)
+  assert.equal(serialized.includes("abcdefghijklmnopqrstuvwxyz1234567890"), false)
+  assert.equal(serialized.includes(card), false)
+  assert.equal(serialized.includes(email), false)
+  assert.match(msg.text, /Bearer \[REDACTED\]/)
+  assert.match(msg.text, /\[REDACTED_PAYMENT_CARD\]/)
+  assert.match(msg.stackTrace, /\[REDACTED_EMAIL\]/)
+  assert.deepEqual(msg.args, ["email=[REDACTED_EMAIL]", "authorization: [REDACTED]"])
 })
 
 test("allSessions diagnostics are scoped to the requested user", () => {

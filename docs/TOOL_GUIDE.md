@@ -123,8 +123,10 @@ taking an action whose effect cannot be verified from page state.
 - `yunti_cdp_send_command`: low-level CDP access routed through the extension.
 - `yunti_get_network_log`, `yunti_list_network_requests`: sanitized network
   observations.
-- `yunti_list_console_messages`: console diagnostics.
-- `yunti_remember_learning`, `yunti_get_learning_memory`: local agent memory.
+- `yunti_list_console_messages`: sanitized console diagnostics.
+- `yunti_get_cdp_events`: raw low-level CDP diagnostics; clear after debugging.
+- `yunti_remember_learning`, `yunti_get_learning_memory`: sanitized local agent
+  memory.
 
 ## Routing Rules
 
@@ -160,6 +162,10 @@ taking an action whose effect cannot be verified from page state.
   `targetId`, use `yunti_cdp_send_command` with `Target.closeTarget`.
 - `yunti_forget_learning_memory` requires `id`, or `all=true` plus
   `confirmed=true` when deleting every memory.
+- `yunti_remember_learning` is for durable patterns and gotchas, not transcripts
+  or raw payloads. It sanitizes likely secrets and PII-like text before storage,
+  but agents should avoid submitting secrets, cookies, auth headers, private
+  keys, payment data, or personal contact details in the first place.
 
 ## Action Recovery Rules
 
@@ -321,6 +327,9 @@ taking an action whose effect cannot be verified from page state.
   explicit user confirmation in the agent workflow.
 - Tool outputs redact likely cookies, authorization headers, passwords, and
   token-like values.
+- Learning memory and console diagnostics sanitize likely secrets and PII-like
+  text before local storage. Raw CDP events are the explicit low-level exception
+  and should be cleared after debugging with `yunti_clear_cdp_events`.
 - Use `yunti_observe_page` `redaction: "strict"` when the page may contain
   personal information. Keep `redaction: "off"` only for explicit local
   debugging.

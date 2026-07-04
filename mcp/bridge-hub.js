@@ -5,6 +5,7 @@ import {
   normalizeCdpEvent,
   sanitizeNetworkEvent,
   sanitizeUrl,
+  redactLikelySensitiveText,
   truncateText,
 } from "./redaction.js"
 import { toolUsageHints } from "./tools.js"
@@ -460,13 +461,13 @@ export class BridgeHub {
       browserSessionId: truncateText(input.browserSessionId || "", 160),
       tabId: Number.isFinite(Number(input.tabId)) ? Number(input.tabId) : null,
       level: ["error", "warning", "info", "debug", "log", "verbose"].includes(input.level) ? input.level : "log",
-      text: truncateText(String(input.text || ""), 2000),
+      text: redactLikelySensitiveText(input.text || "", 2000),
       source: ["console-api", "javascript", "network", "other"].includes(input.source) ? input.source : "other",
       url: input.url ? sanitizeUrl(input.url) : "",
       lineNumber: Number.isFinite(Number(input.lineNumber)) ? Number(input.lineNumber) : null,
       columnNumber: Number.isFinite(Number(input.columnNumber)) ? Number(input.columnNumber) : null,
-      stackTrace: input.stackTrace ? truncateText(String(input.stackTrace), 4000) : "",
-      args: Array.isArray(input.args) ? input.args.slice(0, 20).map(a => truncateText(String(a), 500)) : [],
+      stackTrace: input.stackTrace ? redactLikelySensitiveText(input.stackTrace, 4000) : "",
+      args: Array.isArray(input.args) ? input.args.slice(0, 20).map(a => redactLikelySensitiveText(a, 500)) : [],
       timestamp: input.timestamp || new Date().toISOString(),
     }
     if (!event.browserSessionId) return { accepted: false, error: "browserSessionId is required" }

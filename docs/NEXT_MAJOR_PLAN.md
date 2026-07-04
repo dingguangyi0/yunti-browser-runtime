@@ -290,8 +290,8 @@ The release direction is Yunti-first and ecosystem-informed:
 
 ### P6.1 Agent-Friendly Page Observation
 
-Status: in progress; P6.4.1 DOM strict redaction is implemented, P6.4.2
-secret-boundary tightening for memory and diagnostic artifacts is next.
+Status: in progress; P6.1.4 real-browser closure is pending Playwright/Chromium
+availability.
 
 Create `yunti_observe_page`, a higher-level observation tool. Use Page Agent's
 PageController/browser-state approach as the first concrete reference, adapted
@@ -529,7 +529,9 @@ Acceptance:
 
 ### P6.4 DOM Redaction And Page Content Policy
 
-Status: planned.
+Status: in progress; P6.4.1 DOM strict redaction and P6.4.2 memory/console
+diagnostic sanitization are implemented. P6.4.3 raw diagnostics and screenshot
+non-redaction guidance is next.
 
 Promote DOM snapshot redaction to a first-class runtime capability.
 
@@ -545,11 +547,19 @@ Scope:
   - `balanced`
   - `off` for local debugging only;
 - show redaction metadata in observation output;
-- keep network and console redaction behavior aligned with DOM redaction.
+- keep network, console, and learning-memory redaction behavior aligned with
+  DOM redaction.
 
 P6.1 already carries the minimum DOM observation baseline. P6.4 is for expanding
 coverage, making strict mode robust, aligning DOM/network/console terminology,
 and documenting cleanup/diagnostic retention behavior.
+
+Implemented slices:
+
+- P6.4.1: strict DOM observation redaction for common PII-like text surfaces.
+- P6.4.2: shared MCP text sanitization before learning-memory writes and
+  console diagnostic caching, with raw CDP events documented as the explicit
+  low-level exception.
 
 Security caveats to keep explicit:
 

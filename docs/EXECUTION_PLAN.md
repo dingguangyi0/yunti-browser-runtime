@@ -73,7 +73,8 @@
 | P6.3.1 | 已完成 | Agent 默认工作流契约与可复制提示词 |
 | P6.3.2 | 已完成 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
 | P6.4.1 | 已完成 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
-| P6.4.2 | 下一步 | learning memory / diagnostic artifacts 的 secret 边界收敛 |
+| P6.4.2 | 已完成 | learning memory / diagnostic artifacts 的 secret 边界收敛 |
+| P6.4.3 | 下一步 | raw CDP / screenshot 非默认脱敏诊断的提示与清理边界 |
 | P6.5.1 | 计划中 | 可选本地运行时控制台 |
 | P6.6.1 | 计划中 | 浏览器扩展分发准备 |
 
@@ -206,9 +207,20 @@
   Playwright/Chromium 跳过；`npm run release:check` 通过，覆盖 119 个 node:test
   用例，其中 118 个通过、1 个真实浏览器 smoke 默认跳过，并完成 npm package 内容检查
   45 个文件和 extension zip 内容检查 13 个文件。
-- 下一步固定为 P6.4.2：收敛 learning memory / diagnostic artifacts 的 secret 边界；
-  如果当前环境补齐 Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
-  `observe -> click uid -> observe/verify` 闭环。
+- P6.4.2 已完成：`mcp/redaction.js` 的共享文本脱敏覆盖 Bearer、JWT、private key、
+  长 token-like、email、phone、Luhn-valid payment-card-like 和 address-like 内容；
+  learning memory 的 title/detail/tags/source 写盘前统一脱敏；console diagnostics 的
+  text/stack/args 缓存前统一脱敏；raw CDP events 保持明确的低层原始诊断例外，并要求调试后清理。
+- P6.4.2 最新验证：`node --check mcp/redaction.js`、`node --check mcp/memory.js` 和
+  `node --check mcp/bridge-hub.js` 通过；`node --test tests/bridge.test.js` 通过 70 个用例；
+  `git diff --check` 通过；token 残留检查无输出；`npm run check` 通过；`npm test`
+  通过，覆盖 121 个 node:test 用例，其中 120 个通过、1 个真实浏览器 smoke 默认跳过；
+  `YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip
+  内容检查 13 个文件。
+- 下一步固定为 P6.4.3：补 raw CDP / screenshot 这类非默认脱敏诊断的提示、清理和
+  recovery guidance；如果当前环境补齐 Playwright/Chromium，则优先补跑并关闭 P6.1.4
+  真实浏览器 `observe -> click uid -> observe/verify` 闭环。
 
 ## 压缩上下文恢复锚点
 
@@ -233,7 +245,7 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.4.2：收敛 learning memory / diagnostic artifacts 的 secret 边界。如果当前环境已经具备
+当前锚点是 P6.4.3：补 raw CDP / screenshot 这类非默认脱敏诊断的提示、清理和 recovery guidance。如果当前环境已经具备
 Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
 observe -> click uid -> observe/verify 闭环。保留现有兼容字段，必要时更新
 mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、
@@ -2406,7 +2418,7 @@ P6.3 的一部分应前置到 P6.1 schema 合并时完成：
 
 ## P6.4 DOM 脱敏与页面内容策略
 
-状态：进行中；P6.4.1 已完成，P6.4.2 下一步
+状态：进行中；P6.4.1、P6.4.2 已完成，P6.4.3 下一步
 
 目标：
 
@@ -2434,6 +2446,17 @@ P6.4.1 已落地：
   和 `yunti_get_tool_usage_hints` 已同步 strict/balanced/off 的使用边界。
 - `tests/dom-observer.test.js` 已覆盖 strict PII 类别、select option text 脱敏、
   page title 脱敏和 balanced 普通业务文本不误伤。
+
+P6.4.2 已落地：
+
+- `mcp/redaction.js` 统一增强 likely-sensitive text 脱敏，覆盖 Bearer、JWT、
+  private key、长 token-like、email、phone、Luhn-valid payment-card-like 和 address-like。
+- `yunti_remember_learning` 写入 title、detail、tags、source 前统一脱敏，避免 learning
+  memory 成为 secret 或 PII-like 长期存储。
+- `yunti_list_console_messages` / `yunti_get_console_message` 返回的 text、stackTrace 和 args
+  在缓存前统一脱敏。
+- `yunti_get_cdp_events` 保持 raw low-level diagnostics 语义，但文档和 tool hints 已明确
+  这是例外，应在调试后用 `yunti_clear_cdp_events` 清理。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2508,7 +2531,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   `docs/NEXT_MAJOR_PLAN.md`。
 - 继续 0.2.0 的小切片推进：P6.4.1 DOM strict redaction 已覆盖 page title、文本面、
   select option text、email、phone、Luhn-valid payment-card-like 和 address-like；
-  下一刀建议做 P6.4.2 learning memory / diagnostic artifacts secret 边界，或在环境具备时
+  P6.4.2 已收敛 learning memory 与 console diagnostics 的 secret/PII-like 存储边界。
+  下一刀建议做 P6.4.3 raw CDP / screenshot 非默认脱敏诊断的提示与清理边界，或在环境具备时
   补真实浏览器闭环。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、

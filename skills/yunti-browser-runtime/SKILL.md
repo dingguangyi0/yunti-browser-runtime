@@ -117,6 +117,7 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 - `yunti_fill` requires `value` plus `uid` or `selector`; coordinate-only fill is not supported.
 - `yunti_close_page` accepts `browserSessionId`, not raw `tabId` or `targetId`; use `yunti_cdp_send_command` with `Target.closeTarget` for raw browser targets.
 - `yunti_forget_learning_memory` needs a memory `id`, or `all=true` and `confirmed=true` for deleting everything.
+- `yunti_remember_learning` is for durable patterns and gotchas, not transcripts or raw payloads. It sanitizes likely secrets and PII-like text before storage, but do not intentionally submit secrets, cookies, auth headers, private keys, payment data, or personal contact details.
 
 ## Action Recovery
 
@@ -182,6 +183,7 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 - Read-only inspection is allowed by default.
 - Before submitting forms, deleting data, uploading sensitive files, approving workflows, making purchases, or changing production data, ask the user for explicit confirmation.
 - Do not expose raw cookies, passwords, authorization headers, or token-like values.
+- Treat `yunti_get_cdp_events` as raw low-level diagnostics. Clear it after debugging with `yunti_clear_cdp_events` and do not copy raw CDP payloads into learning memory.
 - Use `yunti_observe_page` with `redaction: "strict"` when a page may contain personal information. Strict DOM redaction hides likely email, phone, Luhn-valid payment-card-like values, address-like text, page titles, labels, names, visible text, placeholders, values, and select option text.
 - Keep `redaction: "off"` only for explicit local debugging.
 - If a tool output appears to include sensitive data, summarize only the safe parts.

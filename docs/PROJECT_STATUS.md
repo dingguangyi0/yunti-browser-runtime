@@ -6,9 +6,9 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.4.2 learning memory / diagnostic artifacts
-secret-boundary tightening, with P6.1.4 real-browser closure still pending on
-Playwright/Chromium availability.
+Current implementation focus: P6.4.3 raw CDP / screenshot non-redaction
+diagnostic guidance and cleanup boundaries, with P6.1.4 real-browser closure
+still pending on Playwright/Chromium availability.
 
 Latest visible 0.2.0 phase split:
 
@@ -49,8 +49,13 @@ Latest visible 0.2.0 phase split:
   option value/text, scrollable container names, and likely email, phone,
   Luhn-valid payment-card-like, and address-like content while keeping balanced
   credential-like protection as the default.
-- P6.4.2 next: tighten learning memory / diagnostic artifacts secret boundaries;
-  if Playwright/Chromium becomes available first, close P6.1.4 real-browser
+- P6.4.2 completed: shared MCP redaction now sanitizes likely Bearer tokens,
+  JWTs, private keys, long token-like values, emails, phones, Luhn-valid
+  payment-card-like values, and address-like text before learning memory writes
+  and console diagnostic caching.
+- P6.4.3 next: tighten guidance and cleanup boundaries for raw CDP events and
+  screenshots, which remain explicit non-default-redaction diagnostics; if
+  Playwright/Chromium becomes available first, close P6.1.4 real-browser
   `observe -> click uid -> observe/verify` validation.
 
 Latest detailed P6.2 status:
@@ -159,9 +164,27 @@ Latest detailed P6.2 status:
   119 node:test cases total, 118 passing and 1 default real-browser smoke
   skipped, plus npm package contents validation with 45 files and extension zip
   contents validation with 13 files.
-- Next: implement P6.4.2 learning memory / diagnostic artifacts secret-boundary
-  tightening, or close P6.1.4 first if Playwright/Chromium is available for
-  real-browser closure.
+- Completed: P6.4.2 learning memory / diagnostic artifacts secret-boundary
+  tightening. `mcp/redaction.js` now provides shared likely-sensitive text
+  sanitization for Bearer tokens, JWTs, private keys, long token-like values,
+  emails, phones, Luhn-valid payment-card-like values, and address-like text.
+  `yunti_remember_learning` sanitizes title, detail, tags, and source before
+  disk writes. Console diagnostics sanitize text, stackTrace, and args before
+  caching. Raw CDP events intentionally remain raw low-level diagnostics and
+  are documented as an explicit exception to clear after debugging.
+- Latest P6.4.2 validation: `node --check mcp/redaction.js`,
+  `node --check mcp/memory.js`, and `node --check mcp/bridge-hub.js` passed;
+  `node --test tests/bridge.test.js` passed 70 tests, including new memory and
+  console redaction coverage; `git diff --check` passed; token residue grep
+  returned no matches; `npm run check` passed; `npm test` passed with 121
+  node:test cases total, 120 passing and 1 default real-browser smoke skipped;
+  `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is not
+  installed in the current environment; `npm run release:check` passed, plus npm
+  package contents validation with 45 files and extension zip contents validation
+  with 13 files.
+- Next: implement P6.4.3 raw CDP / screenshot non-redaction diagnostic guidance
+  and cleanup boundaries, or close P6.1.4 first if Playwright/Chromium is
+  available for real-browser closure.
 
 ## Current State
 
@@ -931,9 +954,10 @@ Latest detailed P6.2 status:
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
   guidance, P6.2.6 structured `yunti_wait_for` results, and P6.2.7 automated
   action result coverage audit, P6.3.1 agent workflow contract, P6.3.2 minimal
-  Tool Guide use cases, and P6.4.1 DOM redaction policy deepening. The next
-  anchored slice is P6.4.2 learning memory / diagnostic artifacts secret-boundary
-  tightening, unless Playwright/Chromium is available to close P6.1.4
+  Tool Guide use cases, P6.4.1 DOM redaction policy deepening, and P6.4.2
+  learning memory / console diagnostic secret-boundary tightening. The next
+  anchored slice is P6.4.3 raw CDP / screenshot non-redaction diagnostic
+  guidance and cleanup boundaries, unless Playwright/Chromium is available to close P6.1.4
   real-browser validation first.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,

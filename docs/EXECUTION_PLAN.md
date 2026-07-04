@@ -72,7 +72,8 @@
 | P6.2.7 | 已完成 | 结构化 action result 覆盖审计与真实浏览器闭环补验准备 |
 | P6.3.1 | 已完成 | Agent 默认工作流契约与可复制提示词 |
 | P6.3.2 | 已完成 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
-| P6.4.1 | 下一步 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
+| P6.4.1 | 已完成 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
+| P6.4.2 | 下一步 | learning memory / diagnostic artifacts 的 secret 边界收敛 |
 | P6.5.1 | 计划中 | 可选本地运行时控制台 |
 | P6.6.1 | 计划中 | 浏览器扩展分发准备 |
 
@@ -193,8 +194,21 @@
   Playwright/Chromium 跳过；`npm run release:check` 通过，覆盖 118 个 node:test 用例，
   其中 117 个通过、1 个真实浏览器 smoke 默认跳过，并完成 npm package 内容检查 45 个文件和
   extension zip 内容检查 13 个文件。
-- 下一步固定为 P6.4.1：深化 DOM 脱敏策略，并与 network/console redaction 的术语和
-  安全边界对齐；继续保持 screenshots 不承诺被 DOM redaction 遮蔽的说明。
+- P6.4.1 已完成：`extension/dom-observer.js` 的 strict redaction 现在覆盖
+  page title、label、name、visible text、placeholder、value preview、select
+  selected value/text、options value/text、scrollable container name，以及 email、
+  phone、Luhn-valid payment-card-like 和 address-like 文本；balanced 保持 credential-like
+  默认保护，`off` 仍仅用于显式本地调试。
+- P6.4.1 最新验证：`node --check extension/dom-observer.js` 通过；
+  `node --test tests/dom-observer.test.js` 通过 6 个 DOM observer 用例；
+  `node --test tests/bridge.test.js` 通过 68 个用例；`git diff --check` 通过；
+  token 残留检查无输出；`YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少
+  Playwright/Chromium 跳过；`npm run release:check` 通过，覆盖 119 个 node:test
+  用例，其中 118 个通过、1 个真实浏览器 smoke 默认跳过，并完成 npm package 内容检查
+  45 个文件和 extension zip 内容检查 13 个文件。
+- 下一步固定为 P6.4.2：收敛 learning memory / diagnostic artifacts 的 secret 边界；
+  如果当前环境补齐 Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
+  `observe -> click uid -> observe/verify` 闭环。
 
 ## 压缩上下文恢复锚点
 
@@ -219,7 +233,7 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.4.1：深化 DOM 脱敏策略，并与 network/console redaction 对齐。如果当前环境已经具备
+当前锚点是 P6.4.2：收敛 learning memory / diagnostic artifacts 的 secret 边界。如果当前环境已经具备
 Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
 observe -> click uid -> observe/verify 闭环。保留现有兼容字段，必要时更新
 mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、
@@ -2372,7 +2386,7 @@ node:test 用例，其中 85 个通过、1 个 real-browser smoke 按默认配�
 
 ## P6.3 Agent 工作流契约
 
-状态：计划中
+状态：已完成
 
 目标：
 
@@ -2392,7 +2406,7 @@ P6.3 的一部分应前置到 P6.1 schema 合并时完成：
 
 ## P6.4 DOM 脱敏与页面内容策略
 
-状态：计划中
+状态：进行中；P6.4.1 已完成，P6.4.2 下一步
 
 目标：
 
@@ -2406,6 +2420,20 @@ P6.1 已前置最小 DOM observation 脱敏基线；P6.4 负责深化：
 - 对齐 DOM、network、console 的敏感词和字段策略。
 - 明确 learning memory、task history、diagnostic artifacts 默认不存 secret，并提供清理路径。
 - 明确截图默认是真实像素，不承诺被 DOM redaction 遮蔽。
+
+P6.4.1 已落地：
+
+- `strict` 模式会在 DOM observation 的 page title、label、name、visible text、
+  placeholder、value preview、select selected value/text、options value/text 和
+  scrollable container name 中遮蔽更广的 PII-like 内容。
+- 新增类别包括 `email`、`phone`、`payment_card` 和 `address`；payment card-like
+  值要求 13-19 位数字且通过 Luhn 校验，减少普通长数字误伤。
+- `balanced` 仍保持默认 credential-like 保护，不因普通业务文本变长而过度遮蔽；
+  `off` 仍只用于显式本地调试。
+- `docs/TOOL_GUIDE.md`、`skills/yunti-browser-runtime/SKILL.md`、`docs/SECURITY.md`
+  和 `yunti_get_tool_usage_hints` 已同步 strict/balanced/off 的使用边界。
+- `tests/dom-observer.test.js` 已覆盖 strict PII 类别、select option text 脱敏、
+  page title 脱敏和 balanced 普通业务文本不误伤。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2478,10 +2506,10 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
 - `0.2.0 Best Browser Automation Runtime` 的大版本计划已沉淀到
   `docs/NEXT_MAJOR_PLAN.md`。
-- 继续 P6.2 的小切片推进：uid/selector fill 的不可编辑、隐藏、disabled/readonly
-  目标诊断已落地，observe 字段状态、select 选中项提示和 select disabled option
-  诊断也已补齐，uid fill 填后值保持验证、scroll partial movement 和 uid scroll
-  缺失/过期目标诊断也已补齐；下一刀建议继续收敛 scroll 的更深语义或补真实浏览器闭环。
+- 继续 0.2.0 的小切片推进：P6.4.1 DOM strict redaction 已覆盖 page title、文本面、
+  select option text、email、phone、Luhn-valid payment-card-like 和 address-like；
+  下一刀建议做 P6.4.2 learning memory / diagnostic artifacts secret 边界，或在环境具备时
+  补真实浏览器闭环。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

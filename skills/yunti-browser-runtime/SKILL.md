@@ -182,6 +182,8 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 - Read-only inspection is allowed by default.
 - Before submitting forms, deleting data, uploading sensitive files, approving workflows, making purchases, or changing production data, ask the user for explicit confirmation.
 - Do not expose raw cookies, passwords, authorization headers, or token-like values.
+- Use `yunti_observe_page` with `redaction: "strict"` when a page may contain personal information. Strict DOM redaction hides likely email, phone, Luhn-valid payment-card-like values, address-like text, page titles, labels, names, visible text, placeholders, values, and select option text.
+- Keep `redaction: "off"` only for explicit local debugging.
 - If a tool output appears to include sensitive data, summarize only the safe parts.
 - DOM observation redaction does not mean screenshots are redacted; treat screenshots as visible page pixels.
 

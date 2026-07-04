@@ -290,7 +290,8 @@ The release direction is Yunti-first and ecosystem-informed:
 
 ### P6.1 Agent-Friendly Page Observation
 
-Status: planned.
+Status: in progress; P6.4.1 DOM strict redaction is implemented, P6.4.2
+secret-boundary tightening for memory and diagnostic artifacts is next.
 
 Create `yunti_observe_page`, a higher-level observation tool. Use Page Agent's
 PageController/browser-state approach as the first concrete reference, adapted
@@ -536,7 +537,9 @@ Scope:
 
 - redact password fields, hidden token-like fields, auth-like attributes, and
   long credential-looking strings;
-- optionally redact email, phone, ID-card-like, and bank-card-like values;
+- in `strict`, redact likely email, phone, address-like, and Luhn-valid
+  payment-card-like values across page titles, labels, names, visible text,
+  placeholders, values, selected option text, and option text;
 - add local configuration for redaction modes:
   - `strict`
   - `balanced`

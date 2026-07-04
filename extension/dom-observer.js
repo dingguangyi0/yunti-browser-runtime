@@ -29,6 +29,11 @@
   const BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/i
   const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]*PRIVATE KEY-----/
   const LONG_RANDOM_RE = /\b[A-Za-z0-9_-]{32,}\b/
+  const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
+  const PHONE_RE = /(?:\+?\d[\d\s().-]{7,}\d)/
+  const PAYMENT_CARD_RE = /(?:^|[^\d])(?:\d[ -]?){13,19}(?:$|[^\d])/
+  const ADDRESS_RE =
+    /\b\d{1,6}\s+[\p{L}0-9 .'-]{2,}\s+(street|st|road|rd|avenue|ave|lane|ln|boulevard|blvd|drive|dr|way|court|ct)\b|[\p{Script=Han}]{1,20}(省|市|区|县|路|街|号楼|单元|室)/iu
 
   function observePage(args = {}) {
     const mode = args.mode === "fullPage" ? "fullPage" : "viewport"
@@ -90,7 +95,7 @@
       uidMapVersion: "observe-v1",
       page: {
         url: redactUrl(location.href, redaction, redactions),
-        title: truncateText(document.title || "", 300),
+        title: redactTextPreview("page title", document.title || "", 300, { redaction, redactions }),
         origin: location.origin,
         readyState: document.readyState,
       },
@@ -121,17 +126,20 @@
   function describeElement(element, uid, options) {
     const tag = element.tagName.toLowerCase()
     const role = element.getAttribute("role") || inferRole(element)
-    const label = findLabel(element)
-    const text = compactText(element.innerText || element.textContent || "", 240)
-    const name = compactText(
+    const rawLabel = findLabel(element)
+    const rawText = compactText(element.innerText || element.textContent || "", 240)
+    const rawName = compactText(
       element.getAttribute("aria-label") ||
-        label ||
+        rawLabel ||
         element.getAttribute("title") ||
         element.getAttribute("name") ||
         element.getAttribute("placeholder") ||
-        text,
+        rawText,
       240
     )
+    const label = redactTextPreview("label", rawLabel, 160, options)
+    const text = redactTextPreview("text", rawText, 240, options)
+    const name = redactTextPreview("name", rawName, 240, options)
     const type = element.getAttribute("type") || (element.isContentEditable ? "contenteditable" : undefined)
     const valueInfo = getValuePreview(element, options.redaction, options.redactions)
     const rect = options.includeRects ? rectInfo(element) : undefined
@@ -179,7 +187,12 @@
       containers.push(cleanObject({
         uid: `scroll-${uidCounter}`,
         tag: element.tagName.toLowerCase(),
-        name: compactText(element.getAttribute("aria-label") || element.getAttribute("title") || element.id || "", 160),
+        name: redactTextPreview(
+          "scrollable container name",
+          compactText(element.getAttribute("aria-label") || element.getAttribute("title") || element.id || "", 160),
+          160,
+          options
+        ),
         rect: options.includeRects ? rectInfo(element) : undefined,
         scrollTop: Math.round(element.scrollTop || 0),
         scrollLeft: Math.round(element.scrollLeft || 0),
@@ -252,13 +265,48 @@
     return truncateText(value, 160)
   }
 
+  function redactTextPreview(key, value, max, options) {
+    if (!value) return value
+    if (shouldRedact(key, value, options.redaction)) {
+      recordRedaction(options.redactions, categoryFor(key, value))
+      return "[REDACTED]"
+    }
+    return truncateText(value, max)
+  }
+
   function shouldRedact(key, value, redaction) {
     if (redaction === "off") return false
     const haystack = `${key || ""} ${value || ""}`
     if (SENSITIVE_KEY_RE.test(haystack)) return true
     if (JWT_RE.test(haystack) || BEARER_RE.test(haystack) || PRIVATE_KEY_RE.test(haystack)) return true
     if (LONG_RANDOM_RE.test(String(value || ""))) return true
+    if (redaction === "strict" && hasStrictPii(value)) return true
     return redaction === "strict" && String(value || "").length >= 16
+  }
+
+  function hasStrictPii(value) {
+    const text = String(value || "")
+    return EMAIL_RE.test(text) || isPaymentCardLike(text) || PHONE_RE.test(text) || ADDRESS_RE.test(text)
+  }
+
+  function isPaymentCardLike(value) {
+    const digits = String(value || "").replace(/\D/g, "")
+    return digits.length >= 13 && digits.length <= 19 && PAYMENT_CARD_RE.test(String(value || "")) && passesLuhn(digits)
+  }
+
+  function passesLuhn(digits) {
+    let sum = 0
+    let shouldDouble = false
+    for (let index = digits.length - 1; index >= 0; index -= 1) {
+      let digit = Number(digits[index])
+      if (shouldDouble) {
+        digit *= 2
+        if (digit > 9) digit -= 9
+      }
+      sum += digit
+      shouldDouble = !shouldDouble
+    }
+    return sum % 10 === 0
   }
 
   function categoryFor(key, value) {
@@ -267,6 +315,10 @@
     if (/cookie|session/i.test(haystack)) return "session"
     if (/api[-_]?key|token|secret|auth|jwt|bearer|private[-_]?key|令牌/i.test(haystack)) return "token"
     if (/otp|验证码/i.test(haystack)) return "otp"
+    if (EMAIL_RE.test(haystack)) return "email"
+    if (isPaymentCardLike(haystack)) return "payment_card"
+    if (PHONE_RE.test(haystack)) return "phone"
+    if (ADDRESS_RE.test(haystack)) return "address"
     return "credential_like"
   }
 
@@ -371,14 +423,21 @@
     if (!optionElements.length) return undefined
     return optionElements.slice(0, 50).map((option) => {
       const rawValue = String(option.value || "")
-      const text = compactText(option.text || option.textContent || "", 120)
+      const rawText = compactText(option.text || option.textContent || "", 120)
       const key = `select option ${element.getAttribute("name") || ""} ${element.getAttribute("id") || ""}`
       let value = truncateText(rawValue, 120)
       let valueRedacted = false
+      let text = rawText
+      let textRedacted = false
       if (shouldRedact(key, rawValue, options.redaction)) {
         recordRedaction(options.redactions, categoryFor(key, rawValue))
         value = "[REDACTED]"
         valueRedacted = true
+      }
+      if (rawText && shouldRedact(`${key} text`, rawText, options.redaction)) {
+        recordRedaction(options.redactions, categoryFor(`${key} text`, rawText))
+        text = "[REDACTED]"
+        textRedacted = true
       }
       return cleanObject({
         value,
@@ -386,6 +445,7 @@
         selected: Boolean(option.selected),
         disabled: Boolean(option.disabled),
         valueRedacted,
+        textRedacted: textRedacted || undefined,
       })
     })
   }
@@ -397,20 +457,28 @@
     const selectedIndex = explicitSelectedIndex >= 0 ? explicitSelectedIndex : inferredSelectedIndex
     const selectedOption = optionElements[selectedIndex] || optionElements.find((option) => option.selected)
     const rawValue = String(element.value || selectedOption?.value || "")
-    const selectedText = compactText(selectedOption?.text || selectedOption?.textContent || "", 120)
+    const rawSelectedText = compactText(selectedOption?.text || selectedOption?.textContent || "", 120)
     const key = `select selected ${element.getAttribute("name") || ""} ${element.getAttribute("id") || ""}`
     let selectedValue = rawValue ? truncateText(rawValue, 120) : ""
     let selectedValueRedacted = false
+    let selectedText = rawSelectedText
+    let selectedTextRedacted = false
     if (rawValue && shouldRedact(key, rawValue, options.redaction)) {
       recordRedaction(options.redactions, categoryFor(key, rawValue))
       selectedValue = "[REDACTED]"
       selectedValueRedacted = true
+    }
+    if (rawSelectedText && shouldRedact(`${key} text`, rawSelectedText, options.redaction)) {
+      recordRedaction(options.redactions, categoryFor(`${key} text`, rawSelectedText))
+      selectedText = "[REDACTED]"
+      selectedTextRedacted = true
     }
     return cleanObject({
       selectedIndex,
       selectedValue,
       selectedValueRedacted,
       selectedText,
+      selectedTextRedacted: selectedTextRedacted || undefined,
     })
   }
 

@@ -16,6 +16,7 @@ class FakeElement {
     this.readOnly = Boolean(options.readOnly)
     this.checked = Boolean(options.checked)
     this.selected = Boolean(options.selected)
+    this.selectedIndex = Number.isFinite(Number(options.selectedIndex)) ? Number(options.selectedIndex) : -1
     this.options = options.options || []
     this.isContentEditable = attrs.contenteditable === "true" || attrs.contenteditable === ""
     this.rect = options.rect || { x: 0, y: 0, width: 100, height: 24 }
@@ -305,6 +306,69 @@ test("DOM observer handles redaction edge modes conservatively", () => {
   assert.equal(off.elements.find((element) => element.uid === "yunti-1").valuePreview, tokenValue.slice(0, 120))
   assert.equal(off.redactions.count, 0)
   assert.ok(off.warnings.some((warning) => /redaction is off/i.test(warning)))
+})
+
+test("DOM observer strict redaction covers PII-like text surfaces", () => {
+  const email = "jane.doe@example.com"
+  const phone = "+1 (415) 555-1234"
+  const card = "4111 1111 1111 1111"
+  const address = "123 Market Street"
+  const elements = [
+    new FakeElement("input", { id: "contact", name: "contact" }, {
+      value: email,
+      rect: { x: 20, y: 20, width: 260, height: 32 },
+    }),
+    new FakeElement("button", {}, {
+      innerText: `Call ${phone}`,
+      rect: { x: 20, y: 70, width: 260, height: 32 },
+    }),
+    new FakeElement("textarea", { id: "shipTo", name: "shipTo", "aria-label": `Ship to ${address}` }, {
+      value: address,
+      rect: { x: 20, y: 120, width: 260, height: 80 },
+    }),
+    new FakeElement("select", { id: "billing", name: "billing" }, {
+      value: card,
+      selectedIndex: 0,
+      rect: { x: 20, y: 220, width: 260, height: 32 },
+      options: [
+        { value: card, text: `Visa ${card}`, selected: true },
+        { value: "standard", text: "Standard" },
+      ],
+    }),
+    new FakeElement("input", { id: "ordinary", name: "query" }, {
+      value: "ordinary business text",
+      rect: { x: 20, y: 270, width: 260, height: 32 },
+    }),
+  ]
+  const document = createDocument(elements, { title: `Profile ${email}` })
+  const observer = loadObserver({
+    document,
+    location: new URL("https://example.test/profile"),
+  })
+
+  const balanced = observer.observePage({ redaction: "balanced" })
+  assert.equal(balanced.elements.find((element) => element.uid === "yunti-5").valuePreview, "ordinary business text")
+
+  const strict = observer.observePage({ redaction: "strict" })
+  const strictJson = JSON.stringify(strict)
+  assert.equal(strict.page.title, "[REDACTED]")
+  assert.equal(strict.elements.find((element) => element.uid === "yunti-1").valuePreview, "[REDACTED]")
+  assert.equal(strict.elements.find((element) => element.uid === "yunti-2").name, "[REDACTED]")
+  assert.equal(strict.elements.find((element) => element.uid === "yunti-3").name, "[REDACTED]")
+  assert.equal(strict.elements.find((element) => element.uid === "yunti-3").valuePreview, "[REDACTED]")
+  const select = strict.elements.find((element) => element.uid === "yunti-4")
+  assert.equal(select.selectedValue, "[REDACTED]")
+  assert.equal(select.selectedText, "[REDACTED]")
+  assert.equal(select.options[0].value, "[REDACTED]")
+  assert.equal(select.options[0].text, "[REDACTED]")
+  assert.equal(strictJson.includes(email), false)
+  assert.equal(strictJson.includes(phone), false)
+  assert.equal(strictJson.includes(card), false)
+  assert.equal(strictJson.includes(address), false)
+  assert.ok(strict.redactions.categories.includes("email"))
+  assert.ok(strict.redactions.categories.includes("phone"))
+  assert.ok(strict.redactions.categories.includes("payment_card"))
+  assert.ok(strict.redactions.categories.includes("address"))
 })
 
 test("DOM observer reports field fillability and select option summaries", () => {

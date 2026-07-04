@@ -17,6 +17,10 @@ The first release is local single-user software:
 
 - Cookies and raw authorization headers are not returned by network tools.
 - Network URLs, headers, request bodies, and console messages are sanitized.
+- DOM observation defaults to `balanced` redaction for credential-like values.
+  `strict` redaction additionally hides likely email, phone, Luhn-valid
+  payment-card-like values, address-like text, page titles, labels, names,
+  visible text, placeholders, values, and select option text.
 - Learning memory is stored under `~/.yunti_agent/users/{userId}/memory`.
 - The content script does not call product-specific login APIs.
 
@@ -45,6 +49,8 @@ Users should only load the extension from a trusted local checkout.
   hosted service.
 - Raw cookies, authorization headers, passwords, and token-like fields are not
   returned by the documented tools.
+- DOM redaction applies to structured observation text, not to screenshots;
+  screenshots are visible page pixels and may contain sensitive content.
 - Learning memory is local filesystem data and should not contain secrets.
 - Agents should summarize sensitive-looking output instead of repeating it.
 

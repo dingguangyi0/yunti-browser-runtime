@@ -111,6 +111,10 @@ taking an action whose effect cannot be verified from page state.
   Element entries may include `editable`, `fillable`, `readOnly`,
   `fillBlockReason`, select `selectedIndex` / `selectedValue` /
   `selectedText`, and `options[]` summaries for action planning.
+  Default `balanced` redaction hides credential-like values; `strict` also
+  hides likely email, phone, Luhn-valid payment-card-like values, address-like
+  text, page titles, labels, names, visible text, placeholders, values, and
+  select option text.
 - `yunti_get_page_snapshot`: lightweight page state and visible context.
 - `yunti_take_snapshot`: element-oriented snapshot for uid-based actions.
 - `yunti_wait_for`: wait for async text, selector, or URL state before
@@ -317,5 +321,8 @@ taking an action whose effect cannot be verified from page state.
   explicit user confirmation in the agent workflow.
 - Tool outputs redact likely cookies, authorization headers, passwords, and
   token-like values.
+- Use `yunti_observe_page` `redaction: "strict"` when the page may contain
+  personal information. Keep `redaction: "off"` only for explicit local
+  debugging.
 - DOM observation redaction does not imply screenshot redaction; screenshots
   represent visible page pixels and may include sensitive content.

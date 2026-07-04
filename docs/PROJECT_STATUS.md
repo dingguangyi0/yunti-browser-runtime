@@ -6,8 +6,9 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.4.1 DOM redaction policy deepening, with P6.1.4
-real-browser closure still pending on Playwright/Chromium availability.
+Current implementation focus: P6.4.2 learning memory / diagnostic artifacts
+secret-boundary tightening, with P6.1.4 real-browser closure still pending on
+Playwright/Chromium availability.
 
 Latest visible 0.2.0 phase split:
 
@@ -43,10 +44,14 @@ Latest visible 0.2.0 phase split:
 - P6.3.2 completed: Tool Guide, packaged skill, and `yunti_get_tool_usage_hints`
   now expose minimal workflows for click, form fill, scroll-to-find, tab
   switching, and async wait.
-- P6.4.1 next: deepen DOM redaction policy and align terminology with
-  network/console redaction; if Playwright/Chromium becomes available first,
-  close P6.1.4 real-browser `observe -> click uid -> observe/verify`
-  validation.
+- P6.4.1 completed: strict DOM redaction now covers page title, labels, names,
+  visible text, placeholders, value previews, select selected value/text,
+  option value/text, scrollable container names, and likely email, phone,
+  Luhn-valid payment-card-like, and address-like content while keeping balanced
+  credential-like protection as the default.
+- P6.4.2 next: tighten learning memory / diagnostic artifacts secret boundaries;
+  if Playwright/Chromium becomes available first, close P6.1.4 real-browser
+  `observe -> click uid -> observe/verify` validation.
 
 Latest detailed P6.2 status:
 
@@ -137,8 +142,26 @@ Latest detailed P6.2 status:
   118 node:test cases total, 117 passing and 1 default real-browser smoke
   skipped, plus npm package contents validation with 45 files and extension zip
   contents validation with 13 files.
-- Next: implement P6.4.1 DOM redaction policy deepening, or close P6.1.4 first
-  if Playwright/Chromium is available for real-browser closure.
+- Completed: P6.4.1 DOM redaction policy deepening. `strict` mode now redacts
+  PII-like text surfaces in `yunti_observe_page`, including page title, labels,
+  names, visible text, placeholders, value previews, select selected value/text,
+  option value/text, scrollable container names, email, phone, Luhn-valid
+  payment-card-like values, and address-like text. `balanced` remains the
+  default credential-like protection mode; `off` remains explicit local
+  debugging only.
+- Latest P6.4.1 validation: `node --check extension/dom-observer.js` passed;
+  `node --test tests/dom-observer.test.js` passed 6 tests covering strict PII
+  categories, select option text redaction, page title redaction, and balanced
+  ordinary business text behavior; `node --test tests/bridge.test.js` passed 68
+  tests; `git diff --check` passed; token residue grep returned no matches;
+  `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is not
+  installed in the current environment; `npm run release:check` passed with
+  119 node:test cases total, 118 passing and 1 default real-browser smoke
+  skipped, plus npm package contents validation with 45 files and extension zip
+  contents validation with 13 files.
+- Next: implement P6.4.2 learning memory / diagnostic artifacts secret-boundary
+  tightening, or close P6.1.4 first if Playwright/Chromium is available for
+  real-browser closure.
 
 ## Current State
 
@@ -903,13 +926,14 @@ Latest detailed P6.2 status:
   P6.1 validation gap until Playwright/Chromium is available locally.
 - Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
   marking P6.1 fully closed.
-- Continue P6.2 in small compatibility-preserving slices. Current completed
+- Continue 0.2.0 in small compatibility-preserving slices. Current completed
   subphases are P6.2.1 action result coverage, P6.2.2 select semantics, P6.2.3
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
   guidance, P6.2.6 structured `yunti_wait_for` results, and P6.2.7 automated
-  action result coverage audit, P6.3.1 agent workflow contract, and P6.3.2
-  minimal Tool Guide use cases. The next anchored slice is P6.4.1 DOM redaction
-  policy deepening, unless Playwright/Chromium is available to close P6.1.4
+  action result coverage audit, P6.3.1 agent workflow contract, P6.3.2 minimal
+  Tool Guide use cases, and P6.4.1 DOM redaction policy deepening. The next
+  anchored slice is P6.4.2 learning memory / diagnostic artifacts secret-boundary
+  tightening, unless Playwright/Chromium is available to close P6.1.4
   real-browser validation first.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,

@@ -54,7 +54,7 @@ export const TOOLS = [
   {
     name: "yunti_observe_page",
     description:
-      "Observe the current browser page for agentic operation. Returns an observationId, page/viewport/scroll metadata, a compact interactive text tree, structured elements with fresh uids, scrollable container metadata, redaction metadata, and next-step hints. Prefer this for observe -> act by uid -> verify workflows once available. Sensitive credential-like values are redacted by default.",
+      "Observe the current browser page for agentic operation. Returns an observationId, page/viewport/scroll metadata, a compact interactive text tree, structured elements with fresh uids, scrollable container metadata, redaction metadata, and next-step hints. Prefer this for observe -> act by uid -> verify workflows once available. Sensitive credential-like values are redacted by default; strict redaction also hides likely email, phone, payment-card, and address text surfaces.",
     inputSchema: {
       type: "object",
       properties: {
@@ -990,7 +990,8 @@ export function toolUsageHints(args = {}) {
         "Use this as the default page-operation refresh step once available.",
         "Returned uids are fresh for the latest observation in the current browserSessionId; observe again after navigation, DOM changes, or stale uid errors.",
         "Input-like elements may include editable, fillable, readOnly, fillBlockReason, selectedIndex/selectedValue/selectedText, and select options[] summaries so agents can inspect field state before filling or selecting.",
-        "Default balanced redaction hides credential-like values. Screenshots are separate and may still contain visible sensitive content.",
+        "Default balanced redaction hides credential-like values. Strict redaction additionally hides likely email, phone, Luhn-valid payment-card-like values, address-like text, page titles, labels, names, visible text, placeholders, value previews, and select option text.",
+        "Screenshots are separate and may still contain visible sensitive content.",
         "Use yunti_get_page_snapshot for lightweight route/title/text overview and yunti_take_snapshot for compatibility with older uid workflows.",
       ],
       commonMistakes: [

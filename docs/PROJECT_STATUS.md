@@ -6,8 +6,8 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.2.7 structured action result coverage audit
-and real-browser closure readiness.
+Current implementation focus: P6.3.1 agent workflow contract, with P6.1.4
+real-browser closure still pending on Playwright/Chromium availability.
 
 Latest visible 0.2.0 phase split:
 
@@ -34,8 +34,12 @@ Latest visible 0.2.0 phase split:
   as `found`, `text`, `selector`, `condition`, `value`, and `waitedMs` while
   adding `action: "wait_for"`, `target`, `ok`, `recoverable`, `nextStepHint`,
   and timeout diagnostics with `code: "WAIT_TIMEOUT"` plus `recoveryHint`.
-- P6.2.7 next: audit structured action result coverage across success and main
-  failure paths, then prepare the real-browser closure validation entry point.
+- P6.2.7 completed: structured action result coverage is now captured in
+  `docs/ACTION_RESULT_COVERAGE.md` and checked by
+  `npm run check:action-results`, which is part of `npm run release:check`.
+- P6.3.1 next: document the default agent workflow contract and copyable
+  prompts; if Playwright/Chromium becomes available first, close P6.1.4
+  real-browser `observe -> click uid -> observe/verify` validation.
 
 Latest detailed P6.2 status:
 
@@ -86,8 +90,20 @@ Latest detailed P6.2 status:
 - Completed: `yunti_observe_page` field-state hints, select selected-option
   hints, select `options[]` summaries, and structured disabled-option
   diagnostics for `yunti_select`.
-- Next: implement P6.2.7 coverage audit and real-browser closure readiness,
-  keeping the same status/documentation discipline.
+- Completed: P6.2.7 coverage audit gate. `docs/ACTION_RESULT_COVERAGE.md`
+  now records the 11 core action surfaces and their success paths, failure
+  diagnostics, preserved compatibility fields, and remaining real-browser
+  validation notes. `scripts/check-action-result-coverage.js` validates the
+  matrix and is exposed as `npm run check:action-results`.
+- Latest P6.2.7 validation: `npm run check:action-results` passed with 11
+  coverage rows; `npm run check` passed; `git diff --check` passed; token
+  residue grep returned no matches; `YUNTI_E2E=1 npm run test:e2e` skipped
+  because Playwright/Chromium is not installed in the current environment;
+  `npm run release:check` passed with 116 node:test cases total, 115 passing
+  and 1 default real-browser smoke skipped, plus npm package contents
+  validation with 44 files and extension zip contents validation with 13 files.
+- Next: implement P6.3.1 agent workflow contract and copyable prompts, or close
+  P6.1.4 first if Playwright/Chromium is available for real-browser closure.
 
 ## Current State
 
@@ -855,9 +871,10 @@ Latest detailed P6.2 status:
 - Continue P6.2 in small compatibility-preserving slices. Current completed
   subphases are P6.2.1 action result coverage, P6.2.2 select semantics, P6.2.3
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
-  guidance, and P6.2.6 structured `yunti_wait_for` results. The next anchored
-  slice is P6.2.7: audit structured action result coverage and prepare the
-  real-browser closure validation entry point.
+  guidance, P6.2.6 structured `yunti_wait_for` results, and P6.2.7 automated
+  action result coverage audit. The next anchored slice is P6.3.1 agent
+  workflow contract, unless Playwright/Chromium is available to close P6.1.4
+  real-browser validation first.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

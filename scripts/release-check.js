@@ -466,6 +466,7 @@ ok = checkVersionConsistency() && ok
 ok = checkCliSmoke() && ok
 ok = checkPrintConfigSmoke() && ok
 ok = checkDoctorSmoke() && ok
+ok = run("npm", ["run", "check:action-results"]) && ok
 ok = run("npm", ["run", "check"]) && ok
 ok = run("npm", ["test"]) && ok
 ok = checkPackageContents() && ok

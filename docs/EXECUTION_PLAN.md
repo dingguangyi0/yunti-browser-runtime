@@ -69,8 +69,8 @@
 | P6.2.4 | 已完成 | `yunti_scroll` uid/coordinate/no-movement/partial/fallback 诊断 |
 | P6.2.5 | 已完成 | 异步 UI 的 `wait -> observe -> fresh uid` 恢复指导 |
 | P6.2.6 | 已完成 | `yunti_wait_for` 自身结构化 action result 与恢复语义 |
-| P6.2.7 | 下一步 | 结构化 action result 覆盖审计与真实浏览器闭环补验准备 |
-| P6.3.1 | 计划中 | Agent 默认工作流契约与可复制提示词 |
+| P6.2.7 | 已完成 | 结构化 action result 覆盖审计与真实浏览器闭环补验准备 |
+| P6.3.1 | 下一步 | Agent 默认工作流契约与可复制提示词 |
 | P6.3.2 | 计划中 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
 | P6.4.1 | 计划中 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
 | P6.5.1 | 计划中 | 可选本地运行时控制台 |
@@ -153,9 +153,23 @@
   因当前环境缺少 Playwright/Chromium 跳过；`npm run release:check` 通过，覆盖
   116 个 node:test 用例，其中 115 个通过、1 个真实浏览器 smoke 默认跳过，并完成 npm
   package 与 extension zip 内容检查。
-- 下一个稳定推进切片固定为 P6.2.7：重新审计结构化 action result 覆盖面，确认
+- P6.2.7 目标：重新审计结构化 action result 覆盖面，确认
   wait/click/hover/fill/select/scroll/type/press/upload/drag/fill_form 的成功和主要失败路径
   都有可读的 `ok` / `code` / `recoverable` / `nextStepHint`，并整理真实浏览器闭环补验入口。
+- P6.2.7 已完成：新增 `docs/ACTION_RESULT_COVERAGE.md` 作为结构化 action result 覆盖矩阵，
+  覆盖 click、hover、fill、select、fill_form、wait_for、scroll、type_text、press_key、
+  upload_file、drag 共 11 个 action surfaces；新增 `npm run check:action-results` 和
+  `scripts/check-action-result-coverage.js`，并接入 `npm run release:check`，避免后续
+  上下文压缩或代码变更后忘记维护覆盖状态。
+- P6.2.7 最新验证：`npm run check:action-results` 通过，识别 11 行覆盖矩阵；
+  `npm run check` 通过；`git diff --check` 通过；token 残留检查无输出；
+  `YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，覆盖 116 个 node:test 用例，其中 115 个通过、1 个
+  真实浏览器 smoke 默认跳过，并完成 npm package 内容检查 44 个文件和 extension zip
+  内容检查 13 个文件。
+- 下一步推进顺序：如果当前环境补齐 Playwright/Chromium，先关闭 P6.1.4 真实浏览器
+  `observe -> click uid -> observe/verify` 闭环；如果环境仍不可用，则进入 P6.3.1，
+  把 agent 默认工作流契约和可复制提示词沉淀成文档、Tool Guide 和 skill 引导。
 
 ## 压缩上下文恢复锚点
 
@@ -180,11 +194,13 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.2.7：审计结构化 action result 覆盖面，并准备真实浏览器闭环补验。
-保留现有兼容字段，必要时更新 mcp/tools.js、docs/TOOL_GUIDE.md、
-skills/yunti-browser-runtime/SKILL.md、docs/EXECUTION_PLAN.md 和 docs/PROJECT_STATUS.md，
-并运行规定门禁。不要把项目改成 Page Agent 克隆，保持 Yunti local-first、
-MCP-native、真实 Chrome/Edge、细粒度 yunti_* 工具的特色。
+当前锚点是 P6.3.1：沉淀 Agent 默认工作流契约与可复制提示词。如果当前环境已经具备
+Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
+observe -> click uid -> observe/verify 闭环。保留现有兼容字段，必要时更新
+mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、
+docs/EXECUTION_PLAN.md 和 docs/PROJECT_STATUS.md，并运行规定门禁。不要把项目改成
+Page Agent 克隆，保持 Yunti local-first、MCP-native、真实 Chrome/Edge、
+细粒度 yunti_* 工具的特色。
 ```
 
 ## P0.1 bridge token + CORS 收紧

@@ -296,7 +296,7 @@ export const TOOLS = [
   {
     name: "yunti_capture_visible_tab",
     description:
-      "Capture a PNG screenshot of the visible area of the active Yunti browser tab through the extension. Reuses the user's current browser without requiring a separate debugging setup.",
+      "Capture a PNG screenshot of the visible area of the active Yunti browser tab through the extension. Screenshots are real visible pixels and are not DOM-redacted; use only when visual evidence is needed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -399,7 +399,7 @@ export const TOOLS = [
   {
     name: "yunti_get_cdp_events",
     description:
-      "Read raw low-level browser protocol events forwarded by the browser extension for the active tab. This diagnostic stream intentionally does not redact event payloads; clear it after debugging.",
+      "Read raw low-level browser protocol events forwarded by the browser extension for the active tab. This diagnostic stream intentionally does not redact event payloads; use only for low-level debugging and clear it after debugging.",
     inputSchema: {
       type: "object",
       properties: {
@@ -845,7 +845,7 @@ export const TOOLS = [
   {
     name: "yunti_take_screenshot",
     description:
-      "Capture a PNG screenshot of the selected browser page. Supports viewport and full-page modes via CDP Page.captureScreenshot.",
+      "Capture a screenshot of the selected browser page. Supports viewport and full-page modes via CDP Page.captureScreenshot. Screenshots are real visible pixels and are not DOM-redacted.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1042,6 +1042,62 @@ export function toolUsageHints(args = {}) {
         "For tab operations, pass top-level tabId or targetId together with browserSessionId.",
         "For Target.closeTarget, call yunti_list_browser_targets first, then pass a returned top-level tabId or targetId.",
         "If browserSessionId is stale, refresh with yunti_list_browser_targets before retrying.",
+      ],
+    },
+    yunti_get_cdp_events: {
+      purpose: "Inspect raw low-level CDP events for debugging transport, protocol, or extension behavior.",
+      required: [],
+      recommended: ["browserSessionId", "method", "limit"],
+      notes: [
+        "This tool intentionally returns raw CDP event payloads and does not apply network, console, DOM, or learning-memory sanitization.",
+        "Use sanitized network and console tools first when they can answer the question.",
+        "Filter by method and keep limit small to reduce sensitive payload exposure.",
+        "Clear raw CDP events after debugging with yunti_clear_cdp_events.",
+      ],
+      recovery: [
+        "After reading raw CDP diagnostics, call yunti_clear_cdp_events for the same browserSessionId or allSessions when appropriate.",
+        "If you need to keep a durable note, summarize the safe conclusion with yunti_remember_learning instead of copying raw event payloads.",
+      ],
+      commonMistakes: [
+        "Do not copy raw CDP params into chat, logs, learning memory, or documentation.",
+        "Do not use raw CDP events as the default page observation path; prefer yunti_observe_page, sanitized network tools, and sanitized console tools.",
+      ],
+    },
+    yunti_clear_cdp_events: {
+      purpose: "Delete raw CDP diagnostic events after low-level debugging.",
+      required: [],
+      recommended: ["browserSessionId"],
+      notes: [
+        "Use browserSessionId to clear one tab's raw diagnostics, or allSessions=true with the current userId when ending a broader debugging session.",
+        "Clearing raw CDP events does not clear sanitized network or console diagnostics.",
+      ],
+    },
+    yunti_take_screenshot: {
+      purpose: "Capture visual page evidence for layout, rendering, or user-visible verification.",
+      required: [],
+      recommended: ["browserSessionId", "fullPage"],
+      notes: [
+        "Screenshots are real visible pixels and are not DOM-redacted.",
+        "Use yunti_observe_page with redaction=strict first when structured text is enough.",
+        "Prefer viewport screenshots over fullPage when a smaller visual proof is sufficient.",
+        "Do not store screenshots in learning memory; summarize only safe visual findings.",
+      ],
+      commonMistakes: [
+        "Do not assume DOM redaction hides sensitive content in screenshots.",
+        "Do not use screenshots as the default data extraction path when observe, snapshot, network, console, or evaluate can provide a safer answer.",
+      ],
+    },
+    yunti_capture_visible_tab: {
+      purpose: "Capture the active visible tab for visual verification through the extension fallback path.",
+      required: [],
+      recommended: ["browserSessionId"],
+      notes: [
+        "Like yunti_take_screenshot, this returns real visible pixels and is not DOM-redacted.",
+        "Use it only when visual state matters and structured observations are insufficient.",
+        "Do not store raw screenshot data in learning memory.",
+      ],
+      commonMistakes: [
+        "Do not expose visible secrets from the screenshot; describe only the safe conclusion.",
       ],
     },
     yunti_evaluate_script: {
@@ -1292,7 +1348,7 @@ export function toolUsageHints(args = {}) {
     }
   }
   return {
-    version: "2026-07-04",
+    version: "2026-07-05",
     coreRules: [
       "Every browser-facing yunti_* tool call requires userId.",
       "browserSessionId is the current user's browser route; tabId and targetId are selectors, not permissions.",
@@ -1303,6 +1359,7 @@ export function toolUsageHints(args = {}) {
       "After yunti_new_page, use the returned browserSessionId for follow-up calls on the new tab.",
       "Sessions expire quickly when the extension stops polling; stale-session errors include the reason and recovery hint.",
       "If a tool call fails due to parameters, inspect this hint output and the tool schema before retrying.",
+      "Prefer sanitized diagnostics before raw CDP events; screenshots are visible pixels and are not DOM-redacted.",
     ],
     workflows: {
       newPage: [
@@ -1362,6 +1419,7 @@ export function toolUsageHints(args = {}) {
         "Use selector or coordinate fallback only as recovery/debugging paths.",
         "Ask me before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, or changing production data.",
         "Do not expose raw cookies, passwords, auth headers, tokens, private keys, or other secrets.",
+        "Prefer sanitized diagnostics; use raw CDP or screenshots only when needed, and summarize safe findings.",
       ],
       minimalUseCases: {
         clickByUid: [

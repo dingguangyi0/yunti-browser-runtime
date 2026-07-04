@@ -74,11 +74,11 @@
 | P6.3.2 | 已完成 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
 | P6.4.1 | 已完成 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
 | P6.4.2 | 已完成 | learning memory / diagnostic artifacts 的 secret 边界收敛 |
-| P6.4.3 | 下一步 | raw CDP / screenshot 非默认脱敏诊断的提示与清理边界 |
-| P6.5.1 | 计划中 | 可选本地运行时控制台 |
+| P6.4.3 | 已完成 | raw CDP / screenshot 非默认脱敏诊断的提示与清理边界 |
+| P6.5.1 | 下一步 | 可选本地运行时控制台 |
 | P6.6.1 | 计划中 | 浏览器扩展分发准备 |
 
-当前 0.2.0 推进快照（2026-07-04）：
+当前 0.2.0 推进快照（2026-07-05）：
 
 - P6.2 最新完成切片：
   - action result 主路径覆盖；
@@ -218,9 +218,21 @@
   `YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少 Playwright/Chromium 跳过；
   `npm run release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip
   内容检查 13 个文件。
-- 下一步固定为 P6.4.3：补 raw CDP / screenshot 这类非默认脱敏诊断的提示、清理和
-  recovery guidance；如果当前环境补齐 Playwright/Chromium，则优先补跑并关闭 P6.1.4
-  真实浏览器 `observe -> click uid -> observe/verify` 闭环。
+- P6.4.3 已完成：`yunti_get_tool_usage_hints` 新增 raw CDP 和 screenshot 专项 guidance；
+  `yunti_get_cdp_events` 明确 raw payload、不默认脱敏、优先 sanitized diagnostics、按
+  `method` / `limit` 缩小范围，并在调试后用 `yunti_clear_cdp_events` 清理；`yunti_take_screenshot`
+  和 `yunti_capture_visible_tab` 明确截图是真实像素、不继承 DOM redaction，优先 viewport
+  和安全摘要，不把 raw image data 写入 learning memory。
+- P6.4.3 最新验证：`node --check mcp/tools.js` 通过；`node --test tests/bridge.test.js`
+  通过 71 个用例，新增 raw CDP / screenshot safety boundary usage hints 覆盖；
+  `git diff --check` 通过；token 残留检查无输出；`npm run check` 通过；`npm test`
+  通过，覆盖 122 个 node:test 用例，其中 121 个通过、1 个真实浏览器 smoke 默认跳过；
+  `YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少 Playwright/Chromium 跳过；
+  `npm run release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip
+  内容检查 13 个文件。
+- 下一步固定为 P6.5.1：可选本地运行时控制台的最小设计与第一刀实现；如果当前环境补齐
+  Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
+  `observe -> click uid -> observe/verify` 闭环。
 
 ## 压缩上下文恢复锚点
 
@@ -245,7 +257,7 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.4.3：补 raw CDP / screenshot 这类非默认脱敏诊断的提示、清理和 recovery guidance。如果当前环境已经具备
+当前锚点是 P6.5.1：可选本地运行时控制台的最小设计与第一刀实现。如果当前环境已经具备
 Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
 observe -> click uid -> observe/verify 闭环。保留现有兼容字段，必要时更新
 mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、
@@ -2418,7 +2430,7 @@ P6.3 的一部分应前置到 P6.1 schema 合并时完成：
 
 ## P6.4 DOM 脱敏与页面内容策略
 
-状态：进行中；P6.4.1、P6.4.2 已完成，P6.4.3 下一步
+状态：已完成
 
 目标：
 
@@ -2457,6 +2469,15 @@ P6.4.2 已落地：
   在缓存前统一脱敏。
 - `yunti_get_cdp_events` 保持 raw low-level diagnostics 语义，但文档和 tool hints 已明确
   这是例外，应在调试后用 `yunti_clear_cdp_events` 清理。
+
+P6.4.3 已落地：
+
+- `yunti_get_tool_usage_hints` 已为 `yunti_get_cdp_events`、`yunti_clear_cdp_events`、
+  `yunti_take_screenshot` 和 `yunti_capture_visible_tab` 增加安全边界和清理 guidance。
+- Raw CDP 诊断明确优先使用 sanitized network/console 工具，必要时按 `method` 和 `limit`
+  缩小范围，用后清理，且不复制 raw params 到聊天、文档或 learning memory。
+- Screenshot 诊断明确是真实可见像素，不受 DOM redaction 保护；优先 viewport 截图，
+  只总结安全视觉结论，不把 raw image data 存入 learning memory。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2529,11 +2550,9 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 扩展 popup 默认不需要用户保存设置；Bridge URL、页面匹配和 token 已移入高级设置。
 - `0.2.0 Best Browser Automation Runtime` 的大版本计划已沉淀到
   `docs/NEXT_MAJOR_PLAN.md`。
-- 继续 0.2.0 的小切片推进：P6.4.1 DOM strict redaction 已覆盖 page title、文本面、
-  select option text、email、phone、Luhn-valid payment-card-like 和 address-like；
-  P6.4.2 已收敛 learning memory 与 console diagnostics 的 secret/PII-like 存储边界。
-  下一刀建议做 P6.4.3 raw CDP / screenshot 非默认脱敏诊断的提示与清理边界，或在环境具备时
-  补真实浏览器闭环。
+- 继续 0.2.0 的小切片推进：P6.4 已完成 DOM strict redaction、learning memory /
+  console diagnostics 存储边界、raw CDP / screenshot 非默认脱敏提示与清理边界。
+  下一刀建议进入 P6.5.1 可选本地运行时控制台，或在环境具备时补真实浏览器闭环。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

@@ -529,9 +529,9 @@ Acceptance:
 
 ### P6.4 DOM Redaction And Page Content Policy
 
-Status: in progress; P6.4.1 DOM strict redaction and P6.4.2 memory/console
-diagnostic sanitization are implemented. P6.4.3 raw diagnostics and screenshot
-non-redaction guidance is next.
+Status: complete for the current 0.2.0 planning scope. P6.4.1 DOM strict
+redaction, P6.4.2 memory/console diagnostic sanitization, and P6.4.3 raw
+diagnostics / screenshot non-redaction guidance are implemented.
 
 Promote DOM snapshot redaction to a first-class runtime capability.
 
@@ -560,6 +560,9 @@ Implemented slices:
 - P6.4.2: shared MCP text sanitization before learning-memory writes and
   console diagnostic caching, with raw CDP events documented as the explicit
   low-level exception.
+- P6.4.3: raw CDP and screenshot tools now expose usage guidance for sanitized
+  tool preference, method/limit scoping, CDP cleanup, screenshot non-redaction,
+  viewport preference, and safe summarization.
 
 Security caveats to keep explicit:
 

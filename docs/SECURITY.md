@@ -28,6 +28,8 @@ The first release is local single-user software:
 - Raw CDP event diagnostics are an explicit low-level exception: payloads are
   not redacted, are cached only in memory, and should be cleared after debugging
   with `yunti_clear_cdp_events`.
+- Screenshot tools return real visible pixels. They do not inherit DOM
+  redaction and should be used only when visual evidence is needed.
 - The content script does not call product-specific login APIs.
 
 ## Browser Permissions
@@ -62,7 +64,10 @@ Users should only load the extension from a trusted local checkout.
   screenshots are visible page pixels and may contain sensitive content.
 - Learning memory is local filesystem data and should not contain secrets.
 - Raw CDP diagnostics may contain sensitive payloads; use them only when needed
-  for low-level debugging and clear them after use.
+  for low-level debugging, filter by method/limit where possible, and clear them
+  after use.
+- Screenshot artifacts may contain all visible sensitive page content; prefer
+  structured redacted observations when text/state is enough.
 - Agents should summarize sensitive-looking output instead of repeating it.
 
 ## Not Yet Implemented

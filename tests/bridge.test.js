@@ -547,7 +547,7 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
 
   assert.equal(fillResponse.result.isError, undefined)
   const fillPayload = JSON.parse(fillResponse.result.content[0].text)
-  assert.equal(fillPayload.version, "2026-07-04")
+  assert.equal(fillPayload.version, "2026-07-05")
   assert.equal(fillPayload.tools.yunti_fill.schema.required.includes("value"), true)
   assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /Coordinate-only fill is not supported/)
 
@@ -633,6 +633,44 @@ test("mcp usage hints include observe-first page operation guidance", async () =
   assert.ok(schema.properties.redaction.enum.includes("off"))
   assert.match(payload.tools.yunti_observe_page.notes.join("\n"), /fresh for the latest observation/)
   assert.match(payload.tools.yunti_observe_page.commonMistakes.join("\n"), /permanent selectors/)
+})
+
+test("mcp usage hints document raw CDP and screenshot safety boundaries", async () => {
+  const cdpResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_get_cdp_events" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(cdpResponse.result.isError, undefined)
+  const cdpPayload = JSON.parse(cdpResponse.result.content[0].text)
+  const cdpHints = cdpPayload.tools.yunti_get_cdp_events
+  assert.match(cdpHints.notes.join("\n"), /intentionally returns raw CDP event payloads/)
+  assert.match(cdpHints.notes.join("\n"), /Clear raw CDP events/)
+  assert.match(cdpHints.recovery.join("\n"), /yunti_clear_cdp_events/)
+  assert.match(cdpHints.commonMistakes.join("\n"), /Do not copy raw CDP params/)
+
+  const screenshotResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_take_screenshot" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(screenshotResponse.result.isError, undefined)
+  const screenshotPayload = JSON.parse(screenshotResponse.result.content[0].text)
+  const screenshotHints = screenshotPayload.tools.yunti_take_screenshot
+  assert.match(screenshotHints.notes.join("\n"), /real visible pixels/)
+  assert.match(screenshotHints.notes.join("\n"), /redaction=strict first/)
+  assert.match(screenshotHints.commonMistakes.join("\n"), /DOM redaction/)
+  assert.match(screenshotHints.commonMistakes.join("\n"), /default data extraction path/)
 })
 
 test("mcp usage hints include action recovery guidance", async () => {

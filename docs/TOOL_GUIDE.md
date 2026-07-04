@@ -335,3 +335,12 @@ taking an action whose effect cannot be verified from page state.
   debugging.
 - DOM observation redaction does not imply screenshot redaction; screenshots
   represent visible page pixels and may include sensitive content.
+- Prefer sanitized tools for diagnostics: `yunti_list_network_requests`,
+  `yunti_get_network_request`, `yunti_list_console_messages`, and
+  `yunti_get_console_message`.
+- Use `yunti_get_cdp_events` only for low-level protocol debugging. Filter by
+  `method`, keep `limit` small, do not copy raw `params` into chat or learning
+  memory, and clear with `yunti_clear_cdp_events` when done.
+- Use screenshots only when visual proof is needed. Prefer viewport screenshots
+  over `fullPage` when sufficient, and summarize safe findings instead of
+  storing raw image data in learning memory.

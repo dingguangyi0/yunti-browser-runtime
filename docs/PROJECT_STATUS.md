@@ -6,9 +6,8 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.4.3 raw CDP / screenshot non-redaction
-diagnostic guidance and cleanup boundaries, with P6.1.4 real-browser closure
-still pending on Playwright/Chromium availability.
+Current implementation focus: P6.5.1 optional local runtime console, with P6.1.4
+real-browser closure still pending on Playwright/Chromium availability.
 
 Latest visible 0.2.0 phase split:
 
@@ -53,10 +52,12 @@ Latest visible 0.2.0 phase split:
   JWTs, private keys, long token-like values, emails, phones, Luhn-valid
   payment-card-like values, and address-like text before learning memory writes
   and console diagnostic caching.
-- P6.4.3 next: tighten guidance and cleanup boundaries for raw CDP events and
-  screenshots, which remain explicit non-default-redaction diagnostics; if
-  Playwright/Chromium becomes available first, close P6.1.4 real-browser
-  `observe -> click uid -> observe/verify` validation.
+- P6.4.3 completed: raw CDP and screenshot tools now expose explicit guidance
+  for non-default-redaction diagnostics, sanitized-tool preference, scope
+  minimization, safe summarization, and CDP cleanup.
+- P6.5.1 next: optional local runtime console minimum design and first
+  implementation slice; if Playwright/Chromium becomes available first, close
+  P6.1.4 real-browser `observe -> click uid -> observe/verify` validation.
 
 Latest detailed P6.2 status:
 
@@ -182,8 +183,24 @@ Latest detailed P6.2 status:
   installed in the current environment; `npm run release:check` passed, plus npm
   package contents validation with 45 files and extension zip contents validation
   with 13 files.
-- Next: implement P6.4.3 raw CDP / screenshot non-redaction diagnostic guidance
-  and cleanup boundaries, or close P6.1.4 first if Playwright/Chromium is
+- Completed: P6.4.3 raw CDP / screenshot non-redaction diagnostic guidance and
+  cleanup boundaries. Tool descriptions, `yunti_get_tool_usage_hints`, Tool
+  Guide, packaged skill, and Security docs now tell agents to prefer sanitized
+  diagnostics, use raw CDP only for low-level debugging, filter by `method` and
+  `limit`, clear with `yunti_clear_cdp_events`, treat screenshots as real
+  visible pixels outside DOM redaction, prefer viewport screenshots when enough,
+  and summarize safe findings instead of storing raw payloads or images.
+- Latest P6.4.3 validation: `node --check mcp/tools.js` passed;
+  `node --test tests/bridge.test.js` passed 71 tests, including new raw CDP and
+  screenshot safety-boundary usage hints coverage; `git diff --check` passed;
+  token residue grep returned no matches; `npm run check` passed; `npm test`
+  passed with 122 node:test cases total, 121 passing and 1 default real-browser
+  smoke skipped; `YUNTI_E2E=1 npm run test:e2e` skipped because
+  Playwright/Chromium is not installed in the current environment;
+  `npm run release:check` passed, plus npm package contents validation with 45
+  files and extension zip contents validation with 13 files.
+- Next: implement P6.5.1 optional local runtime console minimum design and
+  first implementation slice, or close P6.1.4 first if Playwright/Chromium is
   available for real-browser closure.
 
 ## Current State
@@ -954,10 +971,10 @@ Latest detailed P6.2 status:
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
   guidance, P6.2.6 structured `yunti_wait_for` results, and P6.2.7 automated
   action result coverage audit, P6.3.1 agent workflow contract, P6.3.2 minimal
-  Tool Guide use cases, P6.4.1 DOM redaction policy deepening, and P6.4.2
-  learning memory / console diagnostic secret-boundary tightening. The next
-  anchored slice is P6.4.3 raw CDP / screenshot non-redaction diagnostic
-  guidance and cleanup boundaries, unless Playwright/Chromium is available to close P6.1.4
+  Tool Guide use cases, P6.4.1 DOM redaction policy deepening, P6.4.2 learning
+  memory / console diagnostic secret-boundary tightening, and P6.4.3 raw CDP /
+  screenshot non-redaction diagnostic guidance. The next anchored slice is
+  P6.5.1 optional local runtime console, unless Playwright/Chromium is available to close P6.1.4
   real-browser validation first.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,

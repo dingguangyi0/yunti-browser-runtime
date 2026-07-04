@@ -183,11 +183,12 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 - Read-only inspection is allowed by default.
 - Before submitting forms, deleting data, uploading sensitive files, approving workflows, making purchases, or changing production data, ask the user for explicit confirmation.
 - Do not expose raw cookies, passwords, authorization headers, or token-like values.
-- Treat `yunti_get_cdp_events` as raw low-level diagnostics. Clear it after debugging with `yunti_clear_cdp_events` and do not copy raw CDP payloads into learning memory.
+- Prefer sanitized network and console diagnostics before raw CDP events.
+- Treat `yunti_get_cdp_events` as raw low-level diagnostics. Filter by `method`, keep `limit` small, clear it after debugging with `yunti_clear_cdp_events`, and do not copy raw CDP payloads into chat, docs, or learning memory.
 - Use `yunti_observe_page` with `redaction: "strict"` when a page may contain personal information. Strict DOM redaction hides likely email, phone, Luhn-valid payment-card-like values, address-like text, page titles, labels, names, visible text, placeholders, values, and select option text.
 - Keep `redaction: "off"` only for explicit local debugging.
 - If a tool output appears to include sensitive data, summarize only the safe parts.
-- DOM observation redaction does not mean screenshots are redacted; treat screenshots as visible page pixels.
+- DOM observation redaction does not mean screenshots are redacted; treat screenshots as visible page pixels. Use screenshots only when visual proof is needed, prefer viewport captures when enough, and summarize safe visual findings instead of storing raw images in learning memory.
 
 ## Recovery
 

@@ -11,6 +11,19 @@ For any browser task, first call `yunti_get_tool_usage_hints` unless the user is
 
 Then call `yunti_list_browser_targets` to understand the live browser state before choosing a page or tab.
 
+## Default Page Operation Contract
+
+1. Call `yunti_get_tool_usage_hints` when tool usage is uncertain.
+2. Call `yunti_list_browser_targets` and choose the intended `browserSessionId`.
+3. Call `yunti_observe_page` before page actions.
+4. Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations.
+5. After each action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.
+6. For async rendering, validation, navigation, option loading, or infinite scroll, call `yunti_wait_for`, then `yunti_observe_page`, then continue with a fresh uid.
+7. If a result has `ok: false`, `code`, `recoveryHint`, or `nextStepHint`, follow that guidance before retrying.
+8. Use selector or coordinate fallback only when fresh uids are unavailable or as an explicit recovery/debugging path.
+
+Ask the user before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, changing production data, exposing secrets, or taking an action whose effect cannot be verified from page state.
+
 ## Routing Rules
 
 - Treat `yunti_list_browser_targets` as the canonical live browser inventory.

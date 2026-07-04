@@ -13,7 +13,7 @@ export const TOOLS = [
         },
         topic: {
           type: "string",
-          enum: ["all", "browser", "cdp", "tabs", "memory", "network", "console"],
+          enum: ["all", "browser", "cdp", "tabs", "memory", "network", "console", "workflow"],
           description: "Optional topic filter. Defaults to all.",
         },
       },
@@ -1260,6 +1260,7 @@ export function toolUsageHints(args = {}) {
     memory: ["yunti_get_learning_memory", "yunti_remember_learning", "yunti_forget_learning_memory"],
     network: ["yunti_get_network_log", "yunti_list_network_requests", "yunti_get_network_request", "yunti_clear_network_requests"],
     console: ["yunti_list_console_messages", "yunti_get_console_message", "yunti_clear_console_messages"],
+    workflow: ["yunti_get_tool_usage_hints", "yunti_list_browser_targets", "yunti_observe_page", "yunti_wait_for"],
   }
   const selectedNames = requestedTool
     ? [requestedTool]
@@ -1319,6 +1320,33 @@ export function toolUsageHints(args = {}) {
         "For async UI transitions, use yunti_wait_for for expected text/selector/state, read ok/code/nextStepHint, then yunti_observe_page, then continue with a fresh uid instead of reusing the old target.",
         "If the target tab is uncertain, call yunti_list_browser_targets and switch to the intended browserSessionId.",
         "Use selector or coordinate fallbacks only as recovery/debugging paths, not as the default when fresh uids are available.",
+      ],
+      defaultPageOperation: [
+        "Call yunti_get_tool_usage_hints when tool usage is uncertain.",
+        "Call yunti_list_browser_targets and choose the intended browserSessionId.",
+        "Call yunti_observe_page before page actions and use fresh uids whenever possible.",
+        "After every action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.",
+        "For async rendering, validation, navigation, option loading, or infinite scroll, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
+        "If a result has ok=false, code, recoveryHint, or nextStepHint, follow that guidance before retrying.",
+        "Use selector or coordinate fallback only when fresh uids are unavailable or as an explicit recovery/debugging path.",
+      ],
+      confirmationBoundary: [
+        "Ask the user before submitting forms that change production data.",
+        "Ask the user before deleting, approving, purchasing, publishing, or sending messages.",
+        "Ask the user before uploading sensitive files.",
+        "Ask the user before exposing or copying secrets, credentials, cookies, auth headers, tokens, or private keys.",
+        "Ask the user before taking an action whose effect cannot be verified from page state.",
+      ],
+      copyableAgentPrompt: [
+        "Please operate my browser through Yunti Browser Runtime.",
+        "Call yunti_list_browser_targets, choose the intended browserSessionId, then use yunti_observe_page before page actions.",
+        "Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations.",
+        "After each action or wait, observe again and verify the result before continuing.",
+        "For async UI, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
+        "If ok=false, code, recoveryHint, or nextStepHint appears, follow that guidance before retrying.",
+        "Use selector or coordinate fallback only as recovery/debugging paths.",
+        "Ask me before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, or changing production data.",
+        "Do not expose raw cookies, passwords, auth headers, tokens, private keys, or other secrets.",
       ],
       actionResultContract: [
         "Current action outputs are compatibility-shaped: click/hover/fill/scroll/wait may return clicked, hovered, filled, scrolled, found, uid, selector, x/y, method, valueLength, waitedMs, before/after, and browserSessionId depending on the tool path.",

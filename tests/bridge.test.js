@@ -714,6 +714,41 @@ test("mcp usage hints include action recovery guidance", async () => {
   assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /coordinate fallbacks/)
 })
 
+test("mcp usage hints expose default agent workflow contract", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { topic: "workflow" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  const defaultWorkflow = payload.workflows.defaultPageOperation.join("\n")
+  const confirmationBoundary = payload.workflows.confirmationBoundary.join("\n")
+  const copyablePrompt = payload.workflows.copyableAgentPrompt.join("\n")
+
+  assert.deepEqual(Object.keys(payload.tools), [
+    "yunti_get_tool_usage_hints",
+    "yunti_list_browser_targets",
+    "yunti_observe_page",
+    "yunti_wait_for",
+  ])
+  assert.match(defaultWorkflow, /yunti_list_browser_targets/)
+  assert.match(defaultWorkflow, /yunti_observe_page/)
+  assert.match(defaultWorkflow, /fresh uid/)
+  assert.match(defaultWorkflow, /yunti_wait_for/)
+  assert.match(defaultWorkflow, /recoveryHint/)
+  assert.match(confirmationBoundary, /submitting forms/)
+  assert.match(confirmationBoundary, /uploading sensitive files/)
+  assert.match(confirmationBoundary, /secrets/)
+  assert.match(copyablePrompt, /Please operate my browser through Yunti Browser Runtime/)
+  assert.match(copyablePrompt, /Ask me before submitting/)
+})
+
 test("mcp usage hints document action result contract", async () => {
   const response = await handleJsonRpc({
     jsonrpc: "2.0",

@@ -6,7 +6,7 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.3.1 agent workflow contract, with P6.1.4
+Current implementation focus: P6.3.2 Tool Guide minimal use cases, with P6.1.4
 real-browser closure still pending on Playwright/Chromium availability.
 
 Latest visible 0.2.0 phase split:
@@ -37,9 +37,13 @@ Latest visible 0.2.0 phase split:
 - P6.2.7 completed: structured action result coverage is now captured in
   `docs/ACTION_RESULT_COVERAGE.md` and checked by
   `npm run check:action-results`, which is part of `npm run release:check`.
-- P6.3.1 next: document the default agent workflow contract and copyable
-  prompts; if Playwright/Chromium becomes available first, close P6.1.4
-  real-browser `observe -> click uid -> observe/verify` validation.
+- P6.3.1 completed: `docs/AGENT_WORKFLOW_CONTRACT.md`,
+  `yunti_get_tool_usage_hints` workflow hints, Tool Guide, and the packaged
+  skill now share the same default agent workflow contract and copyable prompt.
+- P6.3.2 next: add minimal Tool Guide / skill use cases for click, form fill,
+  scroll-to-find, tab switching, and async wait workflows; if
+  Playwright/Chromium becomes available first, close P6.1.4 real-browser
+  `observe -> click uid -> observe/verify` validation.
 
 Latest detailed P6.2 status:
 
@@ -102,7 +106,20 @@ Latest detailed P6.2 status:
   `npm run release:check` passed with 116 node:test cases total, 115 passing
   and 1 default real-browser smoke skipped, plus npm package contents
   validation with 44 files and extension zip contents validation with 13 files.
-- Next: implement P6.3.1 agent workflow contract and copyable prompts, or close
+- Completed: P6.3.1 agent workflow contract. `docs/AGENT_WORKFLOW_CONTRACT.md`
+  records the default browser operation loop, recovery rules, confirmation
+  boundary, copyable prompt, and non-goals. `yunti_get_tool_usage_hints` now
+  accepts `topic: "workflow"` and returns `defaultPageOperation`,
+  `confirmationBoundary`, and `copyableAgentPrompt`. Tool Guide and packaged
+  skill now include the same default page operation contract.
+- Latest P6.3.1 validation: `node --test tests/bridge.test.js` passed 67
+  tests; `git diff --check` passed; token residue grep returned no matches;
+  `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is not
+  installed in the current environment; `npm run release:check` passed with
+  117 node:test cases total, 116 passing and 1 default real-browser smoke
+  skipped, plus npm package contents validation with 45 files and extension zip
+  contents validation with 13 files.
+- Next: implement P6.3.2 minimal use cases in Tool Guide and skill, or close
   P6.1.4 first if Playwright/Chromium is available for real-browser closure.
 
 ## Current State
@@ -872,9 +889,10 @@ Latest detailed P6.2 status:
   subphases are P6.2.1 action result coverage, P6.2.2 select semantics, P6.2.3
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
   guidance, P6.2.6 structured `yunti_wait_for` results, and P6.2.7 automated
-  action result coverage audit. The next anchored slice is P6.3.1 agent
-  workflow contract, unless Playwright/Chromium is available to close P6.1.4
-  real-browser validation first.
+  action result coverage audit, and P6.3.1 agent workflow contract. The next
+  anchored slice is P6.3.2 minimal Tool Guide use cases, unless
+  Playwright/Chromium is available to close P6.1.4 real-browser validation
+  first.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

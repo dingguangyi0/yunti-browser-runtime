@@ -6,8 +6,8 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.5.2 optional local runtime console diagnostic
-enhancement. P6.5.1 minimum console loop is implemented.
+Current implementation focus: P6.5.3 optional local runtime console real-browser
+validation and UX closeout. P6.5.2 diagnostic polish is implemented.
 
 Latest visible 0.2.0 phase split:
 
@@ -60,8 +60,11 @@ Latest visible 0.2.0 phase split:
   serves `/console`, `/console/state`, and `/console/cancel-pending`; the CLI
   exposes `yunti-browser-runtime console`; state uses sanitized summaries by
   default and remains protected when bridge auth is enabled.
-- P6.5.2 next: local console diagnostic polish, extension/bridge version
-  warnings, stronger empty-state guidance, and real-browser manual validation.
+- P6.5.2 completed: local console diagnostic polish now includes `HEAD
+  /console`, runtime/expected-extension/session-extension version summaries,
+  extension version mismatch warnings, visible warning cards, doctor console URL
+  output, and stronger no-page recovery guidance.
+- P6.5.3 next: real-browser console validation and UX closeout.
 
 Latest detailed P6.2 status:
 
@@ -232,9 +235,21 @@ Latest detailed P6.2 status:
   `npm run release:check` passed, including 11 action-result coverage rows, npm
   package contents validation with 45 files, and extension zip contents
   validation with 13 files.
-- Next: implement P6.5.2 local console diagnostic polish, including
-  extension/bridge version warnings, stronger empty-state guidance, doctor
-  human-summary integration if useful, and real-browser manual validation.
+- Completed: P6.5.2 local console diagnostic polish. Extension sessions now
+  report `client.extensionVersion`; console state reports runtime and expected
+  extension versions, session extension versions, and warning entries for no
+  connected pages, unknown extension version, or mismatched extension/runtime
+  versions. The `/console` route now supports `HEAD` for simple probes, the
+  console UI renders warning cards and version metadata, and `doctor` JSON plus
+  human summary now include the optional console URL.
+- Latest P6.5.2 validation: `git diff --check` passed; token residue grep
+  returned no matches; `npm run check` passed; `npm test` passed with 126
+  node:test cases total, 125 passing and 1 default real-browser smoke skipped;
+  `YUNTI_E2E=1 npm run test:e2e` passed with 1 real-browser smoke test;
+  `npm run release:check` passed, including 11 action-result coverage rows, npm
+  package contents validation with 45 files, and extension zip contents
+  validation with 13 files.
+- Next: implement P6.5.3 real-browser console validation and UX closeout.
 
 ## Current State
 
@@ -1003,9 +1018,9 @@ Latest detailed P6.2 status:
   action result coverage audit, P6.3.1 agent workflow contract, P6.3.2 minimal
   Tool Guide use cases, P6.4.1 DOM redaction policy deepening, P6.4.2 learning
   memory / console diagnostic secret-boundary tightening, P6.4.3 raw CDP /
-  screenshot non-redaction diagnostic guidance, and P6.5.1 optional local
-  runtime console minimum loop. The next anchored slice is P6.5.2 local console
-  diagnostic polish.
+  screenshot non-redaction diagnostic guidance, P6.5.1 optional local runtime
+  console minimum loop, and P6.5.2 local console diagnostic polish. The next
+  anchored slice is P6.5.3 real-browser console validation and UX closeout.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

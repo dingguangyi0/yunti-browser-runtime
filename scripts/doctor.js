@@ -68,6 +68,7 @@ async function checkBridge() {
       authRequired,
       status: health.status,
       url: bridgeUrl,
+      consoleUrl: `${bridgeUrl}/console`,
       tokenConfigured: Boolean(bridgeToken),
       tokenHeader: bridgeTokenHeader,
       userId: routeUserId,
@@ -85,6 +86,7 @@ async function checkBridge() {
       authorized: false,
       authRequired: Boolean(bridgeToken),
       url: bridgeUrl,
+      consoleUrl: `${bridgeUrl}/console`,
       tokenConfigured: Boolean(bridgeToken),
       tokenHeader: bridgeTokenHeader,
       userId: routeUserId,
@@ -119,6 +121,7 @@ function buildNextSteps(checks) {
   }
   if (checks.bridge.ok && !checks.bridge.extensionConnected) {
     steps.push("Load the extension, open an http/https page, then refresh the target page.")
+    steps.push(`Open the optional local console for live status: ${checks.bridge.consoleUrl}.`)
   }
   if (!checks.mcpServer.ok) {
     steps.push(`Restore the MCP server file at ${checks.mcpServer.path}.`)
@@ -134,6 +137,7 @@ function humanSummary(report) {
     `Yunti Browser Runtime doctor: ${report.ok ? "OK" : "needs attention"}`,
     `- Node: ${report.checks.node.version} (${report.checks.node.ok ? "ok" : "requires >=22"})`,
     `- Bridge: ${report.checks.bridge.reachable ? report.checks.bridge.url : "not reachable"}`,
+    `- Console: ${report.checks.bridge.reachable ? report.checks.bridge.consoleUrl : "not available until bridge starts"}`,
     `- Token: ${report.checks.bridge.authRequired ? report.checks.bridge.authorized ? "valid" : "missing or invalid" : "not required for local loopback"}`,
     `- Sessions: ${report.checks.bridge.visibleSessionCount} visible, active ${report.checks.bridge.activeSessionId || "none"}`,
     `- Extension: ${report.checks.bridge.extensionConnected ? "connected" : "not detected"}`,

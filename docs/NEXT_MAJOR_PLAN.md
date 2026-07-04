@@ -614,12 +614,19 @@ P6.5.1 completed:
 - `yunti-browser-runtime console` CLI entry that starts the bridge and prints
   the console URL.
 
+P6.5.2 completed:
+
+- `HEAD /console` works for simple local probes.
+- Console state includes runtime version, expected extension version, connected
+  session extension versions, and warning entries.
+- Extension sessions report `client.extensionVersion`.
+- Console UI renders version metadata and warning cards.
+- `doctor` JSON and human summary include the optional console URL.
+
 Remaining P6.5 work:
 
-- extension/bridge version mismatch warnings;
-- stronger no-page and stale-session recovery guidance;
-- optional doctor human-summary console URL hint;
 - real-browser operator validation from empty state to connected page.
+- UX closeout for stale-session and extension-not-loaded recovery branches.
 
 ### P6.6 Extension Distribution Readiness
 

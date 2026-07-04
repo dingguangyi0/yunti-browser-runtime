@@ -300,6 +300,7 @@ function normalizeClientInfo(client) {
   const value = client && typeof client === "object" ? client : {}
   return {
     family: normalizeBrowserFamily(value.family || value.userAgent),
+    extensionVersion: String(value.extensionVersion || "").slice(0, 80),
     userAgent: String(value.userAgent || "").slice(0, 500),
     platform: String(value.platform || "").slice(0, 120),
     language: String(value.language || "").slice(0, 80),
@@ -308,6 +309,7 @@ function normalizeClientInfo(client) {
 
 function getBackgroundClientInfo() {
   return {
+    extensionVersion: chrome.runtime?.getManifest?.().version || "",
     userAgent: String(globalThis.navigator?.userAgent || ""),
     platform: String(globalThis.navigator?.platform || ""),
     language: String(globalThis.navigator?.language || ""),

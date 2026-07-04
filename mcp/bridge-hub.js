@@ -62,6 +62,7 @@ function summarizeObject(value) {
 
 function summarizeSession(session, activeSessionId) {
   const meta = session.meta || {}
+  const client = meta.client && typeof meta.client === "object" ? meta.client : {}
   return {
     browserSessionId: session.browserSessionId,
     active: session.browserSessionId === activeSessionId,
@@ -72,6 +73,8 @@ function summarizeSession(session, activeSessionId) {
     url: meta.url ? sanitizeUrl(meta.url) : "",
     tabId: meta.tabId ?? null,
     windowId: meta.windowId ?? null,
+    clientFamily: redactLikelySensitiveText(client.family || "", 80),
+    extensionVersion: redactLikelySensitiveText(client.extensionVersion || meta.extensionVersion || "", 80),
     queuedRequests: session.queue.length,
     pollers: session.pollers.length,
     updatedAt: meta.updatedAt || "",
@@ -783,6 +786,10 @@ export class BridgeHub {
       ok: true,
       name: "yunti-browser-runtime-console",
       generatedAt: new Date().toISOString(),
+      runtime: {
+        version: redactLikelySensitiveText(args.runtimeVersion || "", 80),
+        expectedExtensionVersion: redactLikelySensitiveText(args.expectedExtensionVersion || "", 80),
+      },
       sessionCount: sessions.length,
       activeSessionId: userId ? this.activeSessionByUser.get(userId) || null : this.activeSessionId,
       sessions,
@@ -798,14 +805,54 @@ export class BridgeHub {
         .filter((event) => !event.browserSessionId || browserSessionIds.has(event.browserSessionId))
         .slice(-30)
         .reverse(),
+      warnings: consoleWarnings(sessions, {
+        expectedExtensionVersion: args.expectedExtensionVersion,
+      }),
       guidance: {
         noSessions:
-          "Start yunti-browser-runtime bridge, load the extension, open or refresh an http/https page, then run yunti-browser-runtime doctor.",
+          "Keep this bridge running, load or reload the extension, open an http/https page, refresh that page, then run yunti-browser-runtime doctor.",
         staleSession:
           "Refresh the page or reload the extension, then call yunti_list_browser_targets before retrying browser tools.",
+        versionMismatch:
+          "Reload the unpacked extension from the current package directory, then refresh open http/https pages.",
         cancellation:
           "Cancel only clears runtime pending/queued requests; it does not undo browser-side effects that already happened.",
       },
     }
   }
+}
+
+function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
+  const warnings = []
+  if (sessions.length === 0) {
+    warnings.push({
+      code: "NO_CONNECTED_PAGES",
+      severity: "warning",
+      message:
+        "No browser pages are connected. Load or reload the extension, open an http/https page, and refresh the page.",
+    })
+    return warnings
+  }
+  const expected = String(expectedExtensionVersion || "").trim()
+  if (!expected) return warnings
+  const versions = new Set(sessions.map((session) => session.extensionVersion).filter(Boolean))
+  if (versions.size === 0) {
+    warnings.push({
+      code: "EXTENSION_VERSION_UNKNOWN",
+      severity: "info",
+      message:
+        "Connected extension did not report a version. Reload the extension if you recently upgraded the runtime.",
+    })
+    return warnings
+  }
+  for (const version of versions) {
+    if (version !== expected) {
+      warnings.push({
+        code: "EXTENSION_VERSION_MISMATCH",
+        severity: "warning",
+        message: `Connected extension version ${version} does not match runtime package version ${expected}. Reload the unpacked extension from the current package directory.`,
+      })
+    }
+  }
+  return warnings
 }

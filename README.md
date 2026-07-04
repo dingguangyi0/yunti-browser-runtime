@@ -68,6 +68,7 @@ http://127.0.0.1:48887/console
 
 控制台只展示连接页面、pending/queued 任务、最近工具 activity 和诊断数量等脱敏摘要；
 它不是必选 hub，也不会改变 Agent 的 MCP 使用路径。
+`yunti-browser-runtime doctor` 的人类可读摘要也会打印这个控制台 URL。
 
 其他常用 CLI：
 

@@ -1,4 +1,7 @@
 import http from "node:http"
+import { readFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   BridgeHub,
   DEFAULT_SESSION_TTL_MS,
@@ -22,6 +25,9 @@ const RELAY_TOKEN = process.env.YUNTI_BROWSER_RELAY_TOKEN || ""
 const SERVER_NAME = process.env.YUNTI_BROWSER_SERVER_NAME || "Yunti Browser Runtime"
 const _ROUTE_USER_ID = process.env.YUNTI_BROWSER_USER_ID || "local"
 const _ROUTE_USER_NAME = process.env.YUNTI_BROWSER_USER_NAME || "local"
+const PACKAGE_VERSION = readJsonFile(resolve(dirname(fileURLToPath(import.meta.url)), "..", "package.json")).version || ""
+const EXTENSION_VERSION =
+  readJsonFile(resolve(dirname(fileURLToPath(import.meta.url)), "..", "extension", "manifest.json")).version || ""
 const MAX_JSON_BYTES = 2 * 1024 * 1024
 const SESSION_CLEANUP_INTERVAL_MS = Number(
   process.env.YUNTI_BROWSER_SESSION_CLEANUP_INTERVAL_MS || 15_000
@@ -45,6 +51,14 @@ function normalizeBaseUrl(value) {
   return String(value || "")
     .trim()
     .replace(/\/+$/, "")
+}
+
+function readJsonFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"))
+  } catch {
+    return {}
+  }
 }
 
 function normalizeBridgeToken(value) {
@@ -114,12 +128,12 @@ function sendJson(req, res, statusCode, value, { allowOrigins = DEFAULT_ALLOWED_
   res.end(body)
 }
 
-function sendHtml(res, statusCode, html) {
+function sendHtml(req, res, statusCode, html) {
   res.writeHead(statusCode, {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
   })
-  res.end(html)
+  res.end(req.method === "HEAD" ? "" : html)
 }
 
 function bridgeRequestToken(req) {
@@ -236,8 +250,8 @@ export async function startBridgeServer({
         return
       }
 
-      if (req.method === "GET" && (url.pathname === "/console" || url.pathname === "/console/")) {
-        sendHtml(res, 200, localConsoleHtml({ authRequired, tokenHeader: BRIDGE_TOKEN_HEADER }))
+      if ((req.method === "GET" || req.method === "HEAD") && (url.pathname === "/console" || url.pathname === "/console/")) {
+        sendHtml(req, res, 200, localConsoleHtml({ authRequired, tokenHeader: BRIDGE_TOKEN_HEADER }))
         return
       }
 
@@ -258,7 +272,17 @@ export async function startBridgeServer({
 
       if (req.method === "GET" && url.pathname === "/console/state") {
         const userId = url.searchParams.get("userId") || _ROUTE_USER_ID
-        sendJson(req, res, 200, hub.consoleState({ userId }), { allowOrigins })
+        sendJson(
+          req,
+          res,
+          200,
+          hub.consoleState({
+            userId,
+            runtimeVersion: PACKAGE_VERSION,
+            expectedExtensionVersion: EXTENSION_VERSION || PACKAGE_VERSION,
+          }),
+          { allowOrigins }
+        )
         return
       }
 
@@ -408,6 +432,8 @@ function localConsoleHtml({ authRequired, tokenHeader }) {
       .status { display: inline-flex; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: color-mix(in srgb, LinkText 16%, transparent); }
       .warn { color: #9f4e00; }
       .error { color: #b3261e; }
+      .warning-list { display: grid; gap: 8px; margin: 0 0 12px; }
+      .warning-item { border: 1px solid color-mix(in srgb, #9f4e00 50%, transparent); border-radius: 8px; padding: 10px; }
       .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
       @media (max-width: 640px) { main { padding: 16px; } header { align-items: flex-start; flex-direction: column; } }
     </style>
@@ -425,10 +451,12 @@ function localConsoleHtml({ authRequired, tokenHeader }) {
         </div>
       </header>
       <section id="auth" class="panel" hidden></section>
+      <section id="warnings" class="warning-list" aria-live="polite"></section>
       <section class="grid" aria-live="polite">
         <div class="panel"><h2>Sessions</h2><div id="sessionCount" class="metric">-</div><div class="muted">connected browser pages</div></div>
         <div class="panel"><h2>Pending</h2><div id="pendingCount" class="metric">-</div><div class="muted">runtime requests waiting for results</div></div>
         <div class="panel"><h2>Diagnostics</h2><div id="diagCount" class="metric">-</div><div class="muted">sanitized network, console, and CDP summaries</div></div>
+        <div class="panel"><h2>Runtime</h2><div id="runtimeVersion" class="metric">-</div><div class="muted">expected extension <span id="extensionVersion">-</span></div></div>
       </section>
       <section class="panel" style="margin-top: 12px;">
         <h2>Connected Pages</h2>
@@ -488,15 +516,23 @@ function localConsoleHtml({ authRequired, tokenHeader }) {
         document.querySelector("#sessionCount").textContent = state.sessionCount || 0;
         document.querySelector("#pendingCount").textContent = pending;
         document.querySelector("#diagCount").textContent = (diagnostics.networkEvents || 0) + (diagnostics.consoleMessages || 0) + (diagnostics.cdpEvents || 0);
+        document.querySelector("#runtimeVersion").textContent = state.runtime?.version || "-";
+        document.querySelector("#extensionVersion").textContent = state.runtime?.expectedExtensionVersion || "-";
+        document.querySelector("#warnings").innerHTML = renderWarnings(state);
         document.querySelector("#sessions").innerHTML = renderSessions(state);
         document.querySelector("#activity").innerHTML = renderActivity(state);
+      }
+
+      function renderWarnings(state) {
+        if (!state.warnings || state.warnings.length === 0) return "";
+        return state.warnings.map((warning) => '<div class="warning-item"><strong>' + escapeHtml(text(warning.code)) + '</strong><div>' + escapeHtml(text(warning.message)) + '</div></div>').join("");
       }
 
       function renderSessions(state) {
         if (!state.sessions || state.sessions.length === 0) {
           return '<div>No connected pages. ' + escapeHtml(state.guidance?.noSessions || "") + '</div>';
         }
-        return state.sessions.map((session) => '<div class="row"><div><span class="status">' + (session.active ? "active" : "connected") + '</span> <strong>' + escapeHtml(text(session.title || session.displayName)) + '</strong></div><div><code>' + escapeHtml(text(session.url)) + '</code></div><div class="muted">tab ' + escapeHtml(text(session.tabId)) + ' · queued ' + escapeHtml(text(session.queuedRequests)) + ' · last seen ' + escapeHtml(text(session.lastSeenAt)) + '</div></div>').join("");
+        return state.sessions.map((session) => '<div class="row"><div><span class="status">' + (session.active ? "active" : "connected") + '</span> <strong>' + escapeHtml(text(session.title || session.displayName)) + '</strong></div><div><code>' + escapeHtml(text(session.url)) + '</code></div><div class="muted">tab ' + escapeHtml(text(session.tabId)) + ' · extension ' + escapeHtml(text(session.extensionVersion)) + ' · queued ' + escapeHtml(text(session.queuedRequests)) + ' · last seen ' + escapeHtml(text(session.lastSeenAt)) + '</div></div>').join("");
       }
 
       function renderActivity(state) {

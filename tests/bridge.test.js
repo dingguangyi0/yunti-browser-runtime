@@ -114,6 +114,10 @@ test("local bridge defaults to no token requirement", async () => {
 
 test("local runtime console exposes an optional page and sanitized state", async () => {
   await withHttpBridge(async ({ baseUrl }) => {
+    const head = await fetch(`${baseUrl}/console`, { method: "HEAD" })
+    assert.equal(head.status, 200)
+    assert.match(head.headers.get("content-type"), /text\/html/)
+
     const page = await readTextResponse(await fetch(`${baseUrl}/console`))
     assert.equal(page.status, 200)
     assert.match(page.headers.get("content-type"), /text\/html/)
@@ -129,6 +133,7 @@ test("local runtime console exposes an optional page and sanitized state", async
         title: "Checkout owner@example.test",
         url: "https://shop.example.test/cart?token=secret-token-1234567890",
         tabId: 7,
+        client: { family: "chrome", extensionVersion: "0.1.3" },
       }),
     })
 
@@ -137,12 +142,37 @@ test("local runtime console exposes an optional page and sanitized state", async
     }))
     assert.equal(state.status, 200)
     assert.equal(state.body.ok, true)
+    assert.equal(state.body.runtime.version, "0.1.3")
+    assert.equal(state.body.runtime.expectedExtensionVersion, "0.1.3")
     assert.equal(state.body.sessionCount, 1)
     assert.equal(state.body.sessions[0].browserSessionId, "tab-1")
+    assert.equal(state.body.sessions[0].extensionVersion, "0.1.3")
+    assert.deepEqual(state.body.warnings, [])
     assert.doesNotMatch(JSON.stringify(state.body), /owner@example\.test/)
     assert.doesNotMatch(JSON.stringify(state.body), /secret-token-1234567890/)
-    assert.match(state.body.guidance.noSessions, /load the extension/)
+    assert.match(state.body.guidance.noSessions, /reload the extension/)
   })
+})
+
+test("local runtime console reports extension version mismatch warnings", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "tab-1",
+    userId: "u1",
+    client: { family: "chrome", extensionVersion: "0.1.0" },
+  })
+
+  const state = hub.consoleState({
+    userId: "u1",
+    runtimeVersion: "0.1.3",
+    expectedExtensionVersion: "0.1.3",
+  })
+
+  assert.equal(state.runtime.version, "0.1.3")
+  assert.equal(state.sessions[0].extensionVersion, "0.1.0")
+  assert.equal(state.warnings[0].code, "EXTENSION_VERSION_MISMATCH")
+  assert.match(state.warnings[0].message, /0\.1\.0/)
+  assert.match(state.guidance.versionMismatch, /Reload the unpacked extension/)
 })
 
 test("local runtime console state stays protected when bridge auth is enabled", async () => {

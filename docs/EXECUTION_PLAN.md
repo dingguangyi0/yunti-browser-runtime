@@ -71,8 +71,8 @@
 | P6.2.6 | 已完成 | `yunti_wait_for` 自身结构化 action result 与恢复语义 |
 | P6.2.7 | 已完成 | 结构化 action result 覆盖审计与真实浏览器闭环补验准备 |
 | P6.3.1 | 已完成 | Agent 默认工作流契约与可复制提示词 |
-| P6.3.2 | 下一步 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
-| P6.4.1 | 计划中 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
+| P6.3.2 | 已完成 | Tool Guide 最小用例：点击、填表、滚动找元素、切 tab、等待异步结果 |
+| P6.4.1 | 下一步 | DOM 脱敏策略深化，与 network/console redaction 对齐 |
 | P6.5.1 | 计划中 | 可选本地运行时控制台 |
 | P6.6.1 | 计划中 | 浏览器扩展分发准备 |
 
@@ -183,6 +183,18 @@
 - 下一步固定为 P6.3.2：在 Tool Guide 和 skill 中补齐最小用例，包括点击、填表、
   滚动找元素、切 tab、等待异步结果，并确保这些用例复用 P6.3.1 默认循环和 P6.2
   结构化结果读取规则。
+- P6.3.2 已完成：`docs/TOOL_GUIDE.md` 和 packaged skill 已补齐五个最小用例：
+  Click、Fill Form、Scroll To Find、Switch Tab、Wait For Async Result；
+  `yunti_get_tool_usage_hints` 的 `workflow` topic 现在返回 `minimalUseCases`，
+  包含 `clickByUid`、`fillForm`、`scrollToFind`、`switchTab` 和
+  `waitForAsyncResult`，并由 `tests/bridge.test.js` 锁住关键规则。
+- P6.3.2 最新验证：`node --test tests/bridge.test.js` 通过 68 个用例；`git diff --check`
+  通过；token 残留检查无输出；`YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少
+  Playwright/Chromium 跳过；`npm run release:check` 通过，覆盖 118 个 node:test 用例，
+  其中 117 个通过、1 个真实浏览器 smoke 默认跳过，并完成 npm package 内容检查 45 个文件和
+  extension zip 内容检查 13 个文件。
+- 下一步固定为 P6.4.1：深化 DOM 脱敏策略，并与 network/console redaction 的术语和
+  安全边界对齐；继续保持 screenshots 不承诺被 DOM redaction 遮蔽的说明。
 
 ## 压缩上下文恢复锚点
 
@@ -207,8 +219,7 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.3.2：补齐 Tool Guide 最小用例，包括点击、填表、滚动找元素、切 tab、
-等待异步结果。如果当前环境已经具备
+当前锚点是 P6.4.1：深化 DOM 脱敏策略，并与 network/console redaction 对齐。如果当前环境已经具备
 Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
 observe -> click uid -> observe/verify 闭环。保留现有兼容字段，必要时更新
 mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、

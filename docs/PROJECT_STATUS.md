@@ -6,7 +6,7 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.3.2 Tool Guide minimal use cases, with P6.1.4
+Current implementation focus: P6.4.1 DOM redaction policy deepening, with P6.1.4
 real-browser closure still pending on Playwright/Chromium availability.
 
 Latest visible 0.2.0 phase split:
@@ -40,10 +40,13 @@ Latest visible 0.2.0 phase split:
 - P6.3.1 completed: `docs/AGENT_WORKFLOW_CONTRACT.md`,
   `yunti_get_tool_usage_hints` workflow hints, Tool Guide, and the packaged
   skill now share the same default agent workflow contract and copyable prompt.
-- P6.3.2 next: add minimal Tool Guide / skill use cases for click, form fill,
-  scroll-to-find, tab switching, and async wait workflows; if
-  Playwright/Chromium becomes available first, close P6.1.4 real-browser
-  `observe -> click uid -> observe/verify` validation.
+- P6.3.2 completed: Tool Guide, packaged skill, and `yunti_get_tool_usage_hints`
+  now expose minimal workflows for click, form fill, scroll-to-find, tab
+  switching, and async wait.
+- P6.4.1 next: deepen DOM redaction policy and align terminology with
+  network/console redaction; if Playwright/Chromium becomes available first,
+  close P6.1.4 real-browser `observe -> click uid -> observe/verify`
+  validation.
 
 Latest detailed P6.2 status:
 
@@ -121,6 +124,21 @@ Latest detailed P6.2 status:
   contents validation with 13 files.
 - Next: implement P6.3.2 minimal use cases in Tool Guide and skill, or close
   P6.1.4 first if Playwright/Chromium is available for real-browser closure.
+- Completed: P6.3.2 minimal use cases. Tool Guide and packaged skill now cover
+  Click, Fill Form, Scroll To Find, Switch Tab, and Wait For Async Result.
+  `yunti_get_tool_usage_hints` now returns matching `minimalUseCases` under
+  the `workflow` topic, and bridge tests lock the five keys plus critical
+  guidance such as fresh observation, field state, `scrollableContainers[]`,
+  `Target.activateTarget`, and `WAIT_TIMEOUT`.
+- Latest P6.3.2 validation: `node --test tests/bridge.test.js` passed 68
+  tests; `git diff --check` passed; token residue grep returned no matches;
+  `YUNTI_E2E=1 npm run test:e2e` skipped because Playwright/Chromium is not
+  installed in the current environment; `npm run release:check` passed with
+  118 node:test cases total, 117 passing and 1 default real-browser smoke
+  skipped, plus npm package contents validation with 45 files and extension zip
+  contents validation with 13 files.
+- Next: implement P6.4.1 DOM redaction policy deepening, or close P6.1.4 first
+  if Playwright/Chromium is available for real-browser closure.
 
 ## Current State
 
@@ -889,10 +907,10 @@ Latest detailed P6.2 status:
   subphases are P6.2.1 action result coverage, P6.2.2 select semantics, P6.2.3
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
   guidance, P6.2.6 structured `yunti_wait_for` results, and P6.2.7 automated
-  action result coverage audit, and P6.3.1 agent workflow contract. The next
-  anchored slice is P6.3.2 minimal Tool Guide use cases, unless
-  Playwright/Chromium is available to close P6.1.4 real-browser validation
-  first.
+  action result coverage audit, P6.3.1 agent workflow contract, and P6.3.2
+  minimal Tool Guide use cases. The next anchored slice is P6.4.1 DOM redaction
+  policy deepening, unless Playwright/Chromium is available to close P6.1.4
+  real-browser validation first.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

@@ -76,6 +76,18 @@ Follow this workflow:
     screenshots.
 ```
 
+## Minimal Use Case Index
+
+The concrete P6.3.2 minimal use cases are maintained in
+[Tool Guide](TOOL_GUIDE.md#minimal-use-cases) and mirrored in the packaged
+skill:
+
+- Click
+- Fill Form
+- Scroll To Find
+- Switch Tab
+- Wait For Async Result
+
 ## Non-Goals
 
 - Do not move a built-in LLM loop into Yunti Runtime.

@@ -40,6 +40,68 @@ Ask the user before submitting, deleting, approving, purchasing, publishing,
 uploading sensitive files, changing production data, exposing secrets, or
 taking an action whose effect cannot be verified from page state.
 
+## Minimal Use Cases
+
+### Click
+
+1. Call `yunti_list_browser_targets` and select the intended
+   `browserSessionId`.
+2. Call `yunti_observe_page` and choose the target element uid from the fresh
+   observation.
+3. Call `yunti_click` with `browserSessionId` and `uid`.
+4. Read `ok`, `code`, `recoverable`, `recoveryHint`, and `nextStepHint`; if
+   recoverable, follow the hint before retrying.
+5. Call `yunti_observe_page` again or use screenshot/evaluate to verify the
+   expected page change.
+
+### Fill Form
+
+1. Call `yunti_observe_page` and inspect field state: `fillable`, `readOnly`,
+   `disabled`, `fillBlockReason`, `selectedValue`, `selectedText`, and
+   `options[]`.
+2. Fill editable fields with `yunti_fill` using fresh uids; select options with
+   `yunti_select` using `uid` / `value` or `uid` / `text`.
+3. For multiple fields, use `yunti_fill_form` when fields are known and inspect
+   per-field `results[]`.
+4. If async validation or option loading occurs, call `yunti_wait_for`, then
+   `yunti_observe_page`, then continue with fresh uids.
+5. Before submitting or changing production data, ask the user for
+   confirmation.
+
+### Scroll To Find
+
+1. Call `yunti_observe_page` and inspect `scrollableContainers[]`.
+2. Prefer `yunti_scroll` with a fresh scrollable container uid instead of
+   document scroll for nested panels.
+3. After scrolling, call `yunti_observe_page` and search the new
+   `textTree` / `elements` for the target.
+4. If `moved: false`, `partialMovement`, `edgeHint`, or `recoveryHint` appears,
+   follow that guidance before repeating the same scroll.
+5. When async content loads after scrolling, call `yunti_wait_for`, then
+   `yunti_observe_page`, then continue with a fresh scroll container uid.
+
+### Switch Tab
+
+1. Call `yunti_list_browser_targets` to inspect current tabs and browser
+   targets.
+2. Choose the intended `browserSessionId` for Yunti page tools.
+3. Use `yunti_select_page` when switching to a registered Yunti page route.
+4. Use `yunti_cdp_send_command` with `Target.activateTarget` only for raw
+   `targetId` / `tabId` browser target activation.
+5. After switching, call `yunti_observe_page` or `yunti_get_page_snapshot` to
+   verify the active page before acting.
+
+### Wait For Async Result
+
+1. Call `yunti_wait_for` with expected `text`, `selector`, or `urlContains`.
+2. If `ok: true`, call `yunti_observe_page` and use fresh uids for follow-up
+   actions.
+3. If `code: "WAIT_TIMEOUT"`, observe or inspect current page state before
+   adjusting the condition or retrying.
+4. Do not reuse pre-wait uids for newly rendered content.
+5. Verify the final result with observe, snapshot, evaluate, screenshot,
+   network, or console tools.
+
 ## Core Tools
 
 - `yunti_list_browser_targets`: canonical live inventory for tabs and targets.

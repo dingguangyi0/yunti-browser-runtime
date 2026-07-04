@@ -1348,6 +1348,43 @@ export function toolUsageHints(args = {}) {
         "Ask me before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, or changing production data.",
         "Do not expose raw cookies, passwords, auth headers, tokens, private keys, or other secrets.",
       ],
+      minimalUseCases: {
+        clickByUid: [
+          "Call yunti_list_browser_targets and select the intended browserSessionId.",
+          "Call yunti_observe_page and choose the target element uid from the fresh observation.",
+          "Call yunti_click with browserSessionId and uid.",
+          "Read ok, code, recoverable, recoveryHint, and nextStepHint; if recoverable, follow the hint before retrying.",
+          "Call yunti_observe_page again or use screenshot/evaluate to verify the expected page change.",
+        ],
+        fillForm: [
+          "Call yunti_observe_page and inspect field state: fillable, readOnly, disabled, fillBlockReason, selectedValue, selectedText, and options[].",
+          "Fill editable fields with yunti_fill using fresh uids; select options with yunti_select using uid/value or uid/text.",
+          "For multiple fields, use yunti_fill_form when fields are known and inspect per-field results[].",
+          "If async validation or option loading occurs, call yunti_wait_for, then yunti_observe_page, then continue with fresh uids.",
+          "Before submitting or changing production data, ask the user for confirmation.",
+        ],
+        scrollToFind: [
+          "Call yunti_observe_page and inspect scrollableContainers[].",
+          "Prefer yunti_scroll with a fresh scrollable container uid instead of document scroll for nested panels.",
+          "After scrolling, call yunti_observe_page and search the new textTree/elements for the target.",
+          "If moved=false, partialMovement, edgeHint, or recoveryHint appears, follow that guidance before repeating the same scroll.",
+          "When async content loads after scrolling, call yunti_wait_for, then yunti_observe_page, then continue with a fresh scroll container uid.",
+        ],
+        switchTab: [
+          "Call yunti_list_browser_targets to inspect current tabs and browser targets.",
+          "Choose the intended browserSessionId for Yunti page tools.",
+          "Use yunti_select_page when switching to a registered Yunti page route.",
+          "Use yunti_cdp_send_command with Target.activateTarget only for raw targetId/tabId browser target activation.",
+          "After switching, call yunti_observe_page or yunti_get_page_snapshot to verify the active page before acting.",
+        ],
+        waitForAsyncResult: [
+          "Call yunti_wait_for with expected text, selector, or urlContains.",
+          "If ok=true, call yunti_observe_page and use fresh uids for follow-up actions.",
+          "If code=WAIT_TIMEOUT, observe or inspect current page state before adjusting the condition or retrying.",
+          "Do not reuse pre-wait uids for newly rendered content.",
+          "Verify the final result with observe, snapshot, evaluate, screenshot, network, or console tools.",
+        ],
+      },
       actionResultContract: [
         "Current action outputs are compatibility-shaped: click/hover/fill/scroll/wait may return clicked, hovered, filled, scrolled, found, uid, selector, x/y, method, valueLength, waitedMs, before/after, and browserSessionId depending on the tool path.",
         "P6.2 target shape should be additive and structured: action, browserSessionId, target, ok, code, recoverable, nextStepHint, and before/after summaries where useful.",

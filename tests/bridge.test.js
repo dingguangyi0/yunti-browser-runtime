@@ -749,6 +749,40 @@ test("mcp usage hints expose default agent workflow contract", async () => {
   assert.match(copyablePrompt, /Ask me before submitting/)
 })
 
+test("mcp usage hints expose minimal browser workflow use cases", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { topic: "workflow" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  const useCases = payload.workflows.minimalUseCases
+
+  assert.deepEqual(Object.keys(useCases), [
+    "clickByUid",
+    "fillForm",
+    "scrollToFind",
+    "switchTab",
+    "waitForAsyncResult",
+  ])
+  assert.match(useCases.clickByUid.join("\n"), /fresh observation/)
+  assert.match(useCases.clickByUid.join("\n"), /yunti_click/)
+  assert.match(useCases.fillForm.join("\n"), /fillable/)
+  assert.match(useCases.fillForm.join("\n"), /yunti_select/)
+  assert.match(useCases.scrollToFind.join("\n"), /scrollableContainers/)
+  assert.match(useCases.scrollToFind.join("\n"), /partialMovement/)
+  assert.match(useCases.switchTab.join("\n"), /yunti_select_page/)
+  assert.match(useCases.switchTab.join("\n"), /Target.activateTarget/)
+  assert.match(useCases.waitForAsyncResult.join("\n"), /WAIT_TIMEOUT/)
+  assert.match(useCases.waitForAsyncResult.join("\n"), /pre-wait uids/)
+})
+
 test("mcp usage hints document action result contract", async () => {
   const response = await handleJsonRpc({
     jsonrpc: "2.0",

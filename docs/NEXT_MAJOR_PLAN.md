@@ -422,7 +422,7 @@ Acceptance:
 
 ### P6.2 Robust DOM Action Layer
 
-Status: planned.
+Status: in progress; minimum local console loop completed in P6.5.1.
 
 Extract DOM actions from the current content/tool handler code into a focused
 module such as `extension/dom-actions.js`. Use Page Agent's action sequencing
@@ -602,6 +602,24 @@ Acceptance:
   payloads, network bodies, or credential-like values.
 - It helps diagnose "extension loaded but no page connected" without asking the
   user to inspect logs manually.
+
+P6.5.1 completed:
+
+- Optional `/console` page served by the local bridge.
+- Protected `/console/state` JSON with sanitized session, pending request,
+  diagnostic-count, and recent activity summaries.
+- Protected `/console/cancel-pending` action for queued/runtime-pending browser
+  requests, with an explicit boundary that it does not undo browser-side
+  effects that already happened.
+- `yunti-browser-runtime console` CLI entry that starts the bridge and prints
+  the console URL.
+
+Remaining P6.5 work:
+
+- extension/bridge version mismatch warnings;
+- stronger no-page and stale-session recovery guidance;
+- optional doctor human-summary console URL hint;
+- real-browser operator validation from empty state to connected page.
 
 ### P6.6 Extension Distribution Readiness
 

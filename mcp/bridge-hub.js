@@ -14,6 +14,7 @@ export const DEFAULT_TOOL_TIMEOUT_MS = 30_000
 const MAX_NETWORK_EVENTS = 1000
 const MAX_CDP_EVENTS = 2000
 const MAX_CONSOLE_MESSAGES = 1000
+const MAX_ACTIVITY_EVENTS = 100
 const MAX_MEMORY_ITEMS = 500
 export const DEFAULT_SESSION_TTL_MS = Number(
   process.env.YUNTI_BROWSER_SESSION_TTL_MS || 90_000
@@ -42,6 +43,44 @@ function stripBrowserSessionId(args) {
   return next
 }
 
+function summarizeObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { type: typeof value }
+  }
+  const summary = {
+    type: "object",
+    keys: Object.keys(value).slice(0, 12),
+  }
+  if (typeof value.ok === "boolean") summary.ok = value.ok
+  if (typeof value.code === "string") summary.code = redactLikelySensitiveText(value.code, 120)
+  if (typeof value.action === "string") summary.action = redactLikelySensitiveText(value.action, 120)
+  if (typeof value.nextStepHint === "string") {
+    summary.nextStepHint = redactLikelySensitiveText(value.nextStepHint, 240)
+  }
+  return summary
+}
+
+function summarizeSession(session, activeSessionId) {
+  const meta = session.meta || {}
+  return {
+    browserSessionId: session.browserSessionId,
+    active: session.browserSessionId === activeSessionId,
+    userId: redactLikelySensitiveText(meta.userId || "", 120),
+    userName: redactLikelySensitiveText(meta.userName || "", 120),
+    displayName: redactLikelySensitiveText(meta.displayName || "", 160),
+    title: redactLikelySensitiveText(meta.title || "", 240),
+    url: meta.url ? sanitizeUrl(meta.url) : "",
+    tabId: meta.tabId ?? null,
+    windowId: meta.windowId ?? null,
+    queuedRequests: session.queue.length,
+    pollers: session.pollers.length,
+    updatedAt: meta.updatedAt || "",
+    lastSeenAt: meta.lastSeenAt || "",
+    expiresAt: meta.expiresAt || "",
+    staleReason: redactLikelySensitiveText(meta.staleReason || session.staleReason || "", 240),
+  }
+}
+
 export function normalizeRouteUserId(value) {
   const userId = String(value || "").trim()
   return userId && userId !== "anonymous" ? userId : ""
@@ -61,12 +100,32 @@ export class BridgeHub {
     this.networkEvents = []
     this.cdpEvents = []
     this.consoleMessages = []
+    this.activityEvents = []
     this.nextNetworkEventId = 1
     this.nextCdpEventId = 1
     this.nextConsoleMsgId = 1
+    this.nextActivityEventId = 1
     this.activeSessionId = null
     this.activeSessionByUser = new Map()
     this.sessionTtlMs = Math.max(5_000, Number(sessionTtlMs) || DEFAULT_SESSION_TTL_MS)
+  }
+
+  recordActivity(input = {}) {
+    const event = {
+      id: this.nextActivityEventId++,
+      timestamp: new Date().toISOString(),
+      type: redactLikelySensitiveText(input.type || "event", 80),
+      tool: input.tool ? redactLikelySensitiveText(input.tool, 120) : "",
+      browserSessionId: input.browserSessionId ? redactLikelySensitiveText(input.browserSessionId, 160) : "",
+      status: input.status ? redactLikelySensitiveText(input.status, 80) : "",
+      message: input.message ? redactLikelySensitiveText(input.message, 300) : "",
+      summary: input.summary && typeof input.summary === "object" ? input.summary : undefined,
+    }
+    this.activityEvents.push(event)
+    if (this.activityEvents.length > MAX_ACTIVITY_EVENTS) {
+      this.activityEvents.splice(0, this.activityEvents.length - MAX_ACTIVITY_EVENTS)
+    }
+    return event
   }
 
   sessionExpiresAt(now = Date.now()) {
@@ -106,6 +165,12 @@ export class BridgeHub {
     for (const poller of session.pollers.splice(0)) {
       poller({ type: "noop", id: randomUUID(), stale: true, reason })
     }
+    this.recordActivity({
+      type: "stale-session",
+      browserSessionId,
+      status: "stale",
+      message: reason,
+    })
     return session.meta
   }
 
@@ -329,6 +394,13 @@ export class BridgeHub {
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingRequests.delete(requestId)
+        this.recordActivity({
+          type: "tool-result",
+          tool,
+          browserSessionId,
+          status: "timeout",
+          message: `Timed out waiting for browser tool result: ${tool}`,
+        })
         reject(new Error(`Timed out waiting for browser tool result: ${tool}`))
       }, timeoutMs)
       this.pendingRequests.set(requestId, { resolve, reject, timer, browserSessionId, tool })
@@ -340,6 +412,12 @@ export class BridgeHub {
     } else {
       session.queue.push(payload)
     }
+    this.recordActivity({
+      type: "tool-request",
+      tool,
+      browserSessionId,
+      status: poller ? "sent" : "queued",
+    })
     return promise
   }
 
@@ -596,10 +674,138 @@ export class BridgeHub {
     clearTimeout(pending.timer)
     this.pendingRequests.delete(requestId)
     if (ok) {
+      this.recordActivity({
+        type: "tool-result",
+        tool: pending.tool,
+        browserSessionId: pending.browserSessionId,
+        status: "ok",
+        summary: summarizeObject(result),
+      })
       pending.resolve(result ?? null)
     } else {
+      this.recordActivity({
+        type: "tool-result",
+        tool: pending.tool,
+        browserSessionId: pending.browserSessionId,
+        status: "error",
+        message: error || "Browser tool failed",
+      })
       pending.reject(new Error(error || "Browser tool failed"))
     }
     return { accepted: true }
+  }
+
+  cancelPendingRequests(args = {}) {
+    this.cleanupExpiredSessions()
+    const userId = normalizeRouteUserId(args.userId)
+    const explicitSessionId = String(args.browserSessionId || "").trim()
+    const browserSessionIds = explicitSessionId
+      ? new Set([explicitSessionId])
+      : userId
+        ? this.sessionIdsForUser(userId)
+        : new Set([...this.sessions.keys()])
+    const reason = redactLikelySensitiveText(
+      args.reason || "cancelled from local runtime console",
+      240
+    )
+    let queuedCancelled = 0
+    const queuedRequestIds = new Set()
+    for (const session of this.sessions.values()) {
+      if (!browserSessionIds.has(session.browserSessionId)) continue
+      queuedCancelled += session.queue.length
+      for (const item of session.queue) {
+        queuedRequestIds.add(item.id)
+        const pending = this.pendingRequests.get(item.id)
+        if (pending) {
+          clearTimeout(pending.timer)
+          this.pendingRequests.delete(item.id)
+          pending.reject(new Error(reason))
+        }
+        this.recordActivity({
+          type: "tool-result",
+          tool: item.tool,
+          browserSessionId: session.browserSessionId,
+          status: "cancelled",
+          message: reason,
+        })
+      }
+      session.queue = []
+    }
+    let pendingCancelled = 0
+    for (const [requestId, pending] of [...this.pendingRequests.entries()]) {
+      if (queuedRequestIds.has(requestId)) continue
+      if (!browserSessionIds.has(pending.browserSessionId)) continue
+      clearTimeout(pending.timer)
+      this.pendingRequests.delete(requestId)
+      pending.reject(new Error(reason))
+      pendingCancelled += 1
+      this.recordActivity({
+        type: "tool-result",
+        tool: pending.tool,
+        browserSessionId: pending.browserSessionId,
+        status: "cancelled",
+        message: reason,
+      })
+    }
+    return {
+      ok: true,
+      pendingCancelled,
+      queuedCancelled,
+      note: "Only runtime pending or queued requests are cancelled; already completed browser-side effects cannot be undone.",
+    }
+  }
+
+  consoleState(args = {}) {
+    this.cleanupExpiredSessions()
+    const userId = normalizeRouteUserId(args.userId)
+    const sessions = [...this.sessions.values()]
+      .filter((session) => !userId || normalizeRouteUserId(session.meta?.userId) === userId)
+      .map((session) => summarizeSession(session, this.activeSessionId))
+    const browserSessionIds = new Set(sessions.map((session) => session.browserSessionId))
+    const pendingRequests = [...this.pendingRequests.entries()]
+      .filter(([, pending]) => browserSessionIds.has(pending.browserSessionId))
+      .map(([requestId, pending]) => ({
+        requestId,
+        browserSessionId: pending.browserSessionId,
+        tool: pending.tool,
+      }))
+    const queuedRequests = [...this.sessions.values()]
+      .filter((session) => browserSessionIds.has(session.browserSessionId))
+      .flatMap((session) =>
+        session.queue.map((item) => ({
+          requestId: item.id,
+          browserSessionId: session.browserSessionId,
+          tool: item.tool,
+          createdAt: item.createdAt || "",
+        }))
+      )
+    return {
+      ok: true,
+      name: "yunti-browser-runtime-console",
+      generatedAt: new Date().toISOString(),
+      sessionCount: sessions.length,
+      activeSessionId: userId ? this.activeSessionByUser.get(userId) || null : this.activeSessionId,
+      sessions,
+      pendingRequests,
+      queuedRequests,
+      diagnostics: {
+        networkEvents: this.networkEvents.filter((event) => browserSessionIds.has(event.browserSessionId)).length,
+        consoleMessages: this.consoleMessages.filter((event) => browserSessionIds.has(event.browserSessionId)).length,
+        cdpEvents: this.cdpEvents.filter((event) => browserSessionIds.has(event.browserSessionId)).length,
+        activityEvents: this.activityEvents.length,
+      },
+      recentActivity: this.activityEvents
+        .filter((event) => !event.browserSessionId || browserSessionIds.has(event.browserSessionId))
+        .slice(-30)
+        .reverse(),
+      guidance: {
+        noSessions:
+          "Start yunti-browser-runtime bridge, load the extension, open or refresh an http/https page, then run yunti-browser-runtime doctor.",
+        staleSession:
+          "Refresh the page or reload the extension, then call yunti_list_browser_targets before retrying browser tools.",
+        cancellation:
+          "Cancel only clears runtime pending/queued requests; it does not undo browser-side effects that already happened.",
+      },
+    }
   }
 }

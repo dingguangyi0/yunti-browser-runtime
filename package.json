@@ -39,6 +39,7 @@
   "scripts": {
     "mcp": "node mcp/server.js",
     "bridge": "YUNTI_BROWSER_BRIDGE_ONLY=1 node mcp/server.js",
+    "console": "YUNTI_BROWSER_BRIDGE_ONLY=1 node mcp/server.js",
     "doctor": "node scripts/doctor.js",
     "doctor:json": "node scripts/doctor.js 2>/dev/null",
     "print-config": "node scripts/print-config.js",

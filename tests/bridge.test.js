@@ -39,6 +39,14 @@ async function readJsonResponse(response) {
   }
 }
 
+async function readTextResponse(response) {
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: await response.text(),
+  }
+}
+
 test("bridge routes a tool request to the registered browser session", async () => {
   const hub = new BridgeHub()
   hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://shop.example.test/" })
@@ -102,6 +110,75 @@ test("local bridge defaults to no token requirement", async () => {
     assert.equal(health.body.sessionCount, 1)
     assert.equal(health.body.sessions.length, 1)
   }, { bridgeToken: "" })
+})
+
+test("local runtime console exposes an optional page and sanitized state", async () => {
+  await withHttpBridge(async ({ baseUrl }) => {
+    const page = await readTextResponse(await fetch(`${baseUrl}/console`))
+    assert.equal(page.status, 200)
+    assert.match(page.headers.get("content-type"), /text\/html/)
+    assert.match(page.body, /Yunti Browser Runtime/)
+
+    await fetch(`${baseUrl}/sessions/register`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        browserSessionId: "tab-1",
+        userId: "u1",
+        userName: "owner@example.test",
+        title: "Checkout owner@example.test",
+        url: "https://shop.example.test/cart?token=secret-token-1234567890",
+        tabId: 7,
+      }),
+    })
+
+    const state = await readJsonResponse(await fetch(`${baseUrl}/console/state?userId=u1`, {
+      headers: authHeaders(),
+    }))
+    assert.equal(state.status, 200)
+    assert.equal(state.body.ok, true)
+    assert.equal(state.body.sessionCount, 1)
+    assert.equal(state.body.sessions[0].browserSessionId, "tab-1")
+    assert.doesNotMatch(JSON.stringify(state.body), /owner@example\.test/)
+    assert.doesNotMatch(JSON.stringify(state.body), /secret-token-1234567890/)
+    assert.match(state.body.guidance.noSessions, /load the extension/)
+  })
+})
+
+test("local runtime console state stays protected when bridge auth is enabled", async () => {
+  await withHttpBridge(async ({ baseUrl }) => {
+    const page = await readTextResponse(await fetch(`${baseUrl}/console`))
+    assert.equal(page.status, 200)
+
+    const unauthorized = await readJsonResponse(await fetch(`${baseUrl}/console/state?userId=u1`))
+    assert.equal(unauthorized.status, 401)
+    assert.match(unauthorized.body.error, /missing or invalid/)
+
+    const authorized = await readJsonResponse(await fetch(`${baseUrl}/console/state?userId=u1`, {
+      headers: authHeaders(),
+    }))
+    assert.equal(authorized.status, 200)
+    assert.equal(authorized.body.ok, true)
+  })
+})
+
+test("local runtime console can cancel pending and queued browser requests", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1" })
+  const call = hub.callTool("yunti_get_page_snapshot", { browserSessionId: "tab-1", userId: "u1" }, 1000)
+
+  const result = hub.cancelPendingRequests({ userId: "u1" })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.pendingCancelled, 0)
+  assert.equal(result.queuedCancelled, 1)
+  assert.match(result.note, /browser-side effects/)
+  await assert.rejects(call, /cancelled from local runtime console/)
+
+  const state = hub.consoleState({ userId: "u1" })
+  assert.equal(state.pendingRequests.length, 0)
+  assert.equal(state.queuedRequests.length, 0)
+  assert.ok(state.recentActivity.some((event) => event.status === "cancelled"))
 })
 
 test("bridge health is limited without token and complete with token", async () => {

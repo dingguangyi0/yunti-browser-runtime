@@ -214,6 +214,7 @@ export async function runStdio() {
     console.error(
       `[yunti-browser-runtime] bridge ${bridge.mode} on http://${bridge.host}:${bridge.port}`
     )
+    console.error(`[yunti-browser-runtime] console http://${bridge.host}:${bridge.port}/console`)
     if (bridge.mode === "owner") {
       if (bridge.authRequired) {
         console.error(
@@ -253,6 +254,7 @@ export async function runBridgeOnly() {
   console.error(
     `[yunti-browser-runtime] bridge ${bridge.mode} on http://${bridge.host}:${bridge.port}`
   )
+  console.error(`[yunti-browser-runtime] console http://${bridge.host}:${bridge.port}/console`)
   if (bridge.mode === "owner") {
     if (bridge.authRequired) {
       console.error(

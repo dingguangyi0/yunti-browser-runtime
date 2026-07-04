@@ -54,6 +54,21 @@ yunti-browser-runtime print-config -- --agent codex --human
 yunti-browser-runtime bridge
 ```
 
+需要查看本地运行时状态时，可以打开可选控制台：
+
+```bash
+yunti-browser-runtime console
+```
+
+然后访问：
+
+```text
+http://127.0.0.1:48887/console
+```
+
+控制台只展示连接页面、pending/queued 任务、最近工具 activity 和诊断数量等脱敏摘要；
+它不是必选 hub，也不会改变 Agent 的 MCP 使用路径。
+
 其他常用 CLI：
 
 ```bash

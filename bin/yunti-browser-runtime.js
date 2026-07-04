@@ -16,6 +16,10 @@ const commands = {
     script: join(rootDir, "mcp", "server.js"),
     env: { YUNTI_BROWSER_BRIDGE_ONLY: "1" },
   },
+  console: {
+    script: join(rootDir, "mcp", "server.js"),
+    env: { YUNTI_BROWSER_BRIDGE_ONLY: "1" },
+  },
   doctor: {
     script: join(rootDir, "scripts", "doctor.js"),
     env: {},
@@ -73,6 +77,7 @@ Usage:
 Commands:
   mcp                Start the stdio MCP server (default)
   bridge             Start only the local HTTP bridge
+  console            Start the bridge and print the optional local console URL
   doctor             Run install and bridge diagnostics
   print-config       Print MCP configuration for an agent
   package-extension  Build the browser extension zip
@@ -80,6 +85,7 @@ Commands:
 Examples:
   yunti-browser-runtime
   yunti-browser-runtime bridge
+  yunti-browser-runtime console
   yunti-browser-runtime doctor
   yunti-browser-runtime print-config -- --agent codex --human
   yunti-browser-runtime package-extension`)

@@ -35,6 +35,8 @@ const PROTECTED_BRIDGE_PATHS = new Set([
   "/extension/network-event",
   "/extension/cdp-event",
   "/extension/console-event",
+  "/console/state",
+  "/console/cancel-pending",
   "/mcp/request",
   "/mcp/local-tool",
 ])
@@ -110,6 +112,14 @@ function sendJson(req, res, statusCode, value, { allowOrigins = DEFAULT_ALLOWED_
   const body = JSON.stringify(value)
   res.writeHead(statusCode, bridgeCorsHeaders(req, allowOrigins))
   res.end(body)
+}
+
+function sendHtml(res, statusCode, html) {
+  res.writeHead(statusCode, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+  })
+  res.end(html)
 }
 
 function bridgeRequestToken(req) {
@@ -226,6 +236,11 @@ export async function startBridgeServer({
         return
       }
 
+      if (req.method === "GET" && (url.pathname === "/console" || url.pathname === "/console/")) {
+        sendHtml(res, 200, localConsoleHtml({ authRequired, tokenHeader: BRIDGE_TOKEN_HEADER }))
+        return
+      }
+
       if (PROTECTED_BRIDGE_PATHS.has(url.pathname) && !authorized) {
         sendJson(
           req,
@@ -238,6 +253,22 @@ export async function startBridgeServer({
           },
           { allowOrigins }
         )
+        return
+      }
+
+      if (req.method === "GET" && url.pathname === "/console/state") {
+        const userId = url.searchParams.get("userId") || _ROUTE_USER_ID
+        sendJson(req, res, 200, hub.consoleState({ userId }), { allowOrigins })
+        return
+      }
+
+      if (req.method === "POST" && url.pathname === "/console/cancel-pending") {
+        const body = await readJson(req)
+        const result = hub.cancelPendingRequests({
+          ...body,
+          userId: body.userId || _ROUTE_USER_ID,
+        })
+        sendJson(req, res, 200, result, { allowOrigins })
         return
       }
 
@@ -348,4 +379,150 @@ export async function startBridgeServer({
     return { mode: "proxy", host, port, bridgeToken: configuredBridgeToken, authRequired, allowOrigins, hub: null, server: null }
   }
   return { mode: "owner", host, port, bridgeToken: activeBridgeToken, authRequired, allowOrigins, hub, server }
+}
+
+function localConsoleHtml({ authRequired, tokenHeader }) {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Yunti Browser Runtime Console</title>
+    <style>
+      :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; background: Canvas; color: CanvasText; }
+      main { max-width: 1120px; margin: 0 auto; padding: 24px; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+      h1 { margin: 0; font-size: 24px; line-height: 1.2; }
+      h2 { margin: 0 0 10px; font-size: 16px; }
+      button { border: 1px solid ButtonBorder; background: ButtonFace; color: ButtonText; border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+      button:disabled { opacity: .55; cursor: not-allowed; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+      .panel { border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); border-radius: 8px; padding: 14px; }
+      .metric { font-size: 28px; font-weight: 700; }
+      .muted { color: color-mix(in srgb, CanvasText 62%, transparent); }
+      .sessions, .activity { display: grid; gap: 10px; }
+      .row { border-top: 1px solid color-mix(in srgb, CanvasText 14%, transparent); padding-top: 10px; }
+      .row:first-child { border-top: 0; padding-top: 0; }
+      code { overflow-wrap: anywhere; }
+      .status { display: inline-flex; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: color-mix(in srgb, LinkText 16%, transparent); }
+      .warn { color: #9f4e00; }
+      .error { color: #b3261e; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      @media (max-width: 640px) { main { padding: 16px; } header { align-items: flex-start; flex-direction: column; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Yunti Browser Runtime</h1>
+          <div class="muted">Local console for bridge status, connected pages, diagnostics, and pending tasks.</div>
+        </div>
+        <div class="toolbar">
+          <button id="refresh" type="button">Refresh</button>
+          <button id="cancel" type="button">Cancel Pending</button>
+        </div>
+      </header>
+      <section id="auth" class="panel" hidden></section>
+      <section class="grid" aria-live="polite">
+        <div class="panel"><h2>Sessions</h2><div id="sessionCount" class="metric">-</div><div class="muted">connected browser pages</div></div>
+        <div class="panel"><h2>Pending</h2><div id="pendingCount" class="metric">-</div><div class="muted">runtime requests waiting for results</div></div>
+        <div class="panel"><h2>Diagnostics</h2><div id="diagCount" class="metric">-</div><div class="muted">sanitized network, console, and CDP summaries</div></div>
+      </section>
+      <section class="panel" style="margin-top: 12px;">
+        <h2>Connected Pages</h2>
+        <div id="sessions" class="sessions muted">Loading...</div>
+      </section>
+      <section class="panel" style="margin-top: 12px;">
+        <h2>Recent Activity</h2>
+        <div id="activity" class="activity muted">Loading...</div>
+      </section>
+    </main>
+    <script>
+      const stateUrl = "/console/state";
+      const authRequired = ${JSON.stringify(Boolean(authRequired))};
+      const tokenHeader = ${JSON.stringify(tokenHeader)};
+      const refreshButton = document.querySelector("#refresh");
+      const cancelButton = document.querySelector("#cancel");
+      const authPanel = document.querySelector("#auth");
+      const text = (value) => value == null || value === "" ? "-" : String(value);
+
+      if (authRequired) {
+        authPanel.hidden = false;
+        authPanel.innerHTML = '<strong>Bridge auth is enabled.</strong> This page shell is visible, but state requests require the <code>' + tokenHeader + '</code> header. Use <code>yunti-browser-runtime doctor</code> or curl with the header for protected diagnostics.';
+      }
+
+      async function loadState() {
+        refreshButton.disabled = true;
+        try {
+          const response = await fetch(stateUrl, { cache: "no-store" });
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          const state = await response.json();
+          render(state);
+        } catch (error) {
+          document.querySelector("#sessions").innerHTML = '<span class="error">' + escapeHtml(error.message || String(error)) + '</span>';
+          document.querySelector("#activity").textContent = authRequired ? "State is protected by bridge auth." : "Unable to read console state.";
+        } finally {
+          refreshButton.disabled = false;
+        }
+      }
+
+      async function cancelPending() {
+        cancelButton.disabled = true;
+        try {
+          await fetch("/console/cancel-pending", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ reason: "cancelled from local runtime console" })
+          });
+          await loadState();
+        } finally {
+          cancelButton.disabled = false;
+        }
+      }
+
+      function render(state) {
+        const diagnostics = state.diagnostics || {};
+        const pending = (state.pendingRequests || []).length + (state.queuedRequests || []).length;
+        document.querySelector("#sessionCount").textContent = state.sessionCount || 0;
+        document.querySelector("#pendingCount").textContent = pending;
+        document.querySelector("#diagCount").textContent = (diagnostics.networkEvents || 0) + (diagnostics.consoleMessages || 0) + (diagnostics.cdpEvents || 0);
+        document.querySelector("#sessions").innerHTML = renderSessions(state);
+        document.querySelector("#activity").innerHTML = renderActivity(state);
+      }
+
+      function renderSessions(state) {
+        if (!state.sessions || state.sessions.length === 0) {
+          return '<div>No connected pages. ' + escapeHtml(state.guidance?.noSessions || "") + '</div>';
+        }
+        return state.sessions.map((session) => '<div class="row"><div><span class="status">' + (session.active ? "active" : "connected") + '</span> <strong>' + escapeHtml(text(session.title || session.displayName)) + '</strong></div><div><code>' + escapeHtml(text(session.url)) + '</code></div><div class="muted">tab ' + escapeHtml(text(session.tabId)) + ' · queued ' + escapeHtml(text(session.queuedRequests)) + ' · last seen ' + escapeHtml(text(session.lastSeenAt)) + '</div></div>').join("");
+      }
+
+      function renderActivity(state) {
+        if (!state.recentActivity || state.recentActivity.length === 0) return '<div>No recent activity yet.</div>';
+        return state.recentActivity.map((event) => '<div class="row"><div><span class="status">' + escapeHtml(text(event.status || event.type)) + '</span> <strong>' + escapeHtml(text(event.tool || event.type)) + '</strong></div><div class="muted">' + escapeHtml(text(event.timestamp)) + ' · ' + escapeHtml(text(event.browserSessionId)) + '</div><div>' + escapeHtml(text(event.message || summarize(event.summary))) + '</div></div>').join("");
+      }
+
+      function summarize(summary) {
+        if (!summary) return "";
+        const parts = [];
+        if (summary.ok != null) parts.push("ok=" + summary.ok);
+        if (summary.code) parts.push("code=" + summary.code);
+        if (summary.action) parts.push("action=" + summary.action);
+        if (summary.keys) parts.push("keys=" + summary.keys.join(","));
+        return parts.join(" · ");
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+      }
+
+      refreshButton.addEventListener("click", loadState);
+      cancelButton.addEventListener("click", cancelPending);
+      loadState();
+      setInterval(loadState, 5000);
+    </script>
+  </body>
+</html>`
 }

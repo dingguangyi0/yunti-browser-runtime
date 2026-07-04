@@ -6,8 +6,8 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.5.1 optional local runtime console, with P6.1.4
-real-browser closure still pending on Playwright/Chromium availability.
+Current implementation focus: P6.5.1 optional local runtime console. P6.1.4
+real-browser closure has been validated on the local Playwright environment.
 
 Latest visible 0.2.0 phase split:
 
@@ -17,8 +17,9 @@ Latest visible 0.2.0 phase split:
   state hints, scroll metadata, and minimum redaction.
 - P6.1.3 completed: fresh observe uids feed existing click/hover/fill uid
   actions while preserving the snapshot compatibility path.
-- P6.1.4 pending: real-browser `observe -> click uid -> observe/verify`
-  closure validation. Current environment still lacks Playwright/Chromium.
+- P6.1.4 completed: real-browser `observe -> click uid -> observe/verify`
+  closure validation passed with the local `pytest-playwright` environment
+  plus temporary Node Playwright 1.58.0.
 - P6.2.1 completed: additive structured action result contract and main action
   path coverage.
 - P6.2.2 completed: `yunti_select` uid/selector/value/text semantics and
@@ -56,8 +57,7 @@ Latest visible 0.2.0 phase split:
   for non-default-redaction diagnostics, sanitized-tool preference, scope
   minimization, safe summarization, and CDP cleanup.
 - P6.5.1 next: optional local runtime console minimum design and first
-  implementation slice; if Playwright/Chromium becomes available first, close
-  P6.1.4 real-browser `observe -> click uid -> observe/verify` validation.
+  implementation slice.
 
 Latest detailed P6.2 status:
 
@@ -199,9 +199,22 @@ Latest detailed P6.2 status:
   Playwright/Chromium is not installed in the current environment;
   `npm run release:check` passed, plus npm package contents validation with 45
   files and extension zip contents validation with 13 files.
+- Completed: P6.1.4 real-browser closure validation. The local
+  `/opt/miniconda3/envs/pytest-playwright` environment provides Python
+  Playwright 1.58.0 and existing browser caches; the Node E2E still needs the
+  Node `playwright` package, so validation used temporary `npm install --no-save
+  --package-lock=false playwright@1.58.0` with
+  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and without changing package metadata.
+  `YUNTI_E2E=1 npm run test:e2e` then passed the real browser extension bridge
+  smoke with `observe -> click uid -> verify`. Final validation for this status
+  update: `git diff --check` passed; token residue grep returned no matches;
+  `npm run check` passed; `npm test` passed with 122 node:test cases total,
+  121 passing and 1 default real-browser smoke skipped; `YUNTI_E2E=1 npm run
+  test:e2e` passed with 1 real-browser smoke test; `npm run release:check`
+  passed, plus npm package contents validation with 45 files and extension zip
+  contents validation with 13 files.
 - Next: implement P6.5.1 optional local runtime console minimum design and
-  first implementation slice, or close P6.1.4 first if Playwright/Chromium is
-  available for real-browser closure.
+  first implementation slice.
 
 ## Current State
 
@@ -960,12 +973,9 @@ Latest detailed P6.2 status:
 ## Open Work
 
 - Follow `docs/NEXT_MAJOR_PLAN.md` for the next major cycle.
-- Continue P6.1 with a verified `observe -> click uid -> observe` real-browser
-  closure once Playwright/Chromium is available in the validation environment.
-- Keep `observe -> click uid -> observe` real-browser closure as the remaining
-  P6.1 validation gap until Playwright/Chromium is available locally.
-- Use the P6.1 real-browser closure runbook in `docs/EXECUTION_PLAN.md` before
-  marking P6.1 fully closed.
+- P6.1 real-browser closure is complete: `YUNTI_E2E=1 npm run test:e2e` passed
+  locally with temporary Node Playwright 1.58.0 and the existing Playwright
+  browser cache from `/opt/miniconda3/envs/pytest-playwright`.
 - Continue 0.2.0 in small compatibility-preserving slices. Current completed
   subphases are P6.2.1 action result coverage, P6.2.2 select semantics, P6.2.3
   fill/form diagnostics, P6.2.4 scroll diagnostics, P6.2.5 wait-observe
@@ -974,8 +984,7 @@ Latest detailed P6.2 status:
   Tool Guide use cases, P6.4.1 DOM redaction policy deepening, P6.4.2 learning
   memory / console diagnostic secret-boundary tightening, and P6.4.3 raw CDP /
   screenshot non-redaction diagnostic guidance. The next anchored slice is
-  P6.5.1 optional local runtime console, unless Playwright/Chromium is available to close P6.1.4
-  real-browser validation first.
+  P6.5.1 optional local runtime console.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

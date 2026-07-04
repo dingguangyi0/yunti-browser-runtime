@@ -62,7 +62,7 @@
 | P6.1.1 | 已完成 | `yunti_observe_page` schema、tool hints、bridge routing |
 | P6.1.2 | 已完成 | content-script DOM observer、文本树、字段状态、scroll 元数据、最小脱敏 |
 | P6.1.3 | 已完成 | fresh observe uid 兼容现有 click/hover/fill action |
-| P6.1.4 | 待补验 | 真实浏览器 `observe -> click uid -> observe/verify` 闭环 |
+| P6.1.4 | 已完成 | 真实浏览器 `observe -> click uid -> observe/verify` 闭环 |
 | P6.2.1 | 已完成 | action result 兼容契约与主要 action 主路径结构化字段 |
 | P6.2.2 | 已完成 | `yunti_select` uid/selector/value/text 语义与失败诊断 |
 | P6.2.3 | 已完成 | `yunti_fill` / `yunti_fill_form` 字段状态、contenteditable、值保持诊断 |
@@ -96,8 +96,8 @@
   - uid fill 填后值保持验证与 `VALUE_NOT_APPLIED` 长度级诊断；
   - `yunti_observe_page` 字段状态、select 当前选中项与 `options[]` 提示。
 - P6.1：`yunti_observe_page` schema、tool hints、bridge routing、content-script observer
-  和 deterministic fixtures 已落地；剩余缺口是当前环境缺少 Playwright/Chromium，无法补跑
-  `observe -> click uid -> observe/verify` 真实浏览器闭环。
+  和 deterministic fixtures 已落地；真实浏览器 `observe -> click uid -> observe/verify`
+  闭环已在本机 `pytest-playwright` 环境下用临时 Node Playwright 1.58.0 补验通过。
 - P6.2：结构化 action result 正在按兼容优先的小切片推进；已覆盖主要单动作路径：uid click/hover/fill
   keyboard/fill select、coordinate click/hover、selector hover/click/fill passthrough 和
   scroll passthrough、type_text uid/selector fallback、press_key uid/selector fallback、
@@ -230,9 +230,14 @@
   `YUNTI_E2E=1 npm run test:e2e` 因当前环境缺少 Playwright/Chromium 跳过；
   `npm run release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip
   内容检查 13 个文件。
-- 下一步固定为 P6.5.1：可选本地运行时控制台的最小设计与第一刀实现；如果当前环境补齐
-  Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
-  `observe -> click uid -> observe/verify` 闭环。
+- P6.1.4 最新验证：使用 `/opt/miniconda3/envs/pytest-playwright` 中已有的 Playwright
+  浏览器缓存，临时执行
+  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-save --package-lock=false playwright@1.58.0`
+  补齐 Node E2E 依赖；随后 `YUNTI_E2E=1 npm run test:e2e` 通过真实浏览器扩展
+  bridge smoke，覆盖 `observe -> click uid -> verify` 闭环。完整门禁也已通过：
+  `git diff --check`、token 残留检查、`npm run check`、`npm test`、
+  `YUNTI_E2E=1 npm run test:e2e` 和 `npm run release:check`。
+- 下一步固定为 P6.5.1：可选本地运行时控制台的最小设计与第一刀实现。
 
 ## 压缩上下文恢复锚点
 
@@ -257,9 +262,8 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.5.1：可选本地运行时控制台的最小设计与第一刀实现。如果当前环境已经具备
-Playwright/Chromium，则优先补跑并关闭 P6.1.4 真实浏览器
-observe -> click uid -> observe/verify 闭环。保留现有兼容字段，必要时更新
+当前锚点是 P6.5.1：可选本地运行时控制台的最小设计与第一刀实现。P6.1.4
+真实浏览器 observe -> click uid -> observe/verify 闭环已补验通过。保留现有兼容字段，必要时更新
 mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、
 docs/EXECUTION_PLAN.md 和 docs/PROJECT_STATUS.md，并运行规定门禁。不要把项目改成
 Page Agent 克隆，保持 Yunti local-first、MCP-native、真实 Chrome/Edge、
@@ -2552,7 +2556,7 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   `docs/NEXT_MAJOR_PLAN.md`。
 - 继续 0.2.0 的小切片推进：P6.4 已完成 DOM strict redaction、learning memory /
   console diagnostics 存储边界、raw CDP / screenshot 非默认脱敏提示与清理边界。
-  下一刀建议进入 P6.5.1 可选本地运行时控制台，或在环境具备时补真实浏览器闭环。
+  P6.1.4 真实浏览器闭环已补验通过，下一刀建议进入 P6.5.1 可选本地运行时控制台。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

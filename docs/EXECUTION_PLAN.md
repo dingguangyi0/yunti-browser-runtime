@@ -81,7 +81,8 @@
 | P6.6.1 | 已完成 | 浏览器扩展分发准备 |
 | P6.6.2 | 已完成 | 商店权限与隐私文案草案 |
 | P6.6.3 | 已完成 | 商店前权限策略决策 |
-| P6.6.4 | 下一步 | Store candidate 权限 UX 设计 |
+| P6.6.4 | 后置 | Store candidate 权限 UX 设计 |
+| P7.1 | 进行中 | 0.2.0 npm/unpacked 发布收口 |
 
 当前 0.2.0 推进快照（2026-07-05）：
 
@@ -277,8 +278,9 @@
   store-facing 文案。
 - P6.6.3 已完成：商店前权限策略决策已沉淀，当前 npm/unpacked 路径保持完整能力；
   当前 broad-permission manifest 不作为默认推荐商店提交版本。
-- 下一步固定为 P6.6.4：Store candidate 权限 UX 设计，重点设计 optional host access、
-  missing-permission recovery、optional network diagnostics 和对应测试。
+- P6.6.4 已后置到 post-0.2 / store-candidate track，不作为 0.2.0 发布硬门槛。
+- 当前固定进入 P7.1：0.2.0 npm/unpacked 发布收口，先完成版本 bump、发布文档更新、
+  release gates、真实浏览器 E2E 和 dry-run。
 
 ## 压缩上下文恢复锚点
 
@@ -303,12 +305,12 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.6.4：Store candidate 权限 UX 设计。P6.6.1 已完成浏览器扩展分发准备，
+当前锚点是 P7.1：0.2.0 npm/unpacked 发布收口。P6.6.1 已完成浏览器扩展分发准备，
 包括 manifest 权限审计、商店材料清单和 docs/EXTENSION_DISTRIBUTION.md。P6.6.2 已完成
 docs/EXTENSION_STORE_COPY.md，包含商店描述、权限说明、隐私草案、data disclosure
 和 reviewer notes。P6.6.3 已完成 docs/EXTENSION_PERMISSION_STRATEGY.md，结论是
 npm/unpacked 路径保持完整能力，商店候选版本另行设计 optional host access 和 optional
-network diagnostics。P6.5.1 已完成可选本地控制台最小闭环，
+network diagnostics；P6.6.4 后置到 post-0.2，不阻塞发布。P6.5.1 已完成可选本地控制台最小闭环，
 P6.5.2 已完成版本 warning、HEAD /console、doctor console URL 和空状态指引增强，
 P6.5.3 已完成控制台真实浏览器 E2E 验收。P6.1.4 真实浏览器 observe -> click uid ->
 observe/verify 闭环已补验通过。保留现有兼容字段，必要时更新
@@ -2599,7 +2601,7 @@ P6.6.3 完成范围：
   需要先设计 optional host access、missing-permission recovery 和 optional diagnostics。
 - 本切片不改变 extension manifest 或 runtime 行为。
 
-P6.6.4 下一步：
+P6.6.4 后置：
 
 - 设计 store-candidate 权限 UX 和技术原型计划。
 - 明确 popup/doctor/MCP error/tool hints/Tool Guide/skill/tests 在 optional host access
@@ -2609,7 +2611,7 @@ P6.6.4 下一步：
 
 ## P6.6 浏览器扩展分发准备
 
-状态：进行中；P6.6.1-P6.6.3 已完成，P6.6.4 下一步
+状态：0.2.0 npm/unpacked 范围已完成；P6.6.4 后置到 post-0.2 store-candidate track
 
 目标：
 
@@ -2681,10 +2683,49 @@ P6.6.3 最新验证：
   Markdown 文件链接检查、action result coverage 11 行、npm package 内容 48 个文件和
   extension zip 内容 13 个文件。
 
-P6.6.4 下一步：
+P6.6.4 后置：
 
 - 做 store-candidate 权限 UX 设计，列清楚用户操作、agent 恢复提示、doctor 检查和测试矩阵。
 - 该设计完成后，再决定是否进入 manifest/extension 代码实现。
+- 该工作不作为 0.2.0 npm/unpacked 发布硬门槛，后续作为 store-candidate track 单独推进。
+
+## P7.1 0.2.0 npm/unpacked 发布收口
+
+状态：进行中
+
+目标：
+
+冻结 0.2.0 范围，发布 npm/unpacked extension 形态；商店候选版权限 UX 后置。
+
+完成范围：
+
+- package 和 extension 版本同步提升到 `0.2.0`。
+- README / Release / status / execution plan 更新为 0.2.0 release candidate。
+- 执行 `npm run check:metadata`、`npm run release:prepublish`、真实浏览器 E2E 和
+  `npm run release:dry-run`。
+- 不在本切片执行 `npm run release:publish`，除非用户明确要求发布。
+
+当前验证：
+
+- `git diff --check` 通过。
+- token 残留检查无输出。
+- `npm run check:metadata` 曾通过，确认 GitHub repository/homepage/bugs URL 为 200，
+  npm registry 当前已发布版本为 `0.1.3`；随后同一检查因当前环境访问 GitHub 超时而失败。
+- `npm run release:check` 通过，包含 public documentation residue check、17 个公开
+  Markdown 文件链接检查、version consistency check `0.2.0`、CLI smoke `0.2.0`、
+  action result coverage 11 行、npm package 内容 48 个文件和 extension zip 内容 13 个文件。
+- `YUNTI_E2E=1 npm run test:e2e` 在本机 `pytest-playwright` 环境下通过 1 个真实浏览器
+  extension bridge smoke；conda 仅打印 requests 依赖版本 warning，不影响结果。
+- `npm publish --dry-run --registry=https://registry.npmjs.org/` 通过，生成
+  `yunti-browser-runtime-0.2.0.tgz` dry-run 预览，tarball 共 48 个文件。
+- `npm run release:prepublish` 和 `npm run release:dry-run` 当前仍受
+  `check:metadata` 的 GitHub 请求超时影响，需要网络恢复后重跑。
+
+下一步：
+
+- 网络恢复后重跑 `npm run check:metadata`、`npm run release:prepublish` 和
+  `npm run release:dry-run`。
+- 上述脚本门禁全部通过后，由用户确认是否执行正式 npm publish。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2728,6 +2769,7 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 ## 当前下一步
 
 P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm registry。
+当前分支正在收口 `0.2.0` npm/unpacked release candidate。
 
 - 发布后验证已通过：`npm run release:verify-published`。
 - 本地默认使用不再需要 bridge token；需要加固时可显式设置
@@ -2740,12 +2782,14 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   P6.1.4 真实浏览器闭环已补验通过，P6.5.1 可选本地运行时控制台最小闭环已完成，
   P6.5.2 控制台诊断增强第一刀已完成，P6.5.3 控制台真实浏览器 E2E 验收已完成，
   P6.6.1 浏览器扩展分发准备已完成，P6.6.2 商店权限与隐私文案草案已完成，
-  P6.6.3 商店前权限策略决策已完成。下一刀建议进入 P6.6.4 Store candidate 权限 UX 设计。
+  P6.6.3 商店前权限策略决策已完成。P6.6.4 Store candidate 权限 UX 设计已后置；
+  当前进入 P7.1 0.2.0 npm/unpacked 发布收口。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。
 - 验证重点：继续执行
   `git diff --check`、token 残留检查、`YUNTI_E2E=1 npm run test:e2e` 和
   `npm run release:check`。
-- 后续如要上架浏览器扩展商店，发布前还需重新审查 broad host permissions。
+- 后续如要上架浏览器扩展商店，按 `docs/EXTENSION_PERMISSION_STRATEGY.md` 单独推进
+  store-candidate 权限 UX 和 broad host permissions 审查。
 - 后续版本开发前，先按 `docs/NEXT_MAJOR_PLAN.md` 拆阶段执行并更新本文档验收记录。

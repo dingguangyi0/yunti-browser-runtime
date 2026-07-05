@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { createRequire } from "node:module"
 import {
   BRIDGE_TOKEN_HEADER,
   BridgeHub,
@@ -7,6 +8,10 @@ import {
   startBridgeServer,
   TOOLS,
 } from "../mcp/server.js"
+
+const require = createRequire(import.meta.url)
+const packageJson = require("../package.json")
+const PACKAGE_VERSION = packageJson.version
 
 async function withHttpBridge(fn, options = {}) {
   const bridge = await startBridgeServer({
@@ -133,7 +138,7 @@ test("local runtime console exposes an optional page and sanitized state", async
         title: "Checkout owner@example.test",
         url: "https://shop.example.test/cart?token=secret-token-1234567890",
         tabId: 7,
-        client: { family: "chrome", extensionVersion: "0.1.3" },
+        client: { family: "chrome", extensionVersion: PACKAGE_VERSION },
       }),
     })
 
@@ -142,11 +147,11 @@ test("local runtime console exposes an optional page and sanitized state", async
     }))
     assert.equal(state.status, 200)
     assert.equal(state.body.ok, true)
-    assert.equal(state.body.runtime.version, "0.1.3")
-    assert.equal(state.body.runtime.expectedExtensionVersion, "0.1.3")
+    assert.equal(state.body.runtime.version, PACKAGE_VERSION)
+    assert.equal(state.body.runtime.expectedExtensionVersion, PACKAGE_VERSION)
     assert.equal(state.body.sessionCount, 1)
     assert.equal(state.body.sessions[0].browserSessionId, "tab-1")
-    assert.equal(state.body.sessions[0].extensionVersion, "0.1.3")
+    assert.equal(state.body.sessions[0].extensionVersion, PACKAGE_VERSION)
     assert.deepEqual(state.body.warnings, [])
     assert.doesNotMatch(JSON.stringify(state.body), /owner@example\.test/)
     assert.doesNotMatch(JSON.stringify(state.body), /secret-token-1234567890/)
@@ -164,11 +169,11 @@ test("local runtime console reports extension version mismatch warnings", () => 
 
   const state = hub.consoleState({
     userId: "u1",
-    runtimeVersion: "0.1.3",
-    expectedExtensionVersion: "0.1.3",
+    runtimeVersion: PACKAGE_VERSION,
+    expectedExtensionVersion: PACKAGE_VERSION,
   })
 
-  assert.equal(state.runtime.version, "0.1.3")
+  assert.equal(state.runtime.version, PACKAGE_VERSION)
   assert.equal(state.sessions[0].extensionVersion, "0.1.0")
   assert.equal(state.warnings[0].code, "EXTENSION_VERSION_MISMATCH")
   assert.match(state.warnings[0].message, /0\.1\.0/)

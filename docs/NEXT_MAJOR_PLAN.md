@@ -633,7 +633,8 @@ P6.5.3 completed:
 
 ### P6.6 Extension Distribution Readiness
 
-Status: in progress; P6.6.1, P6.6.2, and P6.6.3 are complete. P6.6.4 is next.
+Status: complete for `0.2.0` npm/unpacked release scope. P6.6.1, P6.6.2, and
+P6.6.3 are complete. P6.6.4 is deferred to the post-0.2 store-candidate track.
 
 Prepare for browser-store distribution to reduce manual loading friction.
 
@@ -698,11 +699,23 @@ P6.6.3 completed:
 - Defined a future store-candidate track around optional host access and
   optional network diagnostics, without changing runtime behavior yet.
 
-P6.6.4 next:
+P6.6.4 deferred:
 
 - Design the store-candidate permission UX and technical prototype plan:
   optional host access, missing-permission recovery, optional diagnostics, and
   the exact docs/tool/skill/test surfaces that would change.
+- This is not a `0.2.0` npm/unpacked release blocker.
+
+### P7.1 0.2.0 Release Closure
+
+Status: in progress.
+
+Scope:
+
+- bump package and extension versions to `0.2.0`;
+- preserve the npm/unpacked developer path and current local runtime behavior;
+- run metadata, release, real-browser E2E, and dry-run gates;
+- ask for explicit user confirmation before formal npm publish.
 
 ## Suggested Implementation Order
 

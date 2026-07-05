@@ -71,7 +71,7 @@ Build and inspect the browser extension zip:
 
 ```bash
 npm run package:extension
-unzip -l dist/yunti-browser-runtime-extension-0.1.0.zip
+unzip -l dist/yunti-browser-runtime-extension-0.2.0.zip
 ```
 
 `npm run release:check` also validates this zip automatically by parsing the

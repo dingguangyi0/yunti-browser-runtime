@@ -3,14 +3,15 @@
 ## Current Phase
 
 Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
-implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
-`docs/NEXT_MAJOR_PLAN.md`.
+closing the `0.2.0 Best Browser Automation Runtime` npm/unpacked release
+candidate, documented in `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.6.4 store-candidate permission UX design.
+Current implementation focus: P7.1 `0.2.0` npm/unpacked release closure.
 P6.6.1 browser extension distribution readiness, P6.6.2 store-facing
 permission/privacy copy, and P6.6.3 pre-store permission strategy decision are
 complete; P6.5 optional local runtime console is complete through real-browser
-validation.
+validation. P6.6.4 store-candidate permission UX design is deferred to the
+post-0.2 store-candidate track.
 
 Latest visible 0.2.0 phase split:
 
@@ -75,7 +76,8 @@ Latest visible 0.2.0 phase split:
   doc links.
 - P6.6.2 completed: store-facing permission and privacy copy.
 - P6.6.3 completed: pre-store permission strategy decision.
-- P6.6.4 next: store-candidate permission UX design.
+- P6.6.4 deferred: store-candidate permission UX design.
+- P7.1 in progress: `0.2.0` npm/unpacked release closure.
 
 Latest detailed P6.2 status:
 
@@ -313,9 +315,18 @@ Latest detailed P6.2 status:
   public documentation residue checks, public Markdown link checks for 17 files,
   11 action-result coverage rows, npm package contents validation with 48
   files, and extension zip contents validation with 13 files.
-- Next: implement P6.6.4 store-candidate permission UX design, focused on the
-  user flow, agent recovery messages, doctor checks, and test matrix needed
-  before any manifest or extension behavior change.
+- Next: complete P7.1 `0.2.0` npm/unpacked release closure. Version has moved
+  to `0.2.0`; run metadata, release, real-browser E2E, and dry-run gates before
+  asking for confirmation to publish. P6.6.4 store-candidate permission UX is
+  intentionally deferred and should not block this npm/unpacked release.
+- P7.1 current validation: package and extension versions are both `0.2.0`;
+  `git diff --check`, token residue grep, `npm run release:check`,
+  `YUNTI_E2E=1 npm run test:e2e`, and direct
+  `npm publish --dry-run --registry=https://registry.npmjs.org/` passed.
+  `npm run check:metadata` passed once for the public GitHub/npm metadata, then
+  later failed because this environment timed out connecting to GitHub; scripted
+  `release:prepublish` and `release:dry-run` need to be rerun when GitHub is
+  reachable again.
 
 ## Current State
 
@@ -354,6 +365,8 @@ Latest detailed P6.2 status:
   registry at `https://registry.npmjs.org/`, avoiding accidental publication to
   a locally configured mirror registry.
 - `yunti-browser-runtime@0.1.3` is published on the official npm registry.
+- Current branch package and extension versions are being prepared as
+  `0.2.0` release candidate.
 - Extension popup is a zero-config status panel by default; Bridge URL, page
   matching, and optional Bridge Token stay under advanced settings.
 - `npm run test:e2e` provides an opt-in real-browser Playwright smoke test for
@@ -1088,8 +1101,9 @@ Latest detailed P6.2 status:
   console minimum loop, P6.5.2 local console diagnostic polish, and P6.5.3
   real-browser console validation. P6.6.1 browser extension distribution
   readiness, P6.6.2 store-facing permission/privacy copy, and P6.6.3 pre-store
-  permission strategy decision are complete. The next anchored slice is P6.6.4
-  store-candidate permission UX design.
+  permission strategy decision are complete. P6.6.4 store-candidate permission
+  UX design is deferred to post-0.2. The next anchored slice is P7.1 `0.2.0`
+  npm/unpacked release closure.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

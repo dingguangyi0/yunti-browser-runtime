@@ -633,7 +633,7 @@ P6.5.3 completed:
 
 ### P6.6 Extension Distribution Readiness
 
-Status: in progress; P6.6.1 is complete and P6.6.2 is next.
+Status: in progress; P6.6.1 and P6.6.2 are complete. P6.6.3 is next.
 
 Prepare for browser-store distribution to reduce manual loading friction.
 
@@ -662,7 +662,7 @@ P6.6.1 completed:
 - Linked the audit from README, Security notes, and Roadmap so it stays visible
   before any store-distributed release.
 
-P6.6.2 next:
+P6.6.2 scope:
 
 - Draft store-facing permission and privacy copy for `debugger`, `tabs`,
   `webRequest`, broad `http` / `https` access, localhost bridge access,
@@ -670,6 +670,23 @@ P6.6.2 next:
   memory.
 - Keep this as copy and decision support first; manifest narrowing remains a
   later tested implementation slice.
+
+P6.6.2 completed:
+
+- Added `docs/EXTENSION_STORE_COPY.md` as the draft store copy pack.
+- Drafted short and long descriptions, permission rationale, privacy-policy
+  language, store data disclosure guidance, reviewer notes, and final review
+  checklist.
+- Kept the current extension manifest and runtime behavior unchanged.
+
+P6.6.3 next:
+
+- Decide the pre-store permission strategy for broad host permissions and
+  `webRequest`: keep broad install-time access, move to optional host
+  permissions, optionalize diagnostics, or explicitly defer store submission.
+- If behavior changes, update `extension/manifest.json`, extension UX,
+  `mcp/tools.js`, Tool Guide, packaged skill, Security notes, and tests in one
+  small compatibility-preserving slice.
 
 ## Suggested Implementation Order
 

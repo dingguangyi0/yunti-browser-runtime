@@ -53,6 +53,9 @@ The current browser-store readiness audit and submission checklist are tracked
 in [EXTENSION_DISTRIBUTION.md](EXTENSION_DISTRIBUTION.md). That document is the
 source for store-facing permission rationale, privacy copy, and any future
 decision to keep or narrow broad host permissions.
+Draft store-facing text is tracked in
+[EXTENSION_STORE_COPY.md](EXTENSION_STORE_COPY.md) and must be reviewed before
+any browser-store submission.
 
 Users should only load the extension from a trusted local checkout.
 

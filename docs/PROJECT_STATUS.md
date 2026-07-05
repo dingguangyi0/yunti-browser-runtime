@@ -6,9 +6,10 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.6.2 store-facing permission and privacy copy.
-P6.6.1 browser extension distribution readiness is complete; P6.5 optional
-local runtime console is complete through real-browser validation.
+Current implementation focus: P6.6.3 pre-store permission strategy decision.
+P6.6.1 browser extension distribution readiness and P6.6.2 store-facing
+permission/privacy copy are complete; P6.5 optional local runtime console is
+complete through real-browser validation.
 
 Latest visible 0.2.0 phase split:
 
@@ -71,7 +72,8 @@ Latest visible 0.2.0 phase split:
   the opt-in Playwright extension smoke.
 - P6.6.1 completed: browser extension distribution readiness audit and public
   doc links.
-- P6.6.2 next: store-facing permission and privacy copy.
+- P6.6.2 completed: store-facing permission and privacy copy.
+- P6.6.3 next: pre-store permission strategy decision.
 
 Latest detailed P6.2 status:
 
@@ -283,10 +285,22 @@ Latest detailed P6.2 status:
   public documentation residue checks, public Markdown link checks for 15 files,
   11 action-result coverage rows, npm package contents validation with 46
   files, and extension zip contents validation with 13 files.
-- Next: implement P6.6.2 store-facing permission and privacy copy, turning the
-  audit into reviewable text for `debugger`, `tabs`, `webRequest`, broad host
-  access, localhost bridge access, DOM observation, screenshots,
-  network/console diagnostics, and learning memory.
+- Completed: P6.6.2 store-facing permission and privacy copy. Added
+  `docs/EXTENSION_STORE_COPY.md` with draft short and long descriptions,
+  permission rationale, privacy-policy language, store data disclosure guidance,
+  reviewer notes, local bridge dependency notes, and final review checklist.
+- Latest P6.6.2 validation: `git diff --check` passed; token residue grep
+  returned no matches; `npm run check` passed; `npm test` passed with 126
+  node:test cases total, 125 passing and 1 default real-browser smoke skipped;
+  `YUNTI_E2E=1 npm run test:e2e` passed with 1 real-browser smoke in the local
+  `pytest-playwright` environment; `npm run release:check` passed, including
+  public documentation residue checks, public Markdown link checks for 16 files,
+  11 action-result coverage rows, npm package contents validation with 47
+  files, and extension zip contents validation with 13 files.
+- Next: implement P6.6.3 pre-store permission strategy decision, focused on
+  whether broad host access and `webRequest` stay default, move to optional
+  permissions/diagnostics, or whether store submission should be deferred while
+  preserving the npm/unpacked extension path.
 
 ## Current State
 
@@ -1058,8 +1072,8 @@ Latest detailed P6.2 status:
   screenshot non-redaction diagnostic guidance, P6.5.1 optional local runtime
   console minimum loop, P6.5.2 local console diagnostic polish, and P6.5.3
   real-browser console validation. P6.6.1 browser extension distribution
-  readiness is complete. The next anchored slice is P6.6.2 store-facing
-  permission and privacy copy.
+  readiness and P6.6.2 store-facing permission/privacy copy are complete. The
+  next anchored slice is P6.6.3 pre-store permission strategy decision.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

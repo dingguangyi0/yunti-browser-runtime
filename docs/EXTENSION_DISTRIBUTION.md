@@ -110,8 +110,21 @@ Recommended next slice: keep current manifest behavior, but draft store-facing
 permission and privacy copy. Then decide whether `webRequest` and broad hosts
 should become optional before a real store submission.
 
+## Store Copy Draft
+
+P6.6.2 store-facing copy is tracked in
+[EXTENSION_STORE_COPY.md](EXTENSION_STORE_COPY.md). It contains draft short and
+long descriptions, permission rationale, privacy-policy text, store data
+disclosure guidance, reviewer notes, and the final review checklist.
+
 ## Current P6.6.1 Outcome
 
 P6.6.1 completes when this audit is linked from public docs and the status files
 identify the next store-readiness slice. It does not change extension runtime
 behavior.
+
+## Current P6.6.2 Outcome
+
+P6.6.2 completes when the draft store copy pack is available and linked from
+this distribution readiness audit. It does not change extension runtime
+behavior or the submitted manifest strategy.

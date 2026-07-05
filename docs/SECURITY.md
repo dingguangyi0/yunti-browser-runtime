@@ -56,6 +56,10 @@ decision to keep or narrow broad host permissions.
 Draft store-facing text is tracked in
 [EXTENSION_STORE_COPY.md](EXTENSION_STORE_COPY.md) and must be reviewed before
 any browser-store submission.
+The pre-store permission strategy is tracked in
+[EXTENSION_PERMISSION_STRATEGY.md](EXTENSION_PERMISSION_STRATEGY.md); the
+current npm/unpacked path keeps broad local automation permissions, while a
+store-candidate path should be designed separately before submission.
 
 Users should only load the extension from a trusted local checkout.
 

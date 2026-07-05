@@ -8,6 +8,10 @@ Current status: draft for maintainer review. Do not submit this text to a store
 until the maintainer has confirmed the final permission strategy, privacy-policy
 URL, support URL, screenshots, and test instructions.
 
+The current pre-store permission strategy decision is tracked in
+`docs/EXTENSION_PERMISSION_STRATEGY.md`. Store copy must be reviewed again after
+any manifest or permission-mode change.
+
 ## Policy Baseline
 
 This copy follows the browser-store principles recorded in
@@ -190,6 +194,8 @@ Before store submission:
   manifest or moves to optional host permissions.
 - Confirm whether `webRequest` remains always-on or becomes an optional
   diagnostics feature.
+- Confirm the submitted build follows the accepted strategy in
+  `docs/EXTENSION_PERMISSION_STRATEGY.md`.
 - Confirm the final privacy-policy URL and support URL.
 - Confirm screenshots do not expose real private browser data.
 - Confirm all store form answers match the submitted manifest and package.

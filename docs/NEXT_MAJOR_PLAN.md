@@ -633,7 +633,7 @@ P6.5.3 completed:
 
 ### P6.6 Extension Distribution Readiness
 
-Status: in progress; P6.6.1 and P6.6.2 are complete. P6.6.3 is next.
+Status: in progress; P6.6.1, P6.6.2, and P6.6.3 are complete. P6.6.4 is next.
 
 Prepare for browser-store distribution to reduce manual loading friction.
 
@@ -679,7 +679,7 @@ P6.6.2 completed:
   checklist.
 - Kept the current extension manifest and runtime behavior unchanged.
 
-P6.6.3 next:
+P6.6.3 scope:
 
 - Decide the pre-store permission strategy for broad host permissions and
   `webRequest`: keep broad install-time access, move to optional host
@@ -687,6 +687,22 @@ P6.6.3 next:
 - If behavior changes, update `extension/manifest.json`, extension UX,
   `mcp/tools.js`, Tool Guide, packaged skill, Security notes, and tests in one
   small compatibility-preserving slice.
+
+P6.6.3 completed:
+
+- Added `docs/EXTENSION_PERMISSION_STRATEGY.md` as the pre-store permission
+  decision record.
+- Kept the npm/unpacked developer path unchanged for `0.2.0`.
+- Decided that the current broad-permission manifest should not be submitted to
+  browser stores unchanged by default.
+- Defined a future store-candidate track around optional host access and
+  optional network diagnostics, without changing runtime behavior yet.
+
+P6.6.4 next:
+
+- Design the store-candidate permission UX and technical prototype plan:
+  optional host access, missing-permission recovery, optional diagnostics, and
+  the exact docs/tool/skill/test surfaces that would change.
 
 ## Suggested Implementation Order
 

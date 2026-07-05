@@ -80,7 +80,8 @@
 | P6.5.3 | 已完成 | 控制台真实浏览器验收与 UX 收口 |
 | P6.6.1 | 已完成 | 浏览器扩展分发准备 |
 | P6.6.2 | 已完成 | 商店权限与隐私文案草案 |
-| P6.6.3 | 下一步 | 商店前权限策略决策 |
+| P6.6.3 | 已完成 | 商店前权限策略决策 |
+| P6.6.4 | 下一步 | Store candidate 权限 UX 设计 |
 
 当前 0.2.0 推进快照（2026-07-05）：
 
@@ -274,8 +275,10 @@
   差距审计，未改权限或上架。
 - P6.6.2 已完成：商店权限与隐私文案草案已沉淀为可审核、可复用的
   store-facing 文案。
-- 下一步固定为 P6.6.3：商店前权限策略决策，重点评估 broad host permissions 和
-  `webRequest` 是否继续默认启用、改为 optional，或延后商店上架。
+- P6.6.3 已完成：商店前权限策略决策已沉淀，当前 npm/unpacked 路径保持完整能力；
+  当前 broad-permission manifest 不作为默认推荐商店提交版本。
+- 下一步固定为 P6.6.4：Store candidate 权限 UX 设计，重点设计 optional host access、
+  missing-permission recovery、optional network diagnostics 和对应测试。
 
 ## 压缩上下文恢复锚点
 
@@ -300,10 +303,12 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.6.3：商店前权限策略决策。P6.6.1 已完成浏览器扩展分发准备，
+当前锚点是 P6.6.4：Store candidate 权限 UX 设计。P6.6.1 已完成浏览器扩展分发准备，
 包括 manifest 权限审计、商店材料清单和 docs/EXTENSION_DISTRIBUTION.md。P6.6.2 已完成
 docs/EXTENSION_STORE_COPY.md，包含商店描述、权限说明、隐私草案、data disclosure
-和 reviewer notes。P6.5.1 已完成可选本地控制台最小闭环，
+和 reviewer notes。P6.6.3 已完成 docs/EXTENSION_PERMISSION_STRATEGY.md，结论是
+npm/unpacked 路径保持完整能力，商店候选版本另行设计 optional host access 和 optional
+network diagnostics。P6.5.1 已完成可选本地控制台最小闭环，
 P6.5.2 已完成版本 warning、HEAD /console、doctor console URL 和空状态指引增强，
 P6.5.3 已完成控制台真实浏览器 E2E 验收。P6.1.4 真实浏览器 observe -> click uid ->
 observe/verify 闭环已补验通过。保留现有兼容字段，必要时更新
@@ -2582,19 +2587,29 @@ P6.6.2 完成范围：
   rationale、privacy-policy draft、store data disclosure guidance、reviewer notes
   和 final review checklist。
 
-P6.6.3 下一步：
+P6.6.3 完成范围：
 
 - 决定商店版本前的权限策略：继续 broad host access、迁移到 optional host
   permissions、将 `webRequest` 诊断可选化，或明确 0.2.0 继续只保留 unpacked/npm
   分发路径。
 - 如果改变行为，需要同步 extension manifest/UX、`mcp/tools.js`、Tool Guide、skill、
   Security docs 和测试。
+- 新增 `docs/EXTENSION_PERMISSION_STRATEGY.md`，明确当前 npm/unpacked 路径保持完整能力；
+  当前 broad-permission manifest 不建议默认直接提交商店；store-candidate track
+  需要先设计 optional host access、missing-permission recovery 和 optional diagnostics。
+- 本切片不改变 extension manifest 或 runtime 行为。
+
+P6.6.4 下一步：
+
+- 设计 store-candidate 权限 UX 和技术原型计划。
+- 明确 popup/doctor/MCP error/tool hints/Tool Guide/skill/tests 在 optional host access
+  和 optional network diagnostics 下如何变化。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
 ## P6.6 浏览器扩展分发准备
 
-状态：进行中；P6.6.1 和 P6.6.2 已完成，P6.6.3 下一步
+状态：进行中；P6.6.1-P6.6.3 已完成，P6.6.4 下一步
 
 目标：
 
@@ -2643,11 +2658,33 @@ P6.6.2 最新验证：
   Markdown 文件链接检查、action result coverage 11 行、npm package 内容 47 个文件和
   extension zip 内容 13 个文件。
 
-P6.6.3 下一步：
+P6.6.3 已完成：
 
 - 在不迷失 Yunti local-first / MCP-native 特色的前提下，做商店前权限策略决策。
 - 优先评估 broad host permissions 和 `webRequest` 是否继续保持默认、改为 optional，或
   延后商店上架。
+- `docs/EXTENSION_PERMISSION_STRATEGY.md` 已明确两轨策略：developer/npm track
+  保持当前 zero-config broad-access 体验；store-candidate track 另行设计可选 host access
+  和可选 network diagnostics。
+- 当前 manifest 和 runtime 行为不变。
+
+P6.6.3 最新验证：
+
+- `git diff --check` 通过。
+- token 残留检查无输出。
+- `npm run check` 通过。
+- `npm test` 通过，覆盖 126 个 node:test 用例，其中 125 个通过、1 个默认真实浏览器
+  smoke 按配置跳过。
+- `YUNTI_E2E=1 npm run test:e2e` 在本机 `pytest-playwright` 环境下通过 1 个真实浏览器
+  extension bridge smoke；conda 仅打印 requests 依赖版本 warning，不影响结果。
+- `npm run release:check` 通过，包含 public documentation residue check、17 个公开
+  Markdown 文件链接检查、action result coverage 11 行、npm package 内容 48 个文件和
+  extension zip 内容 13 个文件。
+
+P6.6.4 下一步：
+
+- 做 store-candidate 权限 UX 设计，列清楚用户操作、agent 恢复提示、doctor 检查和测试矩阵。
+- 该设计完成后，再决定是否进入 manifest/extension 代码实现。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2702,8 +2739,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   console diagnostics 存储边界、raw CDP / screenshot 非默认脱敏提示与清理边界。
   P6.1.4 真实浏览器闭环已补验通过，P6.5.1 可选本地运行时控制台最小闭环已完成，
   P6.5.2 控制台诊断增强第一刀已完成，P6.5.3 控制台真实浏览器 E2E 验收已完成，
-  P6.6.1 浏览器扩展分发准备已完成，P6.6.2 商店权限与隐私文案草案已完成。
-  下一刀建议进入 P6.6.3 商店前权限策略决策。
+  P6.6.1 浏览器扩展分发准备已完成，P6.6.2 商店权限与隐私文案草案已完成，
+  P6.6.3 商店前权限策略决策已完成。下一刀建议进入 P6.6.4 Store candidate 权限 UX 设计。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

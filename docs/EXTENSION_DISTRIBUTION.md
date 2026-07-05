@@ -117,6 +117,15 @@ P6.6.2 store-facing copy is tracked in
 long descriptions, permission rationale, privacy-policy text, store data
 disclosure guidance, reviewer notes, and the final review checklist.
 
+## Permission Strategy Decision
+
+P6.6.3 pre-store permission strategy is tracked in
+[EXTENSION_PERMISSION_STRATEGY.md](EXTENSION_PERMISSION_STRATEGY.md). The
+current decision keeps the npm/unpacked developer path unchanged, does not
+recommend submitting the current broad-permission manifest unchanged by default,
+and defines a future store-candidate track for optional host access and optional
+network diagnostics.
+
 ## Current P6.6.1 Outcome
 
 P6.6.1 completes when this audit is linked from public docs and the status files
@@ -128,3 +137,9 @@ behavior.
 P6.6.2 completes when the draft store copy pack is available and linked from
 this distribution readiness audit. It does not change extension runtime
 behavior or the submitted manifest strategy.
+
+## Current P6.6.3 Outcome
+
+P6.6.3 completes when the permission strategy decision is available and linked
+from this distribution readiness audit. It does not change extension runtime
+behavior or `extension/manifest.json`.

@@ -75,6 +75,9 @@ plan.
 - Track store-facing permission/privacy readiness in
   [EXTENSION_DISTRIBUTION.md](EXTENSION_DISTRIBUTION.md) before changing
   manifest behavior.
+- Keep the npm/unpacked path stable while evaluating the browser-store
+  permission strategy in
+  [EXTENSION_PERMISSION_STRATEGY.md](EXTENSION_PERMISSION_STRATEGY.md).
 
 ## Future: Remote Mode
 

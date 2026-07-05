@@ -6,8 +6,8 @@ Patch release `yunti-browser-runtime@0.1.3` is complete. The project is now
 implementing the `0.2.0 Best Browser Automation Runtime` cycle, documented in
 `docs/NEXT_MAJOR_PLAN.md`.
 
-Current implementation focus: P6.5.3 optional local runtime console real-browser
-validation and UX closeout. P6.5.2 diagnostic polish is implemented.
+Current implementation focus: P6.6.1 browser extension distribution readiness.
+P6.5 optional local runtime console is complete through real-browser validation.
 
 Latest visible 0.2.0 phase split:
 
@@ -64,7 +64,11 @@ Latest visible 0.2.0 phase split:
   /console`, runtime/expected-extension/session-extension version summaries,
   extension version mismatch warnings, visible warning cards, doctor console URL
   output, and stronger no-page recovery guidance.
-- P6.5.3 next: real-browser console validation and UX closeout.
+- P6.5.3 completed: real-browser console validation now checks `HEAD
+  /console`, `/console`, `/console/state`, runtime/extension version alignment,
+  connected page state, and absence of no-page or version-mismatch warnings in
+  the opt-in Playwright extension smoke.
+- P6.6.1 next: browser extension distribution readiness.
 
 Latest detailed P6.2 status:
 
@@ -249,7 +253,22 @@ Latest detailed P6.2 status:
   `npm run release:check` passed, including 11 action-result coverage rows, npm
   package contents validation with 45 files, and extension zip contents
   validation with 13 files.
-- Next: implement P6.5.3 real-browser console validation and UX closeout.
+- Completed: P6.5.3 real-browser console validation. `tests/e2e.test.js` now
+  verifies the optional local console against a real Playwright-loaded
+  extension session: `HEAD /console` returns HTML, `/console` renders the page,
+  `/console/state` includes runtime and expected extension versions, the
+  connected session reports the current extension version, and no
+  `NO_CONNECTED_PAGES` or `EXTENSION_VERSION_MISMATCH` warning appears after a
+  real page registers.
+- Latest P6.5.3 validation: `git diff --check` passed; token residue grep
+  returned no matches; `npm run check` passed; `npm test` passed with 126
+  node:test cases total, 125 passing and 1 default real-browser smoke skipped;
+  `YUNTI_E2E=1 npm run test:e2e` passed with 1 real-browser smoke test;
+  `npm run release:check` passed, including 11 action-result coverage rows, npm
+  package contents validation with 45 files, and extension zip contents
+  validation with 13 files.
+- Next: implement P6.6.1 browser extension distribution readiness, starting
+  with manifest permission/privacy/store-material audit and documentation.
 
 ## Current State
 
@@ -1019,8 +1038,9 @@ Latest detailed P6.2 status:
   Tool Guide use cases, P6.4.1 DOM redaction policy deepening, P6.4.2 learning
   memory / console diagnostic secret-boundary tightening, P6.4.3 raw CDP /
   screenshot non-redaction diagnostic guidance, P6.5.1 optional local runtime
-  console minimum loop, and P6.5.2 local console diagnostic polish. The next
-  anchored slice is P6.5.3 real-browser console validation and UX closeout.
+  console minimum loop, P6.5.2 local console diagnostic polish, and P6.5.3
+  real-browser console validation. The next anchored slice is P6.6.1 browser
+  extension distribution readiness.
 - For the next coding slice, update all affected guidance surfaces in one
   commit: `mcp/tools.js`, `docs/TOOL_GUIDE.md`,
   `skills/yunti-browser-runtime/SKILL.md`, `docs/EXECUTION_PLAN.md`, and this

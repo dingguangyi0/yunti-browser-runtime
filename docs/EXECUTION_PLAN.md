@@ -77,8 +77,8 @@
 | P6.4.3 | 已完成 | raw CDP / screenshot 非默认脱敏诊断的提示与清理边界 |
 | P6.5.1 | 已完成 | 可选本地运行时控制台最小闭环 |
 | P6.5.2 | 已完成 | 控制台诊断增强第一刀 |
-| P6.5.3 | 下一步 | 控制台真实浏览器验收与 UX 收口 |
-| P6.6.1 | 计划中 | 浏览器扩展分发准备 |
+| P6.5.3 | 已完成 | 控制台真实浏览器验收与 UX 收口 |
+| P6.6.1 | 下一步 | 浏览器扩展分发准备 |
 
 当前 0.2.0 推进快照（2026-07-05）：
 
@@ -259,9 +259,17 @@
   smoke 默认跳过；`YUNTI_E2E=1 npm run test:e2e` 通过 1 个真实浏览器 smoke；`npm run
   release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip 内容检查 13
   个文件。
-- 下一步固定为 P6.5.3：控制台真实浏览器验收与 UX 收口，包括重启本地控制台后用真实扩展检查
-  version mismatch 是否消失、空状态恢复路径是否清楚、warning 面板是否足够明显，以及是否需要
-  更细的 stale-session/extension-not-loaded 操作分支。
+- P6.5.3 已完成：`tests/e2e.test.js` 的真实浏览器 smoke 现在会加载扩展、注册真实页面、
+  检查 `HEAD /console`、读取 `/console` 页面和 `/console/state`，并验证 runtime version、
+  expected extension version、session extension version 都与 package version 一致，且不会出现
+  `NO_CONNECTED_PAGES` 或 `EXTENSION_VERSION_MISMATCH` warning。
+- P6.5.3 最新验证：`git diff --check` 通过；token 残留检查无输出；`npm run check`
+  通过；`npm test` 通过，覆盖 126 个 node:test 用例，其中 125 个通过、1 个真实浏览器
+  smoke 默认跳过；`YUNTI_E2E=1 npm run test:e2e` 通过 1 个真实浏览器 smoke；`npm run
+  release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip 内容检查 13
+  个文件。
+- 下一步固定为 P6.6.1：浏览器扩展分发准备，先做权限/隐私/商店材料清单和当前 manifest
+  差距审计，不急着改权限或上架。
 
 ## 压缩上下文恢复锚点
 
@@ -286,9 +294,10 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.5.3：控制台真实浏览器验收与 UX 收口。P6.5.1 已完成可选本地控制台最小闭环，
-P6.5.2 已完成版本 warning、HEAD /console、doctor console URL 和空状态指引增强。P6.1.4
-真实浏览器 observe -> click uid -> observe/verify 闭环已补验通过。保留现有兼容字段，必要时更新
+当前锚点是 P6.6.1：浏览器扩展分发准备。P6.5.1 已完成可选本地控制台最小闭环，
+P6.5.2 已完成版本 warning、HEAD /console、doctor console URL 和空状态指引增强，
+P6.5.3 已完成控制台真实浏览器 E2E 验收。P6.1.4 真实浏览器 observe -> click uid ->
+observe/verify 闭环已补验通过。保留现有兼容字段，必要时更新
 mcp/tools.js、docs/TOOL_GUIDE.md、skills/yunti-browser-runtime/SKILL.md、
 docs/EXECUTION_PLAN.md 和 docs/PROJECT_STATUS.md，并运行规定门禁。不要把项目改成
 Page Agent 克隆，保持 Yunti local-first、MCP-native、真实 Chrome/Edge、
@@ -2512,7 +2521,7 @@ P6.4.3 已落地：
 
 ## P6.5 可选本地运行时控制台
 
-状态：进行中；P6.5.1 最小闭环已完成
+状态：已完成；P6.5.1-P6.5.3 已完成
 
 目标：
 
@@ -2537,11 +2546,20 @@ P6.5.2 完成范围：
 - `HEAD /console` 与 `GET /console` 一样返回 200，便于探活工具检查。
 - `doctor` JSON 和 human summary 中加入 console URL。
 
-P6.5.3 下一步：
+P6.5.3 完成范围：
 
-- 用真实浏览器手动验收控制台从无页面到页面连接的恢复路径。
-- 检查 version warning 在重新加载当前扩展后是否消失。
-- 评估是否需要更细的 stale-session/extension-not-loaded 操作分支。
+- `YUNTI_E2E=1 npm run test:e2e` 覆盖真实扩展注册后控制台状态。
+- 验证 `HEAD /console`、`GET /console` 和 `/console/state` 都可用。
+- 验证 runtime version、expected extension version 和 session extension version 与
+  package version 一致。
+- 验证真实页面连接后不会出现 `NO_CONNECTED_PAGES` 或
+  `EXTENSION_VERSION_MISMATCH` warning。
+
+P6.6.1 下一步：
+
+- 审计当前 `extension/manifest.json` 的 permissions / host_permissions。
+- 整理 Chrome Web Store / Edge Add-ons 所需的权限说明、隐私说明和素材清单。
+- 保留 unpacked extension 开发路径，不在第一刀里改变现有权限行为。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2606,8 +2624,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 继续 0.2.0 的小切片推进：P6.4 已完成 DOM strict redaction、learning memory /
   console diagnostics 存储边界、raw CDP / screenshot 非默认脱敏提示与清理边界。
   P6.1.4 真实浏览器闭环已补验通过，P6.5.1 可选本地运行时控制台最小闭环已完成，
-  P6.5.2 控制台诊断增强第一刀已完成。下一刀建议进入 P6.5.3 控制台真实浏览器验收与
-  UX 收口。
+  P6.5.2 控制台诊断增强第一刀已完成，P6.5.3 控制台真实浏览器 E2E 验收已完成。
+  下一刀建议进入 P6.6.1 浏览器扩展分发准备。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

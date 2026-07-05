@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { handleJsonRpc, startBridgeServer } from "../mcp/server.js"
+import packageJson from "../package.json" with { type: "json" }
 
 const runE2e = process.env.YUNTI_E2E === "1"
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)))
@@ -53,6 +54,15 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     page = await context.newPage()
     await page.goto(pageServer.url)
     const browserSessionId = await waitForBrowserSession(bridgeUrl)
+    const consoleState = await getConsoleState(bridgeUrl)
+    assert.equal(consoleState.ok, true)
+    assert.equal(consoleState.runtime.version, packageJson.version)
+    assert.equal(consoleState.runtime.expectedExtensionVersion, packageJson.version)
+    assert.ok(consoleState.sessions.some((session) => session.browserSessionId === browserSessionId))
+    const consoleSession = consoleState.sessions.find((session) => session.browserSessionId === browserSessionId)
+    assert.equal(consoleSession.extensionVersion, packageJson.version)
+    assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_CONNECTED_PAGES"), false)
+    assert.equal(consoleState.warnings.some((warning) => warning.code === "EXTENSION_VERSION_MISMATCH"), false)
 
     const targets = await callTool(bridge, "yunti_list_browser_targets", { browserSessionId })
     assert.ok(targets.total >= 1)
@@ -161,6 +171,21 @@ async function waitForBrowserSession(bridgeUrl) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
   }
   throw new Error("Timed out waiting for extension page registration")
+}
+
+async function getConsoleState(bridgeUrl) {
+  const head = await fetch(`${bridgeUrl}/console`, { method: "HEAD" })
+  assert.equal(head.status, 200)
+  assert.match(head.headers.get("content-type") || "", /text\/html/)
+
+  const page = await fetch(`${bridgeUrl}/console`)
+  const html = await page.text()
+  assert.equal(page.status, 200)
+  assert.match(html, /Yunti Browser Runtime/)
+
+  const response = await fetch(`${bridgeUrl}/console/state?userId=local`)
+  assert.equal(response.status, 200)
+  return response.json()
 }
 
 async function callTool(bridge, name, args) {

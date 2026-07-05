@@ -422,7 +422,7 @@ Acceptance:
 
 ### P6.2 Robust DOM Action Layer
 
-Status: in progress; minimum local console loop completed in P6.5.1.
+Status: completed through real-browser validation.
 
 Extract DOM actions from the current content/tool handler code into a focused
 module such as `extension/dom-actions.js`. Use Page Agent's action sequencing
@@ -623,14 +623,17 @@ P6.5.2 completed:
 - Console UI renders version metadata and warning cards.
 - `doctor` JSON and human summary include the optional console URL.
 
-Remaining P6.5 work:
+P6.5.3 completed:
 
-- real-browser operator validation from empty state to connected page.
-- UX closeout for stale-session and extension-not-loaded recovery branches.
+- Real-browser E2E validates `HEAD /console`, `/console`, `/console/state`,
+  runtime/extension version alignment, connected page state, and absence of
+  no-page/version-mismatch warnings after a page registers.
+- Remaining stale-session and extension-not-loaded UX refinement can continue as
+  polish, but P6.5 no longer blocks the 0.2.0 direction.
 
 ### P6.6 Extension Distribution Readiness
 
-Status: planned.
+Status: next.
 
 Prepare for browser-store distribution to reduce manual loading friction.
 

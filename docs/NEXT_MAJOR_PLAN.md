@@ -633,7 +633,7 @@ P6.5.3 completed:
 
 ### P6.6 Extension Distribution Readiness
 
-Status: next.
+Status: in progress; P6.6.1 is complete and P6.6.2 is next.
 
 Prepare for browser-store distribution to reduce manual loading friction.
 
@@ -650,6 +650,26 @@ Acceptance:
 - A store submission checklist exists.
 - Permission rationale is understandable to non-developers.
 - Release packaging can produce both npm package and extension-store artifact.
+
+P6.6.1 completed:
+
+- Added `docs/EXTENSION_DISTRIBUTION.md` as the durable browser-store readiness
+  audit.
+- Audited the current `extension/manifest.json` permissions and broad host
+  access without changing runtime behavior.
+- Captured Chrome Web Store and Edge Add-ons policy references, store material
+  checklist, privacy disclosure topics, and permission narrowing options.
+- Linked the audit from README, Security notes, and Roadmap so it stays visible
+  before any store-distributed release.
+
+P6.6.2 next:
+
+- Draft store-facing permission and privacy copy for `debugger`, `tabs`,
+  `webRequest`, broad `http` / `https` access, localhost bridge access,
+  screenshots, DOM observation, network/console diagnostics, and learning
+  memory.
+- Keep this as copy and decision support first; manifest narrowing remains a
+  later tested implementation slice.
 
 ## Suggested Implementation Order
 

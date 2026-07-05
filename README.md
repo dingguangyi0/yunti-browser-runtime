@@ -156,6 +156,8 @@ npm run package:extension
 ```
 
 输出文件位于 `dist/yunti-browser-runtime-extension-<version>.zip`，zip 内只包含扩展运行所需文件。
+浏览器商店分发前的权限、隐私和素材准备清单见
+[扩展分发准备度](docs/EXTENSION_DISTRIBUTION.md)。
 
 ## 给 Agent 注册 MCP
 

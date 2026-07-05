@@ -49,6 +49,11 @@ allowlist can be configured in the extension popup with page match patterns, and
 store-distributed releases should re-review whether broad host permissions are
 still appropriate for the intended audience.
 
+The current browser-store readiness audit and submission checklist are tracked
+in [EXTENSION_DISTRIBUTION.md](EXTENSION_DISTRIBUTION.md). That document is the
+source for store-facing permission rationale, privacy copy, and any future
+decision to keep or narrow broad host permissions.
+
 Users should only load the extension from a trusted local checkout.
 
 ## Privacy Notes

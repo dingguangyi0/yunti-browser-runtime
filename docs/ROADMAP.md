@@ -72,6 +72,9 @@ plan.
 - Add optional local runtime console without changing the zero-config install
   path.
 - Prepare extension distribution readiness for browser stores.
+- Track store-facing permission/privacy readiness in
+  [EXTENSION_DISTRIBUTION.md](EXTENSION_DISTRIBUTION.md) before changing
+  manifest behavior.
 
 ## Future: Remote Mode
 

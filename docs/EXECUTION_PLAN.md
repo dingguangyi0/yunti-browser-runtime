@@ -78,7 +78,8 @@
 | P6.5.1 | 已完成 | 可选本地运行时控制台最小闭环 |
 | P6.5.2 | 已完成 | 控制台诊断增强第一刀 |
 | P6.5.3 | 已完成 | 控制台真实浏览器验收与 UX 收口 |
-| P6.6.1 | 下一步 | 浏览器扩展分发准备 |
+| P6.6.1 | 已完成 | 浏览器扩展分发准备 |
+| P6.6.2 | 下一步 | 商店权限与隐私文案草案 |
 
 当前 0.2.0 推进快照（2026-07-05）：
 
@@ -268,8 +269,10 @@
   smoke 默认跳过；`YUNTI_E2E=1 npm run test:e2e` 通过 1 个真实浏览器 smoke；`npm run
   release:check` 通过，并完成 npm package 内容检查 45 个文件和 extension zip 内容检查 13
   个文件。
-- 下一步固定为 P6.6.1：浏览器扩展分发准备，先做权限/隐私/商店材料清单和当前 manifest
-  差距审计，不急着改权限或上架。
+- P6.6.1 已完成：浏览器扩展分发准备，已沉淀权限/隐私/商店材料清单和当前 manifest
+  差距审计，未改权限或上架。
+- 下一步固定为 P6.6.2：商店权限与隐私文案草案，把审计结果转成可审核、可复用的
+  store-facing 文案。
 
 ## 压缩上下文恢复锚点
 
@@ -294,7 +297,8 @@
 ```text
 继续推进 yunti-browser-runtime 0.2.0。请先读取 docs/PROJECT_STATUS.md、
 docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md，只做一个兼容优先的小切片。
-当前锚点是 P6.6.1：浏览器扩展分发准备。P6.5.1 已完成可选本地控制台最小闭环，
+当前锚点是 P6.6.2：商店权限与隐私文案草案。P6.6.1 已完成浏览器扩展分发准备，
+包括 manifest 权限审计、商店材料清单和 docs/EXTENSION_DISTRIBUTION.md。P6.5.1 已完成可选本地控制台最小闭环，
 P6.5.2 已完成版本 warning、HEAD /console、doctor console URL 和空状态指引增强，
 P6.5.3 已完成控制台真实浏览器 E2E 验收。P6.1.4 真实浏览器 observe -> click uid ->
 observe/verify 闭环已补验通过。保留现有兼容字段，必要时更新
@@ -2555,22 +2559,56 @@ P6.5.3 完成范围：
 - 验证真实页面连接后不会出现 `NO_CONNECTED_PAGES` 或
   `EXTENSION_VERSION_MISMATCH` warning。
 
-P6.6.1 下一步：
+P6.6.1 完成范围：
 
 - 审计当前 `extension/manifest.json` 的 permissions / host_permissions。
 - 整理 Chrome Web Store / Edge Add-ons 所需的权限说明、隐私说明和素材清单。
 - 保留 unpacked extension 开发路径，不在第一刀里改变现有权限行为。
+- 新增 `docs/EXTENSION_DISTRIBUTION.md`，并从 README、Security 和 Roadmap 链接。
+
+P6.6.2 下一步：
+
+- 起草面向 Chrome Web Store / Edge Add-ons 的权限说明和隐私披露文本。
+- 覆盖 `debugger`、`tabs`、`webRequest`、广泛 `http` / `https` host access、
+  localhost bridge、DOM observation、screenshots、network/console diagnostics
+  和 learning memory。
+- 只沉淀文案与决策依据；不在这一刀直接收窄 manifest 权限。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
 ## P6.6 浏览器扩展分发准备
 
-状态：计划中
+状态：进行中；P6.6.1 已完成，P6.6.2 下一步
 
 目标：
 
 准备 Chrome Web Store / Edge Add-ons 上架材料和权限说明，降低最终用户手动加载扩展的
 安装成本，同时保留 unpacked extension 开发路径。
+
+P6.6.1 已完成：
+
+- `docs/EXTENSION_DISTRIBUTION.md` 记录当前 manifest 权限审计、官方策略参考、
+  store submission checklist、隐私披露主题和权限收窄选项。
+- 该审计已接入 README、Security 和 Roadmap，避免后续发布商店版本前丢失上下文。
+- 本切片不改变 extension runtime 行为，也不收窄 manifest 权限。
+
+P6.6.1 最新验证：
+
+- `git diff --check` 通过。
+- token 残留检查无输出。
+- `npm run check` 通过。
+- `npm test` 通过，覆盖 126 个 node:test 用例，其中 125 个通过、1 个默认真实浏览器
+  smoke 按配置跳过。
+- `YUNTI_E2E=1 npm run test:e2e` 在本机 `pytest-playwright` 环境下通过 1 个真实浏览器
+  extension bridge smoke；conda 仅打印 requests 依赖版本 warning，不影响结果。
+- `npm run release:check` 通过，包含 public documentation residue check、15 个公开
+  Markdown 文件链接检查、action result coverage 11 行、npm package 内容 46 个文件和
+  extension zip 内容 13 个文件。
+
+P6.6.2 下一步：
+
+- 将 P6.6.1 的审计结果转成可提交商店时使用的 permission rationale 和 privacy copy 草案。
+- 明确哪些内容可直接用于 store listing，哪些仍需用户/维护者最终确认。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2624,8 +2662,8 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
 - 继续 0.2.0 的小切片推进：P6.4 已完成 DOM strict redaction、learning memory /
   console diagnostics 存储边界、raw CDP / screenshot 非默认脱敏提示与清理边界。
   P6.1.4 真实浏览器闭环已补验通过，P6.5.1 可选本地运行时控制台最小闭环已完成，
-  P6.5.2 控制台诊断增强第一刀已完成，P6.5.3 控制台真实浏览器 E2E 验收已完成。
-  下一刀建议进入 P6.6.1 浏览器扩展分发准备。
+  P6.5.2 控制台诊断增强第一刀已完成，P6.5.3 控制台真实浏览器 E2E 验收已完成，
+  P6.6.1 浏览器扩展分发准备已完成。下一刀建议进入 P6.6.2 商店权限与隐私文案草案。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

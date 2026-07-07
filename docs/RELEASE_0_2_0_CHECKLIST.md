@@ -641,7 +641,7 @@ http://127.0.0.1:48887/console
 - store-candidate manifest；
 - 商店权限相关测试。
 
-当前发布目标是 npm/unpacked release candidate，而不是浏览器商店提交版。
+0.2.0 发布目标是 npm/unpacked release，而不是浏览器商店提交版。
 
 ## 发布门禁增强
 
@@ -775,14 +775,14 @@ http://127.0.0.1:48887/console
 
 这些边界是主动选择。当前重点是把 Yunti 做成可靠的本地浏览器操作层。
 
-## 发布前清单
+## 发布前后清单
 
 正式发布 `0.2.0` 前确认：
 
 - 工作区干净；
 - `package.json` 是 `0.2.0`；
 - `extension/manifest.json` 是 `0.2.0`；
-- README 在发布前仍说明稳定版为 `0.1.3`，发布后再改成 `0.2.0`；
+- README 发布前仍说明稳定版为 `0.1.3`，发布后改成 `0.2.0`；
 - browser store 工作明确为 post-0.2；
 - public files 没有 npm/GitHub 凭据或 registry auth 配置片段；
 - `npm run check:metadata` 通过；
@@ -803,7 +803,12 @@ npm run release:publish
 npm run release:verify-published
 ```
 
-发布后还需要把 README 和状态文档从 release candidate 更新为已经发布的 `0.2.0`。
+发布结果：
+
+- `npm run release:publish` 已发布 `yunti-browser-runtime@0.2.0`；
+- `npm run release:verify-published` 已验证 name、version、repository、homepage、bugs
+  和 tarball URL；
+- README 和状态文档已从发布候选状态更新为已经发布的 `0.2.0`。
 
 ## 对外 changelog 短版
 

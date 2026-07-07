@@ -314,10 +314,9 @@ token。
 
 ## 发布状态与后续事项
 
-- 当前稳定发布版本：`yunti-browser-runtime@0.1.3`。
-- 当前分支正在收口 `0.2.0` npm/unpacked extension 发布候选版本；`0.2.0`
-  增强了 `yunti_observe_page`、fresh uid 操作闭环、结构化恢复诊断、DOM/diagnostic
-  脱敏和可选本地控制台。
-- 发布后验证命令：`npm run release:verify-published`。
+- 当前稳定发布版本：`yunti-browser-runtime@0.2.0`。
+- `0.2.0` 已发布到官方 npm registry，增强了 `yunti_observe_page`、fresh uid
+  操作闭环、结构化恢复诊断、DOM/diagnostic 脱敏和可选本地控制台。
+- 发布后验证已通过：`npm run release:verify-published`。
 - 浏览器扩展商店版本不阻塞 `0.2.0` npm 发布；如要上架商店，需要沿
   `docs/EXTENSION_PERMISSION_STRATEGY.md` 另行设计 store-candidate 权限 UX。

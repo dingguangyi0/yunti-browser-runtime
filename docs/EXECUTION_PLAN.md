@@ -82,7 +82,7 @@
 | P6.6.2 | 已完成 | 商店权限与隐私文案草案 |
 | P6.6.3 | 已完成 | 商店前权限策略决策 |
 | P6.6.4 | 后置 | Store candidate 权限 UX 设计 |
-| P7.1 | 进行中 | 0.2.0 npm/unpacked 发布收口 |
+| P7.1 | 已完成 | 0.2.0 npm/unpacked 发布收口 |
 
 当前 0.2.0 推进快照（2026-07-05）：
 
@@ -2691,7 +2691,7 @@ P6.6.4 后置：
 
 ## P7.1 0.2.0 npm/unpacked 发布收口
 
-状态：进行中
+状态：已完成
 
 目标：
 
@@ -2700,32 +2700,31 @@ P6.6.4 后置：
 完成范围：
 
 - package 和 extension 版本同步提升到 `0.2.0`。
-- README / Release / status / execution plan 更新为 0.2.0 release candidate。
-- 执行 `npm run check:metadata`、`npm run release:prepublish`、真实浏览器 E2E 和
-  `npm run release:dry-run`。
-- 不在本切片执行 `npm run release:publish`，除非用户明确要求发布。
+- README / Release / status / execution plan 先更新为 0.2.0 发布候选状态，并在发布后
+  更新为已发布状态。
+- 执行 `npm run check:metadata`、`npm run release:prepublish`、真实浏览器 E2E、
+  `npm run release:dry-run`、`npm run release:publish` 和
+  `npm run release:verify-published`。
 
 当前验证：
 
 - `git diff --check` 通过。
 - token 残留检查无输出。
-- `npm run check:metadata` 曾通过，确认 GitHub repository/homepage/bugs URL 为 200，
-  npm registry 当前已发布版本为 `0.1.3`；随后同一检查因当前环境访问 GitHub 超时而失败。
-- `npm run release:check` 通过，包含 public documentation residue check、17 个公开
+- `npm run check:metadata` 通过，确认 GitHub repository/homepage/bugs URL 为 200。
+- `npm run release:check` 通过，包含 public documentation residue check、18 个公开
   Markdown 文件链接检查、version consistency check `0.2.0`、CLI smoke `0.2.0`、
-  action result coverage 11 行、npm package 内容 48 个文件和 extension zip 内容 13 个文件。
+  action result coverage 11 行、npm package 内容 49 个文件和 extension zip 内容 13 个文件。
 - `YUNTI_E2E=1 npm run test:e2e` 在本机 `pytest-playwright` 环境下通过 1 个真实浏览器
   extension bridge smoke；conda 仅打印 requests 依赖版本 warning，不影响结果。
-- `npm publish --dry-run --registry=https://registry.npmjs.org/` 通过，生成
-  `yunti-browser-runtime-0.2.0.tgz` dry-run 预览，tarball 共 48 个文件。
-- `npm run release:prepublish` 和 `npm run release:dry-run` 当前仍受
-  `check:metadata` 的 GitHub 请求超时影响，需要网络恢复后重跑。
+- `npm run release:dry-run` 通过，生成 `yunti-browser-runtime-0.2.0.tgz` dry-run
+  预览，tarball 共 49 个文件。
+- `npm run release:publish` 已发布 `yunti-browser-runtime@0.2.0` 到官方 npm registry。
+- `npm run release:verify-published` 已验证 name、version、repository、homepage、bugs
+  和 tarball URL。
 
 下一步：
 
-- 网络恢复后重跑 `npm run check:metadata`、`npm run release:prepublish` 和
-  `npm run release:dry-run`。
-- 上述脚本门禁全部通过后，由用户确认是否执行正式 npm publish。
+- 选择 post-0.2 下一阶段；P6.6.4 store-candidate 权限 UX 仍作为浏览器商店方向后置。
 
 详细范围、非目标和验收标准见 `docs/NEXT_MAJOR_PLAN.md`。
 
@@ -2768,8 +2767,7 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm registry。
-当前分支正在收口 `0.2.0` npm/unpacked release candidate。
+P0.1-P7.1 已完成，`yunti-browser-runtime@0.2.0` 已发布到官方 npm registry。
 
 - 发布后验证已通过：`npm run release:verify-published`。
 - 本地默认使用不再需要 bridge token；需要加固时可显式设置
@@ -2783,7 +2781,7 @@ P0.1-P6.0 已完成，`yunti-browser-runtime@0.1.3` 已发布到官方 npm regis
   P6.5.2 控制台诊断增强第一刀已完成，P6.5.3 控制台真实浏览器 E2E 验收已完成，
   P6.6.1 浏览器扩展分发准备已完成，P6.6.2 商店权限与隐私文案草案已完成，
   P6.6.3 商店前权限策略决策已完成。P6.6.4 Store candidate 权限 UX 设计已后置；
-  当前进入 P7.1 0.2.0 npm/unpacked 发布收口。
+  P7.1 0.2.0 npm/unpacked 发布收口已完成。
 - 保持兼容：不改变成功 fill、select、scroll、CDP、截图、network/console、file upload 或 tab
   能力；新增诊断只在失败结果或 observe 元数据里追加更具体的 `code`、`recoveryHint`、
   `element` / 字段状态摘要和验证提示。

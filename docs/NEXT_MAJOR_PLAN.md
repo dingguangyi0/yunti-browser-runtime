@@ -1,7 +1,7 @@
 # Next Major Plan: 0.2.0 Best Browser Automation Runtime
 
-This document is the durable planning contract for the next major development
-cycle after `yunti-browser-runtime@0.1.3`.
+This document is the durable planning contract for the `0.2.0` development
+cycle, now completed by `yunti-browser-runtime@0.2.0`.
 
 ## Goal
 
@@ -708,14 +708,14 @@ P6.6.4 deferred:
 
 ### P7.1 0.2.0 Release Closure
 
-Status: in progress.
+Status: completed.
 
 Scope:
 
 - bump package and extension versions to `0.2.0`;
 - preserve the npm/unpacked developer path and current local runtime behavior;
-- run metadata, release, real-browser E2E, and dry-run gates;
-- ask for explicit user confirmation before formal npm publish.
+- run metadata, release, real-browser E2E, dry-run, publish, and
+  post-publish verification gates.
 
 ## Suggested Implementation Order
 

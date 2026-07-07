@@ -2,6 +2,9 @@
 
 This runbook describes the local release checklist for Yunti Browser Runtime.
 
+For the detailed `0.2.0` release checklist and the full comparison against
+`0.1.0`, see [`docs/RELEASE_0_2_0_CHECKLIST.md`](RELEASE_0_2_0_CHECKLIST.md).
+
 ## Prerequisites
 
 - Node.js 22 or newer.

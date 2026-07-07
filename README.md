@@ -239,6 +239,7 @@ cp -R skills/yunti-browser-runtime ~/.codex/skills/
 - [工具指南](docs/TOOL_GUIDE.md)
 - [权限和隐私说明](docs/SECURITY.md)
 - [发布运行手册](docs/RELEASE.md)
+- [0.2.0 发布清单](docs/RELEASE_0_2_0_CHECKLIST.md)
 - [发布阻塞处理](docs/PUBLISHING_BLOCKERS.md)
 - [项目初衷](docs/PROJECT_INTENT.md)
 - [项目状态](docs/PROJECT_STATUS.md)

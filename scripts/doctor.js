@@ -120,7 +120,8 @@ function buildNextSteps(checks) {
     steps.push("Save the same token in the extension popup.")
   }
   if (checks.bridge.ok && !checks.bridge.extensionConnected) {
-    steps.push("Load the extension, open an http/https page, then refresh the target page.")
+    steps.push("Load or reload the extension and open an http/https page; Yunti will auto-register accessible tabs.")
+    steps.push("If no page appears after a few seconds, refresh the target page as a fallback.")
     steps.push(`Open the optional local console for live status: ${checks.bridge.consoleUrl}.`)
   }
   if (!checks.mcpServer.ok) {

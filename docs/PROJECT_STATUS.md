@@ -6,11 +6,12 @@ Release `yunti-browser-runtime@0.2.0` is complete and verified on the official
 npm registry. The current patch line is `0.2.1`, focused on making default
 observe-first page actions avoid automatic Chrome debugger attachment.
 
-Current implementation focus: `0.2.1` anti-debug-sensitive default action path.
-Fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
-`yunti_type_text`, and `yunti_press_key` now dispatch through content script
-page events instead of CDP mouse/keyboard/runtime commands. Explicit CDP,
-trace, screenshot fallback, drag/upload/emulation/resize, and legacy snapshot
+Current implementation focus: `0.2.1` install/bridge recovery without default
+manual page refresh. The anti-debug-sensitive default action path is already in
+place: fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
+`yunti_type_text`, and `yunti_press_key` dispatch through content script page
+events instead of CDP mouse/keyboard/runtime commands. Explicit CDP, trace,
+screenshot fallback, drag/upload/emulation/resize, and legacy snapshot
 compatibility remain low-level/advanced paths that may show the Chrome debugger
 banner.
 
@@ -20,6 +21,29 @@ permission/privacy copy, and P6.6.3 pre-store permission strategy decision are
 complete; P6.5 optional local runtime console is complete through real-browser
 validation. P6.6.4 store-candidate permission UX design is deferred to the
 post-0.2 store-candidate track.
+
+Active slice status: `0.2.1` install/bridge recovery has code and docs in
+progress. The extension background scans accessible `http` / `https` tabs after
+install/startup/background recovery, tab activation/update, popup refresh, and
+`yunti_list_browser_targets`; it pings existing content scripts, injects the
+packaged scripts when missing, and triggers registration automatically. Manual
+refresh is now documented as a last resort only for pages Chrome cannot inject
+into, unsupported protocols, missing permissions, or other browser-enforced
+limits.
+
+Acceptance for this slice:
+
+- Add `scripting`-based auto injection / auto registration for existing
+  supported tabs.
+- Trigger recovery on extension install/startup, tab activation/update, popup
+  refresh, and list-targets style inventory recovery where feasible.
+- Keep the content-script observe/action path non-CDP by default.
+- Update README, install guide, skill, Tool Guide, and usage hints so agents no
+  longer tell users to refresh as the default post-install step.
+- Doctor/no-session guidance should prefer automatic recovery and mention manual
+  refresh only as a fallback.
+- Verify with unit tests, release checks, and real-browser E2E if browser
+  behavior changes.
 
 Latest visible 0.2.0 phase split:
 

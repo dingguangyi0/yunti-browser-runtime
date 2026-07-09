@@ -84,6 +84,7 @@ Edge certification notes, and any public privacy-policy explanation.
 | --- | --- | --- | --- |
 | `activeTab` | Allows temporary access to the visible tab for user-directed capture and fallback operations. | Used as a narrower visible-tab fallback where possible. It does not replace persistent access needed for the current automation workflow. | Keep. |
 | `debugger` | Enables the local agent to control the user's browser tab through the browser's debugging protocol. | Core transport for CDP commands, target routing, console/runtime diagnostics, screenshots, and low-level recovery. This is high-sensitivity and must be explained as the product's primary browser automation mechanism. | Keep for current developer path; re-review before store submission. |
+| `scripting` | Lets the extension inject its packaged content scripts into supported pages that were already open before the extension loaded. | Used for automatic page registration and recovery after install, browser startup, or background service worker restart. It does not execute remote code. | Keep for current developer path so users do not need to refresh pages by default; re-review before store submission. |
 | `storage` | Saves local extension settings such as bridge URL, optional token, user id/name, and page match settings. | Stores local configuration only. It is not used for hosted sync by default. | Keep. |
 | `tabs` | Lets the agent list and switch the user's open browser tabs. | Needed for tab inventory, target selection, activation, and routing metadata. Store copy should explain that tab metadata is used only for user-directed local automation. | Keep for current workflow; evaluate narrower alternatives later. |
 | `webRequest` | Lets the runtime provide sanitized network diagnostics when debugging page automation. | Used for observation and diagnostics, not ad blocking or request modification. Because this combines with broad hosts, consider making network diagnostics optional in a later slice. | Keep for developer path; P6.6.3 should decide optionalization. |
@@ -151,7 +152,9 @@ include install and test steps:
 2. Install the runtime package.
 3. Start or configure an MCP-capable agent so it launches the local bridge.
 4. Install the extension build.
-5. Open and refresh an `http` or `https` page.
+5. Open or keep an `http` or `https` page; the extension auto-registers
+   accessible pages and only needs a refresh if browser restrictions prevent
+   injection.
 6. Run `yunti-browser-runtime doctor`.
 7. Verify that the extension shows a connected page and that MCP tools can list
    browser targets.

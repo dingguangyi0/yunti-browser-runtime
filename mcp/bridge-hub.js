@@ -810,11 +810,11 @@ export class BridgeHub {
       }),
       guidance: {
         noSessions:
-          "Keep this bridge running, load or reload the extension, open an http/https page, refresh that page, then run yunti-browser-runtime doctor.",
+          "Keep this bridge running, load or reload the extension, and open an http/https page. Yunti will auto-register accessible tabs; refresh the target page only if it remains invisible.",
         staleSession:
-          "Refresh the page or reload the extension, then call yunti_list_browser_targets before retrying browser tools.",
+          "Call yunti_list_browser_targets to refresh live routes; Yunti will try to auto-register accessible tabs before listing. Refresh the page only as a fallback.",
         versionMismatch:
-          "Reload the unpacked extension from the current package directory, then refresh open http/https pages.",
+          "Reload the unpacked extension from the current package directory. It will auto-register accessible open http/https pages; refresh only if a page remains invisible.",
         cancellation:
           "Cancel only clears runtime pending/queued requests; it does not undo browser-side effects that already happened.",
       },
@@ -829,7 +829,7 @@ function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
       code: "NO_CONNECTED_PAGES",
       severity: "warning",
       message:
-        "No browser pages are connected. Load or reload the extension, open an http/https page, and refresh the page.",
+        "No browser pages are connected. Load or reload the extension and open an http/https page; Yunti will auto-register accessible pages. Refresh only if the page remains invisible.",
     })
     return warnings
   }

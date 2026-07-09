@@ -12,6 +12,8 @@ import {
 export function createSessionManager() {
   const sessionsByTab = new Map()
   const pollers = new Map()
+  const pendingTabRecovery = new Map()
+  const lastInjectionAtByTab = new Map()
   let cachedPlatformMatches = null
   let toolRequestHandler = null
 
@@ -36,6 +38,104 @@ export function createSessionManager() {
       browserSessionId: session.browserSessionId,
       userId: session.userId || "",
     }).catch(() => {})
+  }
+
+  async function ensureAllTabsRegistered(options = {}) {
+    const settings = await getSettings()
+    cachedPlatformMatches = settings.platformMatches
+    const tabs = await chrome.tabs.query({})
+    const results = await Promise.allSettled(
+      tabs.map((tab) => ensureTabRegistered(tab.id, { ...options, tab, settings }))
+    )
+    return {
+      ok: true,
+      reason: options.reason || "manual",
+      checked: tabs.length,
+      recovered: results.filter((result) => result.value?.registered || result.value?.injected)
+        .length,
+      skipped: results.filter((result) => result.value?.skipped).length,
+      failed: results.filter((result) => result.status === "rejected" || result.value?.ok === false)
+        .length,
+    }
+  }
+
+  async function ensureTabRegistered(tabId, options = {}) {
+    if (!Number.isFinite(Number(tabId))) {
+      return { ok: false, skipped: true, reason: "missing_tab_id" }
+    }
+    const key = Number(tabId)
+    if (pendingTabRecovery.has(key)) return pendingTabRecovery.get(key)
+    const promise = recoverTabRegistration(key, options).finally(() => {
+      pendingTabRecovery.delete(key)
+    })
+    pendingTabRecovery.set(key, promise)
+    return promise
+  }
+
+  async function recoverTabRegistration(tabId, options = {}) {
+    const settings = options.settings || (await getSettings())
+    cachedPlatformMatches = settings.platformMatches
+    const tab = options.tab || (await chrome.tabs.get(tabId).catch(() => null))
+    if (!isInjectableTab(tab, settings)) {
+      return { ok: true, skipped: true, reason: "unsupported_tab" }
+    }
+    if (sessionsByTab.has(tabId)) {
+      await refreshTabRegistration(tabId).catch(() => null)
+      return { ok: true, registered: true, reason: "already_registered" }
+    }
+    const ping = await refreshTabRegistration(tabId).catch((error) => ({
+      ok: false,
+      error: error?.message || String(error),
+    }))
+    if (ping?.ok) {
+      return { ok: true, registered: true, reason: "content_script_present" }
+    }
+    const lastInjectionAt = lastInjectionAtByTab.get(tabId) || 0
+    if (Date.now() - lastInjectionAt < 5000) {
+      return { ok: true, skipped: true, reason: "recently_injected" }
+    }
+    const injected = await injectContentScripts(tabId).catch((error) => ({
+      ok: false,
+      error: error?.message || String(error),
+    }))
+    if (!injected?.ok) {
+      return { ok: false, reason: "inject_failed", error: injected?.error || "inject failed" }
+    }
+    lastInjectionAtByTab.set(tabId, Date.now())
+    await delay(50)
+    await refreshTabRegistration(tabId).catch(() => null)
+    return { ok: true, injected: true, reason: options.reason || "auto_recovery" }
+  }
+
+  function isInjectableTab(tab, settings) {
+    if (!tab?.id) return false
+    if (tab.discarded) return false
+    return isPlatformUrl(tab.url, settings)
+  }
+
+  async function refreshTabRegistration(tabId) {
+    return chrome.tabs.sendMessage(tabId, { type: "yunti_refresh_registration" })
+  }
+
+  async function injectContentScripts(tabId) {
+    if (!chrome.scripting?.executeScript) {
+      return { ok: false, error: "chrome.scripting permission is unavailable" }
+    }
+    if (chrome.scripting.insertCSS) {
+      await chrome.scripting.insertCSS({
+        target: { tabId },
+        files: ["content.css"],
+      })
+    }
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["dom-observer.js"],
+    })
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"],
+    })
+    return { ok: true }
   }
 
   async function handleMessage(message, sender) {
@@ -244,9 +344,7 @@ export function createSessionManager() {
   async function refreshActiveTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tab?.id) return { ok: false, error: "no active tab" }
-    await chrome.tabs
-      .sendMessage(tab.id, { type: "yunti_refresh_registration" })
-      .catch(() => null)
+    await ensureTabRegistered(tab.id, { tab, reason: "popup_refresh" }).catch(() => null)
     return getPanelState()
   }
 
@@ -254,6 +352,8 @@ export function createSessionManager() {
     sessionsByTab,
     pollers,
     activateTab,
+    ensureAllTabsRegistered,
+    ensureTabRegistered,
     forgetTab,
     forwardConsoleEvent,
     getPlatformMatches,
@@ -279,7 +379,7 @@ function normalizePageAuth(auth, source = "unknown") {
     return {
       state: "missing_from_content_script",
       loggedIn: false,
-      reason: "Content script did not report page state; reload the extension and refresh the page",
+      reason: "Content script did not report page state; Yunti will try automatic registration recovery before asking for a page refresh",
       checkedAt: new Date().toISOString(),
       checkedBy: source,
     }

@@ -18,6 +18,7 @@ const cdp = createCdpController({
   postBridge,
   startPolling,
   forwardConsoleEvent,
+  ensureAllTabsRegistered: sessionManager.ensureAllTabsRegistered,
 })
 
 const { detachCdpTab, installCdpEventForwarder } = cdp
@@ -45,6 +46,23 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   void sessionManager.activateTab(tabId)
+  void sessionManager.ensureTabRegistered(tabId, { reason: "tab_activated" }).catch(() => {})
+})
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return
+  void sessionManager.ensureTabRegistered(tabId, {
+    tab,
+    reason: "tab_updated_complete",
+  }).catch(() => {})
+})
+
+chrome.runtime.onInstalled.addListener(() => {
+  void sessionManager.ensureAllTabsRegistered({ reason: "extension_installed" }).catch(() => {})
+})
+
+chrome.runtime.onStartup.addListener(() => {
+  void sessionManager.ensureAllTabsRegistered({ reason: "browser_startup" }).catch(() => {})
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -53,3 +71,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   )
   return true
 })
+
+void sessionManager.ensureAllTabsRegistered({ reason: "background_started" }).catch(() => {})

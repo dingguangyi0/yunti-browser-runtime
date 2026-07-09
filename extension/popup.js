@@ -33,7 +33,7 @@ async function save() {
     return
   }
   renderSettings(state.settings || {})
-  setStatus("设置已保存。请刷新目标页面完成重新注册。")
+  setStatus("设置已保存。扩展会自动尝试重新注册可访问页面。")
 }
 
 function renderSettings(settings) {
@@ -56,7 +56,7 @@ function statusText(state) {
   if (!state.bridge?.ok) {
     return "Bridge 未连接。请确认 Agent MCP 已启动，或运行 yunti-browser-runtime bridge。"
   }
-  return "默认无需设置。打开或刷新任意 http/https 页面即可连接。"
+  return "默认无需设置。打开任意 http/https 页面后会自动连接。"
 }
 
 function setStatus(text) {

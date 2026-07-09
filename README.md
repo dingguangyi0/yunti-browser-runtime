@@ -52,7 +52,8 @@ npm install -g yunti-browser-runtime
 yunti-browser-runtime print-config -- --agent codex --human
 ```
 
-把输出的 MCP 配置加入 Agent 后，加载浏览器扩展并刷新任意 `http` / `https` 页面即可。
+把输出的 MCP 配置加入 Agent 后，加载浏览器扩展并打开或保持任意 `http` / `https`
+页面即可。扩展会自动扫描可访问页面、注入内容脚本并注册到本地 bridge。
 默认不需要填写 token，不需要打开扩展 popup，也不需要保存设置。
 
 需要独立调试 bridge 时，可以手动运行：
@@ -127,11 +128,11 @@ npm run doctor:json
 6. 引导我打开 Chrome/Edge 的扩展管理页，开启开发者模式，手动加载扩展目录：
    $(npm root -g)/yunti-browser-runtime/extension
 7. 告诉我：扩展默认 bridge URL 是 http://127.0.0.1:48887，本地默认不需要 token，不需要打开 popup，也不需要保存设置。
-8. 打开任意 http/https 页面并刷新。
+8. 打开或保持任意 http/https 页面；扩展会自动尝试注入并注册已有页面。
 9. 执行：yunti-browser-runtime doctor
 10. 如果 doctor 正常，再调用 yunti_list_browser_targets 或 yunti_get_tool_usage_hints 验证你能看到浏览器页面。
 
-注意：Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后默认立即可用，不要要求我填写 token、打开 popup 或保存设置；除非 doctor 明确提示 bridge 未运行，才让我单独执行 yunti-browser-runtime bridge。
+注意：Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后会自动尝试接管已打开的 http/https 页面，不要默认要求我刷新页面、填写 token、打开 popup 或保存设置；只有 doctor/list targets 仍看不到页面，且确认是浏览器限制或页面未加载完成时，才把刷新目标页作为兜底。
 ```
 
 ## 安装浏览器扩展
@@ -149,7 +150,7 @@ $(npm root -g)/yunti-browser-runtime/extension
 3. 点击“加载已解压的扩展程序”。
 4. 选择本项目的 `extension/` 目录。
 5. 打开任意 `http` 或 `https` 页面。
-6. 刷新目标页面即可连接。
+6. 扩展会自动扫描并注册可访问页面；如果 doctor 仍看不到页面，再刷新目标页作为兜底。
 
 扩展默认使用 `http://127.0.0.1:48887`，本地安装不需要 token，不需要打开 popup，
 也不需要保存设置。扩展 popup 首屏只显示连接状态；自定义 bridge URL、页面匹配或

@@ -194,7 +194,7 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 
 ## Recovery
 
-- No connected tab: ask the user to open a page, load the extension, or refresh the page.
+- No connected tab: call `yunti_list_browser_targets` or doctor first so Yunti can auto-register accessible tabs; ask the user to refresh only when the page remains invisible because of browser restrictions or a failed injection.
 - Stale session: call `yunti_list_browser_targets` and use the latest `browserSessionId`.
 - Stale or missing page uid: observe again once `yunti_observe_page` is available, or take a fresh snapshot for compatibility workflows.
 - Wrong tab: use `yunti_list_browser_targets` to find the intended tab, then route CDP with that tab's `tabId` or `targetId`.

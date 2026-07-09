@@ -338,7 +338,7 @@ function isExtensionContextInvalidated(error) {
 }
 
 function contextInvalidatedResponse() {
-  return { ok: false, error: "插件已重新加载，请刷新 browser page恢复连接。" }
+  return { ok: false, error: "插件已重新加载，正在等待扩展自动恢复连接；必要时再刷新页面。" }
 }
 
 function markExtensionContextInvalidated() {

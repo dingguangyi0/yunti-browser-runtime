@@ -2769,6 +2769,42 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 P0.1-P7.1 已完成，`yunti-browser-runtime@0.2.0` 已发布到官方 npm registry。
 
+## P7.2 0.2.1 安装后自动注入 / 自动注册页面
+
+状态：实施中，代码与文档已完成，等待完整验证和提交。
+
+目标：
+
+让用户加载扩展后尽量不需要手动刷新页面。扩展后台应主动扫描可访问的 `http` /
+`https` tabs，对没有注册 session 的页面注入 `dom-observer.js`、`content.js` 和
+`content.css`，再触发 `yunti_refresh_registration`，使 Agent 能直接发现和操作已打开页面。
+bridge 重启或 background service worker 恢复后，也应尽量自动恢复注册。
+
+非目标：
+
+- 不绕过 Chrome 对 `chrome://`、扩展页、Web Store、权限不足页面等不可注入页面的限制。
+- 不引入远程服务、不要求用户填写 token、不要求默认打开 popup。
+- 不改变普通 observe-first action 的非 CDP 默认路径。
+
+验收：
+
+- manifest 增加必要的 `scripting` 能力。
+- background/session manager 支持 scan -> ping -> inject -> refresh registration。
+- 安装/startup、tab update/activation、popup refresh、targets inventory/recovery 等路径能触发恢复。
+- README / INSTALL / skill / Tool Guide / usage hints / doctor guidance 不再默认要求用户刷新；
+  只把刷新作为无法注入时的兜底恢复。
+- `git diff --check`、token 残留检查、`npm run release:check` 通过；涉及真实浏览器链路时执行
+  `YUNTI_E2E=1 npm run test:e2e`。
+
+进展：
+
+- manifest 已新增 `scripting` 权限，用于向已打开的受支持页面注入打包内容脚本。
+- session manager 已支持 scan -> ping -> inject -> refresh registration，并带同页短时间去重。
+- background 已接入 install/startup/background start、tab activated、tab updated complete。
+- popup refresh 和 `yunti_list_browser_targets` 已接入自动恢复。
+- README、INSTALL、doctor、console guidance、skill、store/permission docs 已改为自动注册优先，
+  刷新页面只作为浏览器限制下的兜底。
+
 - 发布后验证已通过：`npm run release:verify-published`。
 - 本地默认使用不再需要 bridge token；需要加固时可显式设置
   `YUNTI_BROWSER_BRIDGE_TOKEN`。

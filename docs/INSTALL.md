@@ -63,7 +63,8 @@ Development loading:
 2. Enable developer mode.
 3. Choose "Load unpacked".
 4. Select the project `extension/` directory.
-5. Open or refresh any `http` or `https` page.
+5. Open or keep any `http` or `https` page. The extension automatically tries
+   to inject and register accessible existing pages.
 6. Do not open the extension popup unless you want to confirm status or
    customize settings.
 
@@ -150,8 +151,9 @@ npm run print-config -- --agent cline --human
 ```
 
 Add the printed server entry to Cline's MCP settings. Keep the extension loaded
-in Chrome/Edge and refresh the target page so the content script registers a
-fresh `browserSessionId`.
+in Chrome/Edge. The extension should register accessible `http`/`https` pages
+automatically; refresh the target page only if browser restrictions or a failed
+doctor check make it necessary.
 
 ## Check Health
 
@@ -187,7 +189,9 @@ runs the unit test suite, and verifies the npm package contents with
 
 ## Common Recovery
 
-- If tools say no browser tab is connected, refresh the target page.
+- If tools say no browser tab is connected, call `yunti_list_browser_targets`
+  or run doctor first; the extension will try to auto-register accessible pages.
+  Refresh the target page only as a fallback.
 - If doctor reports `authorized: false` with `authRequired: true`, set
   `YUNTI_BROWSER_BRIDGE_TOKEN` and save the same token in the extension popup.
 - If an old `browserSessionId` fails, call `yunti_list_browser_targets` again
@@ -198,8 +202,9 @@ runs the unit test suite, and verifies the npm package contents with
   is rejected.
 - For closing a raw `tabId` or `targetId`, use `yunti_cdp_send_command` with
   `Target.closeTarget` instead of `yunti_close_page`.
-- If the extension was reloaded, refresh browser pages so the content script can
-  register again.
+- If the extension was reloaded, it should scan and register accessible pages
+  automatically. Refresh browser pages only if the page cannot be injected or
+  remains invisible after the recovery check.
 
 ## Real Browser Smoke Test
 

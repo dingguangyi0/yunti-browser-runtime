@@ -4,6 +4,7 @@ export function createCdpController({
   postBridge,
   startPolling,
   forwardConsoleEvent,
+  ensureAllTabsRegistered,
 }) {
   const cdpAttachedTabs = new Set()
   const cdpEnabledDomains = new Map()
@@ -159,6 +160,9 @@ export function createCdpController({
   }
 
   async function listBrowserTargets(session) {
+    if (typeof ensureAllTabsRegistered === "function") {
+      await ensureAllTabsRegistered({ reason: "list_browser_targets" }).catch(() => null)
+    }
     const cdpResult = await interceptTargetGetTargets(session)
     const targetInfos = Array.isArray(cdpResult?.result?.targetInfos)
       ? cdpResult.result.targetInfos

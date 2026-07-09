@@ -12,7 +12,7 @@ current `0.2.0` development cycle:
 - broad `http` / `https` host access remains acceptable for the local developer
   and npm-installed extension path;
 - `webRequest` remains available by default for local diagnostics;
-- `debugger`, `tabs`, screenshots, CDP, network, console, upload, and tab
+- `debugger`, `scripting`, `tabs`, screenshots, CDP, network, console, upload, and tab
   capabilities remain part of Yunti's core local browser automation surface;
 - the current manifest should not be submitted to Chrome Web Store or Edge
   Add-ons as the recommended store build without an explicit maintainer
@@ -47,7 +47,7 @@ developer install:
 - Edge policy says extensions should request only permissions essential for the
   declared functionality, and must clearly disclose dependency on non-integrated
   software and testing steps.
-- Yunti's current `debugger`, broad host access, `tabs`, and `webRequest`
+- Yunti's current `debugger`, `scripting`, broad host access, `tabs`, and `webRequest`
   combination is truthful for a browser automation runtime, but it is also the
   highest-review-burden shape.
 
@@ -74,9 +74,11 @@ The safest product path is therefore:
 
 Keep current behavior:
 
-- `permissions`: `activeTab`, `debugger`, `storage`, `tabs`, `webRequest`.
+- `permissions`: `activeTab`, `debugger`, `scripting`, `storage`, `tabs`, `webRequest`.
 - `host_permissions`: `http://*/*`, `https://*/*`, localhost bridge access.
 - Static content scripts for `http` / `https` pages.
+- Programmatic injection for already-open supported pages after extension load,
+  startup, bridge recovery, or target inventory refresh.
 - Popup remains zero-config by default.
 - Advanced page match patterns remain a runtime registration filter, not a
   browser permission boundary.
@@ -113,9 +115,10 @@ Before any store build with narrowed permissions:
   when the current page is blocked by missing host permission.
 - Agent-facing errors should say whether the page is unavailable because host
   permission is missing, the bridge is offline, the page is unsupported, or the
-  extension needs a refresh.
+  browser blocked automatic injection.
 - Tool hints and the packaged skill should explain how to recover:
-  `open page -> grant site access -> refresh -> yunti_list_browser_targets`.
+  `open page -> grant site access -> yunti_list_browser_targets`, with page
+  refresh only as a fallback.
 - Optional network diagnostics should be visibly separate from basic DOM
   automation.
 - `doctor` should detect permission-mode problems and provide a human-readable
@@ -136,7 +139,7 @@ small and testable:
 6. Add real-browser E2E coverage for:
    - page blocked before host grant;
    - grant access;
-   - refresh/register;
+   - auto-register existing pages;
    - observe/action success;
    - optional diagnostics enabled/disabled.
 7. Update store copy and privacy text after the final manifest strategy is

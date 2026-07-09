@@ -38,6 +38,17 @@ Use this loop for normal page work:
 - Coordinates/selectors: use them as recovery or debugging paths when fresh
   uids are unavailable.
 
+## Debugger Boundary
+
+- In `0.2.1+`, normal observe-first page actions should not automatically
+  attach Chrome debugger. Prefer `yunti_observe_page` plus fresh uid
+  `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`, `yunti_scroll`,
+  `yunti_type_text`, and `yunti_press_key` on anti-debug-sensitive pages.
+- Chrome debugger banners may still appear for explicit low-level or advanced
+  tools such as `yunti_cdp_send_command`, raw CDP diagnostics, performance
+  tracing, screenshot fallback paths, drag, upload, emulation, resize, or
+  legacy snapshot compatibility.
+
 ## Confirmation Boundary
 
 Ask the user for explicit confirmation before:

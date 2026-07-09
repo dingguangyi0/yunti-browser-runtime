@@ -1,6 +1,6 @@
 {
   "name": "yunti-browser-runtime",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Local browser runtime and MCP tools for AI agents.",
   "license": "MIT",

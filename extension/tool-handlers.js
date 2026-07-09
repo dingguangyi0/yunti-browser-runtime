@@ -534,7 +534,30 @@ export function createToolDispatcher({
   async function clickByUid(tabId, session, args = {}) {
     const uid = String(args.uid || "").trim()
     if (uid) {
-      return clickViaSnapshotUid(tabId, session, uid)
+      const point = resolveObservedUidCenter(session, uid)
+      if (!point.ok) return buildUidPointFailureResult(session, uid, "click", point.error)
+      const result = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_click",
+        arguments: { ...args, x: point.x, y: point.y },
+      })
+      if (!result || typeof result !== "object" || result.clicked !== true) {
+        return buildUidPointFailureResult(session, uid, "click", result?.error || "Uid click failed")
+      }
+      const roundedX = Math.round(point.x)
+      const roundedY = Math.round(point.y)
+      return {
+        ...result,
+        uid,
+        x: roundedX,
+        y: roundedY,
+        browserSessionId: session.browserSessionId,
+        action: "click",
+        target: { uid, x: roundedX, y: roundedY },
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Click dispatched without attaching Chrome debugger. Observe again or read page state to verify the intended change.",
+      }
     }
     const x = Number(args.x)
     const y = Number(args.y)
@@ -542,7 +565,26 @@ export function createToolDispatcher({
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         throw new Error("yunti_click coordinate mode requires both x and y. Use yunti_click_at with x/y, or call yunti_take_snapshot and pass uid.")
       }
-      return clickAtCoordinate(tabId, session, x, y)
+      const result = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_click",
+        arguments: { ...args, x, y },
+      })
+      if (!result || typeof result !== "object" || result.clicked !== true) return result
+      const roundedX = Math.round(x)
+      const roundedY = Math.round(y)
+      return {
+        ...result,
+        x: roundedX,
+        y: roundedY,
+        browserSessionId: session.browserSessionId,
+        method: "coordinate",
+        action: "click",
+        target: { method: "coordinate", x: roundedX, y: roundedY },
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Coordinate click dispatched without attaching Chrome debugger. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
+      }
     }
     const selector = String(args.selector || "").trim()
     if (!selector) {
@@ -573,7 +615,30 @@ export function createToolDispatcher({
   async function hoverByUid(tabId, session, args = {}) {
     const uid = String(args.uid || "").trim()
     if (uid) {
-      return hoverViaSnapshotUid(tabId, session, uid)
+      const point = resolveObservedUidCenter(session, uid)
+      if (!point.ok) return buildUidPointFailureResult(session, uid, "hover", point.error)
+      const result = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_hover",
+        arguments: { ...args, x: point.x, y: point.y },
+      })
+      if (!result || typeof result !== "object" || result.hovered !== true) {
+        return buildUidPointFailureResult(session, uid, "hover", result?.error || "Uid hover failed")
+      }
+      const roundedX = Math.round(point.x)
+      const roundedY = Math.round(point.y)
+      return {
+        ...result,
+        uid,
+        x: roundedX,
+        y: roundedY,
+        browserSessionId: session.browserSessionId,
+        action: "hover",
+        target: { uid, x: roundedX, y: roundedY },
+        ok: true,
+        recoverable: false,
+        nextStepHint: "Hover dispatched without attaching Chrome debugger. Observe again or read page state to verify menus, tooltips, or hover-only controls.",
+      }
     }
     const x = Number(args.x)
     const y = Number(args.y)
@@ -581,10 +646,16 @@ export function createToolDispatcher({
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         throw new Error("yunti_hover coordinate mode requires both x and y. Call yunti_take_snapshot to get uid, pass selector, or provide both coordinates.")
       }
-      await mouseMove(tabId, x, y)
+      const result = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_hover",
+        arguments: { ...args, x, y },
+      })
+      if (!result || typeof result !== "object" || result.hovered !== true) return result
       const roundedX = Math.round(x)
       const roundedY = Math.round(y)
       return {
+        ...result,
         hovered: true,
         x: roundedX,
         y: roundedY,
@@ -594,29 +665,30 @@ export function createToolDispatcher({
         target: { method: "coordinate", x: roundedX, y: roundedY },
         ok: true,
         recoverable: false,
-        nextStepHint: "Coordinate hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+        nextStepHint: "Coordinate hover dispatched without attaching Chrome debugger. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
       }
     }
     const selector = String(args.selector || "").trim()
     if (!selector) {
       throw new Error("yunti_hover requires uid, selector, or both x and y. Call yunti_take_snapshot to get uid or pass a CSS selector.")
     }
-    const point = await resolveSelectorCenter(tabId, selector)
-    await mouseMove(tabId, point.x, point.y)
-    const roundedX = Math.round(point.x)
-    const roundedY = Math.round(point.y)
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_hover",
+      arguments: args,
+    })
+    if (!result || typeof result !== "object" || result.hovered !== true) return result
     return {
+      ...result,
       hovered: true,
       selector,
-      x: roundedX,
-      y: roundedY,
       browserSessionId: session.browserSessionId,
       method: "selector",
       action: "hover",
-      target: { selector, method: "selector", x: roundedX, y: roundedY },
+      target: { selector, method: "selector" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Selector hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+      nextStepHint: "Selector hover dispatched without attaching Chrome debugger. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
     }
   }
   
@@ -626,187 +698,45 @@ export function createToolDispatcher({
     const value = String(args.value)
     if (uid) {
       try {
-        const { x, y } = await resolveUidCenter(tabId, session, uid)
-        await mouseClick(tabId, x, y, 1)
-        await delayCdp(100)
-        // Clear existing value
-        const elements = await chromeDebuggerSendCommand(
-          { tabId },
-          "Runtime.evaluate",
-          { expression: `(() => {
-            const el = document.elementFromPoint(${x}, ${y});
-            if (!el) return 'not found';
-            const tag = el.tagName.toLowerCase();
-            const rect = el.getBoundingClientRect();
-            const style = getComputedStyle(el);
-            const type = String(el.type || '').toLowerCase();
-            const disabled = Boolean(el.disabled || el.getAttribute('aria-disabled') === 'true');
-            const readOnly = Boolean(el.readOnly || el.getAttribute('aria-readonly') === 'true');
-            const hidden = Boolean(el.hidden || style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0 || rect.width <= 0 || rect.height <= 0);
-            const valueEditable = tag === 'input' || tag === 'textarea';
-            const blockedInputType = tag === 'input' && ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(type);
-            const editable = el.isContentEditable || tag === 'select' || (valueEditable && !blockedInputType);
-            if (tag === 'select') {
-              const opts = Array.from(el.options);
-              return { tag: 'select', type, disabled, readOnly, hidden, editable, options: opts.map(o => ({ value: o.value, text: o.text.slice(0, 80) })), selectedIndex: el.selectedIndex };
-            }
-            const beforeText = el.isContentEditable ? String(el.textContent || '') : '';
-            if (el.isContentEditable) {
-              el.focus();
-              el.textContent = '';
-            } else if (valueEditable && !blockedInputType && !disabled && !readOnly && !hidden) {
-              el.focus();
-              el.select();
-            }
-            return {
-              tag,
-              type,
-              contentEditable: el.isContentEditable,
-              disabled,
-              readOnly,
-              hidden,
-              editable,
-              before: el.isContentEditable ? { textLength: beforeText.length } : undefined,
-            };
-          })()`,
-            returnByValue: true,
-          }
-        )
-        const elInfo = elements?.result?.value
-
-        if (elInfo === "not found") {
+        const point = resolveObservedUidCenter(session, uid)
+        if (!point.ok) {
           return buildUidFillFailureResult(session, uid, {
-            code: "ELEMENT_NOT_FOUND",
-            error: `No element found at uid ${uid} coordinates`,
+            code: "UID_COORDINATES_UNAVAILABLE",
+            error: point.error,
           })
         }
-
-        if (elInfo?.hidden || elInfo?.disabled || elInfo?.readOnly || elInfo?.editable === false) {
-          return buildUidFillFailureResult(session, uid, {
-            code: "TARGET_NOT_EDITABLE",
-            error: buildFillEditabilityError(uid, elInfo),
-            element: summarizeFillTarget(elInfo),
-          })
+        const result = await chrome.tabs.sendMessage(tabId, {
+          type: "yunti_execute_tool",
+          tool: "yunti_fill",
+          arguments: { ...args, x: point.x, y: point.y },
+        })
+        if (!result || typeof result !== "object" || result.filled !== true) {
+          return buildUidFillFailureResult(session, uid, result)
         }
-  
-        // Handle select element
-        if (elInfo?.tag === "select") {
-          const targetOption = elInfo.options?.find(
-            o => o.value === value || o.text === value
-          )
-          if (targetOption) {
-            await chromeDebuggerSendCommand(
-              { tabId },
-              "Runtime.evaluate",
-              {
-                expression: `(() => {
-                  const el = document.elementFromPoint(${x}, ${y});
-                  if (el) el.value = ${JSON.stringify(targetOption.value)};
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                  el.dispatchEvent(new Event('input', { bubbles: true }));
-                })()`,
-              }
-            )
-            return {
-              filled: true,
-              uid,
-              method: "select",
-              value: targetOption.value,
-              browserSessionId: session.browserSessionId,
-              action: "fill",
-              target: { uid, method: "select" },
-              ok: true,
-              recoverable: false,
-              nextStepHint: "Select value dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
-            }
-          }
+        const method = result.method || "dom"
+        if (result.valueApplied === false) {
           return buildUidFillFailureResult(session, uid, {
-            code: "OPTION_NOT_FOUND",
-            error: `Option '${value}' not found in select at uid ${uid}`,
-            availableValues: elInfo.options?.map((option) => option.value).slice(0, 50),
-            availableTexts: elInfo.options?.map((option) => option.text).slice(0, 50),
-          })
-        }
-  
-        // Type text via CDP Input.dispatchKeyEvent
-        const text = value
-        for (const char of text) {
-          await chromeDebuggerSendCommand(
-            { tabId },
-            "Input.dispatchKeyEvent",
-            { type: "char", text: char, unmodifiedText: char }
-          )
-        }
-        const method = elInfo?.contentEditable ? "contenteditable" : "keyboard"
-        const before = elInfo?.before
-        await delayCdp(50)
-        const verification = await chromeDebuggerSendCommand(
-          { tabId },
-          "Runtime.evaluate",
-          {
-            expression: `(() => {
-              const el = document.elementFromPoint(${x}, ${y});
-              if (!el) return { found: false };
-              const tag = el.tagName.toLowerCase();
-              const type = String(el.type || '').toLowerCase();
-              const expected = ${JSON.stringify(text)};
-              const actual = el.isContentEditable
-                ? String(el.textContent || '')
-                : (tag === 'input' || tag === 'textarea')
-                  ? String(el.value || '')
-                  : undefined;
-              if (actual === undefined) {
-                return { found: true, tag, type, contentEditable: el.isContentEditable };
-              }
-              return {
-                found: true,
-                tag,
-                type,
-                contentEditable: el.isContentEditable,
-                valueMatches: actual === expected,
-                valueLength: actual.length,
-                expectedLength: expected.length,
-              };
-            })()`,
-            returnByValue: true,
-          }
-        )
-        const verificationInfo = verification?.result?.value
-        const verifiedAfter = verificationInfo?.found && Number.isFinite(Number(verificationInfo.valueLength))
-          ? { textLength: Number(verificationInfo.valueLength) }
-          : undefined
-        const after = verifiedAfter || (elInfo?.contentEditable ? { textLength: text.length } : undefined)
-        if (verificationInfo?.found && verificationInfo.valueMatches === false) {
-          return buildUidFillFailureResult(session, uid, {
+            ...result,
             code: "VALUE_NOT_APPLIED",
             error: `Filled value did not remain on uid ${uid}`,
             method,
-            expectedValueLength: Number(verificationInfo.expectedLength),
-            actualValueLength: Number(verificationInfo.valueLength),
-            ...(before ? { before } : {}),
-            after,
-            element: summarizeFillTarget({
-              tag: verificationInfo.tag,
-              type: verificationInfo.type,
-              contentEditable: verificationInfo.contentEditable,
-            }),
+            expectedValueLength: value.length,
           })
         }
         return {
+          ...result,
           filled: true,
           uid,
           method,
-          value: text,
-          ...(before ? { before } : {}),
-          ...(after ? { after } : {}),
+          value,
           browserSessionId: session.browserSessionId,
           action: "fill",
           target: { uid, method },
           ok: true,
           recoverable: false,
-          nextStepHint: elInfo?.contentEditable
+          nextStepHint: method === "contenteditable"
             ? "Contenteditable fill dispatched. Observe again, read page text, or evaluate textContent to verify the intended change."
-            : "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+            : "Fill dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended change.",
         }
     } catch (error) {
       return buildUidFillFailureResult(session, uid, {
@@ -1208,65 +1138,27 @@ export function createToolDispatcher({
     if (uid) {
       const matchMode = text ? "text" : "value"
       const targetOption = text || value
-      const { x, y } = await resolveUidCenter(tabId, session, uid)
-      await ensureCdpAttached(tabId, "1.3")
-      const result = await chromeDebuggerSendCommand(
-        { tabId },
-        "Runtime.evaluate",
-        {
-          expression: `(() => {
-            const el = document.elementFromPoint(${x}, ${y});
-            if (!el) return { ok: false, code: "ELEMENT_NOT_FOUND", error: "No element found at uid coordinates" };
-            if (el.tagName.toLowerCase() !== "select") {
-              return { ok: false, code: "NOT_SELECT", error: "Element at uid is not a select element" };
-            }
-            const options = Array.from(el.options);
-            const option = options.find((item) => {
-              if (${JSON.stringify(matchMode)} === "text") return item.text.trim() === ${JSON.stringify(targetOption)};
-              return item.value === ${JSON.stringify(targetOption)};
-            });
-            if (!option) {
-              return {
-                ok: false,
-                code: "OPTION_NOT_FOUND",
-                error: ${JSON.stringify(matchMode)} === "text" ? "Option text not found" : "Option value not found",
-                availableValues: options.map((item) => item.value).slice(0, 50),
-                availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
-              };
-            }
-            if (option.disabled) {
-              return {
-                ok: false,
-                code: "OPTION_DISABLED",
-                error: ${JSON.stringify(matchMode)} === "text" ? "Option text is disabled" : "Option value is disabled",
-                disabledValue: option.value,
-                disabledText: option.text.trim(),
-                availableValues: options.map((item) => item.value).slice(0, 50),
-                availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
-              };
-            }
-            el.value = option.value;
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            return {
-              ok: true,
-              value: option.value,
-              selectedIndex: el.selectedIndex,
-              optionText: option.text.slice(0, 80),
-            };
-          })()`,
-          returnByValue: true,
-        }
-      )
-      const selectResult = result?.result?.value
-      if (!selectResult?.ok) {
+      const point = resolveObservedUidCenter(session, uid)
+      if (!point.ok) {
+        return buildUidSelectFailureResult(session, uid, matchMode, targetOption, {
+          code: "UID_COORDINATES_UNAVAILABLE",
+          error: point.error,
+        })
+      }
+      const selectResult = await chrome.tabs.sendMessage(tabId, {
+        type: "yunti_execute_tool",
+        tool: "yunti_select",
+        arguments: { ...args, x: point.x, y: point.y },
+      })
+      if (!selectResult?.selected) {
         return buildUidSelectFailureResult(session, uid, matchMode, targetOption, selectResult)
       }
       return {
+        ...selectResult,
         selected: true,
         uid,
         value: selectResult.value,
-        text: selectResult.optionText,
+        text: selectResult.text,
         selectedIndex: selectResult.selectedIndex,
         browserSessionId: session.browserSessionId,
         action: "select",
@@ -1274,8 +1166,8 @@ export function createToolDispatcher({
         ok: true,
         recoverable: false,
         nextStepHint: matchMode === "text"
-          ? "Uid select dispatched by visible option text. Observe again, read page state, or evaluate the select value to verify the intended change."
-          : "Uid select dispatched by option value. Observe again, read page state, or evaluate the select value to verify the intended change.",
+          ? "Uid select dispatched by visible option text without attaching Chrome debugger. Observe again, read page state, or evaluate the select value to verify the intended change."
+          : "Uid select dispatched by option value without attaching Chrome debugger. Observe again, read page state, or evaluate the select value to verify the intended change.",
       }
     }
 
@@ -1529,39 +1421,72 @@ export function createToolDispatcher({
   }
   
   async function resolveUidCenter(tabId, session, uid) {
+    const point = resolveObservedUidCenter(session, uid)
+    if (point.ok) return { x: point.x, y: point.y }
+    throw new Error(point.error)
+  }
+
+  function resolveObservedUidCenter(session, uid) {
     const uidState = pageUidStore.get(session.browserSessionId)
     const uidMap = uidState?.uidMap
     if (!uidMap || !uidMap[uid]) {
-      throw new Error(
-        `uid ${uid} not found in the latest page uid map. Run yunti_observe_page or yunti_take_snapshot again before retrying.`
-      )
+      return {
+        ok: false,
+        error: `uid ${uid} not found in the latest page uid map. Run yunti_observe_page again before retrying.`,
+      }
     }
     const el = uidMap[uid]
   
     if (el.rect && el.rect.width > 0 && el.rect.height > 0) {
       return {
+        ok: true,
         x: el.rect.x + el.rect.width / 2,
         y: el.rect.y + el.rect.height / 2,
       }
     }
-  
-    // Resolve coordinates via CDP DOM.getBoxModel using backendNodeId
-    if (el.backendNodeId) {
-      await ensureCdpAttached(tabId, "1.3")
-      const boxModel = await chromeDebuggerSendCommand(
-        { tabId },
-        "DOM.getBoxModel",
-        { backendNodeId: el.backendNodeId }
-      )
-      const content = boxModel?.model?.content
-      if (content && content.length >= 4) {
-        const x = (content[0] + content[4]) / 2
-        const y = (content[1] + content[5]) / 2
-        return { x, y }
-      }
+
+    return {
+      ok: false,
+      error: `Cannot resolve coordinates for uid ${uid} without Chrome debugger. Run yunti_observe_page with includeRects enabled, scroll the element into view, or use an explicit selector fallback.`,
     }
-  
-    throw new Error(`Cannot resolve coordinates for uid ${uid}. Element may be off-screen, hidden, or stale. Run yunti_observe_page again before retrying.`)
+  }
+
+  function buildUidPointFailureResult(session, uid, action, error) {
+    const code = /not found|latest page uid map/i.test(String(error || "")) ? "UID_NOT_FOUND" : "UID_COORDINATES_UNAVAILABLE"
+    const resultFieldByAction = {
+      click: "clicked",
+      hover: "hovered",
+      type: "typed",
+      press: "pressed",
+    }
+    const resultField = resultFieldByAction[action] || `${action}ed`
+    const recommendedToolByAction = {
+      click: "yunti_click",
+      hover: "yunti_hover",
+      type: "yunti_type_text",
+      press: "yunti_press_key",
+    }
+    const recommendedTool = recommendedToolByAction[action] || "yunti_observe_page"
+    return {
+      [resultField]: false,
+      uid,
+      browserSessionId: session.browserSessionId,
+      action,
+      target: { uid, method: "uid" },
+      ok: false,
+      recoverable: true,
+      code,
+      error: error || `Cannot ${action} uid ${uid}`,
+      recoveryHint: {
+        reason: `uid-${action}-failed`,
+        recommendedTools: ["yunti_observe_page", recommendedTool],
+        nextAction: "observe-again",
+        decision: "refresh-observation-before-retry",
+        uid,
+        message: "The uid could not be resolved without attaching Chrome debugger. Observe again with rects enabled, scroll the target into view, or retry with selector fallback.",
+      },
+      nextStepHint: `Uid ${action} failed without attaching Chrome debugger. Observe again for a fresh visible uid before retrying.`,
+    }
   }
   
   async function mouseClick(tabId, x, y, clickCount = 1) {
@@ -2034,31 +1959,27 @@ export function createToolDispatcher({
     const text = String(args.text || "")
     if (!text) throw new Error("text is required")
   
-    // Click the uid element to focus it
-    const { x, y } = await resolveUidCenter(tabId, session, uid)
-    await mouseClick(tabId, x, y, 1)
-    await delayCdp(100)
-  
-    // Type each character via CDP
-    for (const char of text) {
-      await chromeDebuggerSendCommand(
-        { tabId },
-        "Input.dispatchKeyEvent",
-        { type: "char", text: char, unmodifiedText: char }
-      )
-    }
+    const point = resolveObservedUidCenter(session, uid)
+    if (!point.ok) return buildUidPointFailureResult(session, uid, "type", point.error)
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_type_text",
+      arguments: { ...args, x: point.x, y: point.y },
+    })
+    if (!result || typeof result !== "object" || result.typed !== true) return result
   
     return {
+      ...result,
       typed: true,
       uid,
       text,
-      method: "cdp.keyboard",
+      method: result.method || "dom",
       browserSessionId: session.browserSessionId,
       action: "type_text",
-      target: { uid, method: "cdp.keyboard" },
+      target: { uid, method: result.method || "dom" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Type text dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+      nextStepHint: "Type text dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended change.",
     }
   }
   
@@ -2099,39 +2020,26 @@ export function createToolDispatcher({
     const key = String(args.key || "").trim()
     if (!key) throw new Error("key is required")
   
-    // Focus the uid element
-    const { x, y } = await resolveUidCenter(tabId, session, uid)
-    await mouseClick(tabId, x, y, 1)
-    await delayCdp(50)
-  
-    // Map common key names to CDP key events
-    const keyDef = normalizeKey(key)
-  
-    await chromeDebuggerSendCommand({ tabId }, "Input.dispatchKeyEvent", {
-      type: "keyDown",
-      key: keyDef.key,
-      code: keyDef.code,
-      windowsVirtualKeyCode: keyDef.keyCode,
-      nativeVirtualKeyCode: keyDef.keyCode,
+    const point = resolveObservedUidCenter(session, uid)
+    if (!point.ok) return buildUidPointFailureResult(session, uid, "press", point.error)
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_press_key",
+      arguments: { ...args, x: point.x, y: point.y },
     })
-    await chromeDebuggerSendCommand({ tabId }, "Input.dispatchKeyEvent", {
-      type: "keyUp",
-      key: keyDef.key,
-      code: keyDef.code,
-      windowsVirtualKeyCode: keyDef.keyCode,
-      nativeVirtualKeyCode: keyDef.keyCode,
-    })
+    if (!result || typeof result !== "object" || result.pressed !== true) return result
   
     return {
+      ...result,
       pressed: true,
       uid,
       key,
       browserSessionId: session.browserSessionId,
       action: "press_key",
-      target: { uid, method: "cdp.keyboard" },
+      target: { uid, method: "dom" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Key press dispatched. Observe again, read page state, or evaluate the field value to verify the intended effect.",
+      nextStepHint: "Key press dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended effect.",
     }
   }
   

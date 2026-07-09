@@ -143,6 +143,14 @@ taking an action whose effect cannot be verified from page state.
 
 ## CDP Rules
 
+- In `0.2.1+`, normal observe-first page actions should not automatically
+  attach Chrome debugger. Prefer `yunti_observe_page` plus fresh uid
+  `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`, `yunti_scroll`,
+  `yunti_type_text`, and `yunti_press_key` on anti-debug-sensitive pages.
+- Chrome debugger banners may still appear for explicit low-level or advanced
+  tools such as `yunti_cdp_send_command`, raw CDP diagnostics, performance
+  tracing, screenshot fallback paths, drag, upload, emulation, resize, or
+  legacy snapshot compatibility.
 - Do not run CDP method names in a shell.
 - Use `yunti_cdp_send_command` with `method` and optional `params`.
 - `params` must be an object when provided.

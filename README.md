@@ -13,6 +13,13 @@ Chrome/Edge 浏览器：查看标签页、读取页面、点击输入、截图�
 
 它的第一目标是：**部署简单、执行高效、和具体 Agent/平台解耦**。
 
+`0.2.1+` 默认页面操作路径优先走扩展 content script，不会自动 attach Chrome
+debugger：`yunti_observe_page`、fresh uid 的 `yunti_click` / `yunti_hover` /
+`yunti_fill` / `yunti_select` / `yunti_scroll` / `yunti_type_text` /
+`yunti_press_key` 应作为普通页面操作首选。显式 CDP、trace、部分截图 fallback、
+drag/upload/emulation/resize 和 legacy snapshot 兼容路径仍可能触发 Chrome 的调试横幅，
+只在确实需要低层能力时使用。
+
 ## 当前定位
 
 当前版本是本地单用户 MVP：
@@ -217,6 +224,8 @@ cp -R skills/yunti-browser-runtime ~/.codex/skills/
 
 - `yunti_click` / `yunti_hover` 需要 `uid`、`selector`，或同时提供 `x` 和 `y`。
 - `yunti_fill` 必须提供 `value`，并用 `uid` 或 `selector` 定位；不支持只传坐标。
+- 普通页面操作优先使用 `yunti_observe_page` 返回的 fresh uid；`0.2.1+` 的默认
+  fresh-uid action 路径不会自动 attach Chrome debugger。
 - `yunti_close_page` 按 `browserSessionId` 关闭页面；如只有 `tabId` / `targetId`，请用 `yunti_cdp_send_command` + `Target.closeTarget`。
 - `yunti_cdp_send_command` 必须提供 `method`；`params` 可选，但传入时必须是 object。
 - `yunti_forget_learning_memory` 需要 memory `id`，或使用 `all=true` 且 `confirmed=true` 删除全部。
@@ -314,9 +323,11 @@ token。
 
 ## 发布状态与后续事项
 
-- 当前稳定发布版本：`yunti-browser-runtime@0.2.0`。
-- `0.2.0` 已发布到官方 npm registry，增强了 `yunti_observe_page`、fresh uid
+- 当前源码版本：`yunti-browser-runtime@0.2.1`。
+- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.0`。
+- `0.2.1` 修复默认 observe-first 页面动作误触发 Chrome debugger 的问题；
+  `0.2.0` 增强了 `yunti_observe_page`、fresh uid
   操作闭环、结构化恢复诊断、DOM/diagnostic 脱敏和可选本地控制台。
-- 发布后验证已通过：`npm run release:verify-published`。
+- `0.2.0` 发布后验证已通过：`npm run release:verify-published`。
 - 浏览器扩展商店版本不阻塞 `0.2.0` npm 发布；如要上架商店，需要沿
   `docs/EXTENSION_PERMISSION_STRATEGY.md` 另行设计 store-candidate 权限 UX。

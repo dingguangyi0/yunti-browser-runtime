@@ -3,10 +3,18 @@
 ## Current Phase
 
 Release `yunti-browser-runtime@0.2.0` is complete and verified on the official
-npm registry. The `0.2.0 Best Browser Automation Runtime` npm/unpacked release
-cycle is now closed, documented in `docs/NEXT_MAJOR_PLAN.md`.
+npm registry. The current patch line is `0.2.1`, focused on making default
+observe-first page actions avoid automatic Chrome debugger attachment.
 
-Current implementation focus: post-0.2 planning.
+Current implementation focus: `0.2.1` anti-debug-sensitive default action path.
+Fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
+`yunti_type_text`, and `yunti_press_key` now dispatch through content script
+page events instead of CDP mouse/keyboard/runtime commands. Explicit CDP,
+trace, screenshot fallback, drag/upload/emulation/resize, and legacy snapshot
+compatibility remain low-level/advanced paths that may show the Chrome debugger
+banner.
+
+Post-0.2 planning remains active after this patch.
 P6.6.1 browser extension distribution readiness, P6.6.2 store-facing
 permission/privacy copy, and P6.6.3 pre-store permission strategy decision are
 complete; P6.5 optional local runtime console is complete through real-browser

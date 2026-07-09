@@ -3,11 +3,46 @@ import assert from "node:assert/strict"
 import { createToolDispatcher } from "../extension/tool-handlers.js"
 
 function createDispatcherHarness(options = {}) {
-  const posted = []
-  const sentMessages = []
-  const cdpCommands = []
-  const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
-  const contentToolResponses = options.contentToolResponses || {}
+const posted = []
+const sentMessages = []
+const cdpCommands = []
+const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
+  const defaultContentToolResponses = {
+    yunti_click: (message) => ({
+      clicked: true,
+      x: Number.isFinite(Number(message.arguments?.x)) ? Number(message.arguments.x) : undefined,
+      y: Number.isFinite(Number(message.arguments?.y)) ? Number(message.arguments.y) : undefined,
+    }),
+    yunti_hover: (message) => ({
+      hovered: true,
+      ...(Number.isFinite(Number(message.arguments?.x)) ? { x: Math.round(Number(message.arguments.x)) } : {}),
+      ...(Number.isFinite(Number(message.arguments?.y)) ? { y: Math.round(Number(message.arguments.y)) } : {}),
+    }),
+    yunti_fill: (message) => ({
+      filled: true,
+      valueLength: String(message.arguments?.value ?? "").length,
+      valueApplied: true,
+      method: "dom",
+    }),
+    yunti_select: (message) => ({
+      selected: true,
+      value: String(message.arguments?.value ?? message.arguments?.text ?? ""),
+      text: String(message.arguments?.text ?? message.arguments?.value ?? ""),
+      selectedIndex: 1,
+    }),
+    yunti_type_text: (message) => ({
+      typed: true,
+      textLength: String(message.arguments?.text ?? "").length,
+      mode: message.arguments?.clear ? "replace" : "append",
+      method: "dom",
+    }),
+    yunti_press_key: (message) => ({
+      pressed: true,
+      key: String(message.arguments?.key || ""),
+      valueChanged: false,
+    }),
+  }
+  const contentToolResponses = { ...defaultContentToolResponses, ...(options.contentToolResponses || {}) }
   const originalChrome = globalThis.chrome
   const observations = options.observations || [
     {
@@ -113,12 +148,14 @@ test("observe uid map feeds existing uid-based click path", async () => {
       target: { uid: "yunti-1", x: 60, y: 40 },
       ok: true,
       recoverable: false,
-      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
+      nextStepHint: "Click dispatched without attaching Chrome debugger. Observe again or read page state to verify the intended change.",
     })
     assert.deepEqual(
-      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
-      ["mousePressed", "mouseReleased"]
+      harness.sentMessages.map((item) => item.message.tool),
+      ["yunti_observe_page", "yunti_click"]
     )
+    assert.deepEqual(harness.sentMessages.at(-1).message.arguments, { uid: "yunti-1", x: 60, y: 40 })
+    assert.deepEqual(harness.cdpCommands, [])
     assert.equal(
       harness.sentMessages.filter((item) => item.message.tool === "yunti_observe_page").length,
       1
@@ -149,12 +186,10 @@ test("coordinate click preserves compatibility fields with structured result", a
       target: { method: "coordinate", x: 12, y: 35 },
       ok: true,
       recoverable: false,
-      nextStepHint: "Coordinate click dispatched. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
+      nextStepHint: "Coordinate click dispatched without attaching Chrome debugger. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
     })
-    assert.deepEqual(
-      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
-      ["mousePressed", "mouseReleased"]
-    )
+    assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), ["yunti_click"])
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -229,12 +264,10 @@ test("coordinate hover preserves compatibility fields with structured result", a
       target: { method: "coordinate", x: 44, y: 89 },
       ok: true,
       recoverable: false,
-      nextStepHint: "Coordinate hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+      nextStepHint: "Coordinate hover dispatched without attaching Chrome debugger. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
     })
-    assert.deepEqual(
-      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
-      ["mouseMoved"]
-    )
+    assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), ["yunti_hover"])
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -267,20 +300,16 @@ test("selector hover preserves compatibility fields with structured result", asy
     assert.deepEqual(harness.posted.at(-1).result, {
       hovered: true,
       selector: "#menu",
-      x: 101,
-      y: 203,
       browserSessionId: "tab-1",
       method: "selector",
       action: "hover",
-      target: { selector: "#menu", method: "selector", x: 101, y: 203 },
+      target: { selector: "#menu", method: "selector" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Selector hover dispatched. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
+      nextStepHint: "Selector hover dispatched without attaching Chrome debugger. Observe again, read page state, or use a fresh uid when possible to verify menus, tooltips, or hover-only controls.",
     })
-    assert.deepEqual(
-      harness.cdpCommands.filter((command) => command.method === "Input.dispatchMouseEvent").map((command) => command.params.type),
-      ["mouseMoved"]
-    )
+    assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), ["yunti_hover"])
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -344,7 +373,7 @@ test("dispatcher preserves current action result shapes", async () => {
       target: { uid: "yunti-click", x: 60, y: 40 },
       ok: true,
       recoverable: false,
-      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
+      nextStepHint: "Click dispatched without attaching Chrome debugger. Observe again or read page state to verify the intended change.",
     })
 
     await harness.dispatcher.executeToolRequest(123, session, {
@@ -362,7 +391,7 @@ test("dispatcher preserves current action result shapes", async () => {
       target: { uid: "yunti-click", x: 60, y: 40 },
       ok: true,
       recoverable: false,
-      nextStepHint: "Hover dispatched. Observe again or read page state to verify menus, tooltips, or hover-only controls.",
+      nextStepHint: "Hover dispatched without attaching Chrome debugger. Observe again or read page state to verify menus, tooltips, or hover-only controls.",
     })
 
     await harness.dispatcher.executeToolRequest(123, session, {
@@ -373,14 +402,16 @@ test("dispatcher preserves current action result shapes", async () => {
     assert.deepEqual(harness.posted.at(-1).result, {
       filled: true,
       uid: "yunti-input",
-      method: "keyboard",
+      valueLength: 2,
+      valueApplied: true,
+      method: "dom",
       value: "hi",
       browserSessionId: "tab-1",
       action: "fill",
-      target: { uid: "yunti-input", method: "keyboard" },
+      target: { uid: "yunti-input", method: "dom" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Fill dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+      nextStepHint: "Fill dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended change.",
     })
 
     await harness.dispatcher.executeToolRequest(123, session, {
@@ -822,7 +853,7 @@ test("uid scroll missing target returns structured recovery diagnostic", async (
       ok: false,
       recoverable: true,
       code: "UID_NOT_FOUND",
-      error: "uid missing-scroll not found in the latest page uid map. Run yunti_observe_page or yunti_take_snapshot again before retrying.",
+      error: "uid missing-scroll not found in the latest page uid map. Run yunti_observe_page again before retrying.",
       recoveryHint: {
         reason: "uid-scroll-failed",
         recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_scroll"],
@@ -855,23 +886,15 @@ test("uid fill select path preserves compatibility fields with structured result
         ],
       },
     ],
-    cdpResponses: [
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "select",
-            options: [
-              { value: "basic", text: "Basic" },
-              { value: "pro", text: "Pro" },
-            ],
-            selectedIndex: 0,
-          },
-        },
+    contentToolResponses: {
+      yunti_fill: {
+        filled: true,
+        method: "select",
+        value: "pro",
+        valueLength: 3,
+        valueApplied: true,
       },
-      {},
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -892,14 +915,17 @@ test("uid fill select path preserves compatibility fields with structured result
       filled: true,
       uid: "yunti-select",
       method: "select",
-      value: "pro",
+      value: "Pro",
+      valueLength: 3,
+      valueApplied: true,
       browserSessionId: "tab-1",
       action: "fill",
       target: { uid: "yunti-select", method: "select" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Select value dispatched. Observe again, read page state, or evaluate the select value to verify the intended change.",
+      nextStepHint: "Fill dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended change.",
     })
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -922,20 +948,16 @@ test("uid fill contenteditable path reports semantic method and text summary", a
         ],
       },
     ],
-    cdpResponses: [
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "div",
-            type: undefined,
-            contentEditable: true,
-            before: { textLength: 8 },
-          },
-        },
+    contentToolResponses: {
+      yunti_fill: {
+        filled: true,
+        method: "contenteditable",
+        valueLength: 5,
+        valueApplied: true,
+        before: { textLength: 8 },
+        after: { textLength: 5 },
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -959,6 +981,8 @@ test("uid fill contenteditable path reports semantic method and text summary", a
       value: "draft",
       before: { textLength: 8 },
       after: { textLength: 5 },
+      valueLength: 5,
+      valueApplied: true,
       browserSessionId: "tab-1",
       action: "fill",
       target: { uid: "yunti-editor", method: "contenteditable" },
@@ -966,10 +990,7 @@ test("uid fill contenteditable path reports semantic method and text summary", a
       recoverable: false,
       nextStepHint: "Contenteditable fill dispatched. Observe again, read page text, or evaluate textContent to verify the intended change.",
     })
-    assert.deepEqual(
-      harness.cdpCommands.filter((command) => command.method === "Input.dispatchKeyEvent").map((command) => command.params.text),
-      ["d", "r", "a", "f", "t"]
-    )
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -1113,23 +1134,22 @@ test("uid fill non-editable target returns structured recovery diagnostic", asyn
         ],
       },
     ],
-    cdpResponses: [
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "button",
-            type: "submit",
-            contentEditable: false,
-            disabled: true,
-            readOnly: false,
-            hidden: false,
-            editable: false,
-          },
+    contentToolResponses: {
+      yunti_fill: {
+        filled: false,
+        code: "TARGET_NOT_EDITABLE",
+        error: "Target at uid yunti-submit is not editable (button type=submit: disabled, not editable)",
+        element: {
+          tag: "button",
+          type: "submit",
+          contentEditable: false,
+          disabled: true,
+          readOnly: false,
+          hidden: false,
+          editable: false,
         },
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1201,22 +1221,15 @@ test("uid fill select option miss returns structured recovery diagnostic", async
         ],
       },
     ],
-    cdpResponses: [
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "select",
-            options: [
-              { value: "basic", text: "Basic" },
-              { value: "pro", text: "Pro" },
-            ],
-            selectedIndex: 0,
-          },
-        },
+    contentToolResponses: {
+      yunti_fill: {
+        filled: false,
+        code: "OPTION_NOT_FOUND",
+        error: "Option 'Enterprise' not found in select at uid yunti-select",
+        availableValues: ["basic", "pro"],
+        availableTexts: ["Basic", "Pro"],
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1478,18 +1491,14 @@ test("uid select value path preserves compatibility fields with structured resul
         ],
       },
     ],
-    cdpResponses: [
-      {
-        result: {
-          value: {
-            ok: true,
-            value: "pro",
-            selectedIndex: 1,
-            optionText: "Pro",
-          },
-        },
+    contentToolResponses: {
+      yunti_select: {
+        selected: true,
+        value: "pro",
+        text: "Pro",
+        selectedIndex: 1,
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1517,14 +1526,19 @@ test("uid select value path preserves compatibility fields with structured resul
       target: { uid: "yunti-plan", method: "uid.value" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Uid select dispatched by option value. Observe again, read page state, or evaluate the select value to verify the intended change.",
+      nextStepHint: "Uid select dispatched by option value without attaching Chrome debugger. Observe again, read page state, or evaluate the select value to verify the intended change.",
     })
     assert.deepEqual(
       harness.sentMessages.map((item) => item.message.tool),
-      ["yunti_observe_page"]
+      ["yunti_observe_page", "yunti_select"]
     )
-    assert.equal(harness.cdpCommands.at(-1).method, "Runtime.evaluate")
-    assert.match(harness.cdpCommands.at(-1).params.expression, /item\.value === "pro"/)
+    assert.deepEqual(harness.sentMessages.at(-1).message.arguments, {
+      uid: "yunti-plan",
+      value: "pro",
+      x: 80,
+      y: 42,
+    })
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -1547,18 +1561,14 @@ test("uid select visible text path preserves compatibility fields with structure
         ],
       },
     ],
-    cdpResponses: [
-      {
-        result: {
-          value: {
-            ok: true,
-            value: "enterprise",
-            selectedIndex: 2,
-            optionText: "Enterprise",
-          },
-        },
+    contentToolResponses: {
+      yunti_select: {
+        selected: true,
+        value: "enterprise",
+        text: "Enterprise",
+        selectedIndex: 2,
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1586,14 +1596,19 @@ test("uid select visible text path preserves compatibility fields with structure
       target: { uid: "yunti-plan", method: "uid.text" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Uid select dispatched by visible option text. Observe again, read page state, or evaluate the select value to verify the intended change.",
+      nextStepHint: "Uid select dispatched by visible option text without attaching Chrome debugger. Observe again, read page state, or evaluate the select value to verify the intended change.",
     })
     assert.deepEqual(
       harness.sentMessages.map((item) => item.message.tool),
-      ["yunti_observe_page"]
+      ["yunti_observe_page", "yunti_select"]
     )
-    assert.equal(harness.cdpCommands.at(-1).method, "Runtime.evaluate")
-    assert.match(harness.cdpCommands.at(-1).params.expression, /item\.text\.trim\(\) === "Enterprise"/)
+    assert.deepEqual(harness.sentMessages.at(-1).message.arguments, {
+      uid: "yunti-plan",
+      text: "Enterprise",
+      x: 80,
+      y: 42,
+    })
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -1616,19 +1631,15 @@ test("uid select option miss returns structured recovery diagnostic", async () =
         ],
       },
     ],
-    cdpResponses: [
-      {
-        result: {
-          value: {
-            ok: false,
-            code: "OPTION_NOT_FOUND",
-            error: "Option text not found",
-            availableValues: ["free", "pro"],
-            availableTexts: ["Free", "Pro"],
-          },
-        },
+    contentToolResponses: {
+      yunti_select: {
+        selected: false,
+        code: "OPTION_NOT_FOUND",
+        error: "Option text not found",
+        availableValues: ["free", "pro"],
+        availableTexts: ["Free", "Pro"],
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1695,21 +1706,17 @@ test("uid select disabled option returns structured recovery diagnostic", async 
         ],
       },
     ],
-    cdpResponses: [
-      {
-        result: {
-          value: {
-            ok: false,
-            code: "OPTION_DISABLED",
-            error: "Option text is disabled",
-            disabledValue: "enterprise",
-            disabledText: "Enterprise",
-            availableValues: ["free", "enterprise"],
-            availableTexts: ["Free", "Enterprise"],
-          },
-        },
+    contentToolResponses: {
+      yunti_select: {
+        selected: false,
+        code: "OPTION_DISABLED",
+        error: "Option text is disabled",
+        disabledValue: "enterprise",
+        disabledText: "Enterprise",
+        availableValues: ["free", "enterprise"],
+        availableTexts: ["Free", "Enterprise"],
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1780,17 +1787,13 @@ test("uid select non-select target returns structured recovery diagnostic", asyn
         ],
       },
     ],
-    cdpResponses: [
-      {
-        result: {
-          value: {
-            ok: false,
-            code: "NOT_SELECT",
-            error: "Element at uid is not a select element",
-          },
-        },
+    contentToolResponses: {
+      yunti_select: {
+        selected: false,
+        code: "NOT_SELECT",
+        error: "Element at uid is not a select element",
       },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -1859,53 +1862,19 @@ test("fill form preserves aggregate fields with structured result", async () => 
         ],
       },
     ],
-    cdpResponses: [
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "input",
-            type: "text",
-            contentEditable: false,
-          },
-        },
-      },
-      {},
-      {},
-      {},
-      {
-        result: {
-          value: {
-            found: true,
-            tag: "input",
-            type: "text",
-            contentEditable: false,
-            valueMatches: true,
-            valueLength: 3,
-            expectedLength: 3,
-          },
-        },
-      },
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "select",
-            options: [
-              { value: "basic", text: "Basic" },
-              { value: "pro", text: "Pro" },
-            ],
-            selectedIndex: 0,
-          },
-        },
-      },
-    ],
     contentToolResponses: {
       yunti_fill: (message) => {
         if (message.arguments.selector === "#missing") {
           throw new Error("selector not found")
+        }
+        if (message.arguments.uid === "yunti-plan") {
+          return {
+            filled: false,
+            code: "OPTION_NOT_FOUND",
+            error: "Option 'Enterprise' not found in select at uid yunti-plan",
+            availableValues: ["basic", "pro"],
+            availableTexts: ["Basic", "Pro"],
+          }
         }
         return { filled: true, element: "input#email", valueLength: 13 }
       },
@@ -2088,41 +2057,14 @@ test("uid fill reports value-not-applied when field value does not remain", asyn
         ],
       },
     ],
-    cdpResponses: [
-      {},
-      {},
-      {
-        result: {
-          value: {
-            tag: "input",
-            type: "text",
-            contentEditable: false,
-            disabled: false,
-            readOnly: false,
-            hidden: false,
-            editable: true,
-          },
-        },
+    contentToolResponses: {
+      yunti_fill: {
+        filled: true,
+        valueLength: 5,
+        valueApplied: false,
+        method: "dom",
       },
-      {},
-      {},
-      {},
-      {},
-      {},
-      {
-        result: {
-          value: {
-            found: true,
-            tag: "input",
-            type: "text",
-            contentEditable: false,
-            valueMatches: false,
-            valueLength: 0,
-            expectedLength: 5,
-          },
-        },
-      },
-    ],
+    },
   })
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
 
@@ -2149,15 +2091,10 @@ test("uid fill reports value-not-applied when field value does not remain", asyn
       recoverable: true,
       code: "VALUE_NOT_APPLIED",
       error: "Filled value did not remain on uid yunti-controlled",
-      method: "keyboard",
+      valueLength: 5,
+      valueApplied: false,
+      method: "dom",
       expectedValueLength: 5,
-      actualValueLength: 0,
-      after: { textLength: 0 },
-      element: {
-        tag: "input",
-        type: "text",
-        contentEditable: false,
-      },
       recoveryHint: {
         reason: "uid-fill-failed",
         recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
@@ -2168,6 +2105,7 @@ test("uid fill reports value-not-applied when field value does not remain", asyn
       },
       nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
     })
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -2210,14 +2148,18 @@ test("uid type text preserves compatibility fields with structured result", asyn
       typed: true,
       uid: "yunti-input",
       text: "hi",
-      method: "cdp.keyboard",
+      textLength: 2,
+      mode: "append",
+      method: "dom",
       browserSessionId: "tab-1",
       action: "type_text",
-      target: { uid: "yunti-input", method: "cdp.keyboard" },
+      target: { uid: "yunti-input", method: "dom" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Type text dispatched. Observe again, read page state, or evaluate the field value to verify the intended change.",
+      nextStepHint: "Type text dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended change.",
     })
+    assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), ["yunti_observe_page", "yunti_type_text"])
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -2297,13 +2239,16 @@ test("uid press key preserves compatibility fields with structured result", asyn
       pressed: true,
       uid: "yunti-input",
       key: "Enter",
+      valueChanged: false,
       browserSessionId: "tab-1",
       action: "press_key",
-      target: { uid: "yunti-input", method: "cdp.keyboard" },
+      target: { uid: "yunti-input", method: "dom" },
       ok: true,
       recoverable: false,
-      nextStepHint: "Key press dispatched. Observe again, read page state, or evaluate the field value to verify the intended effect.",
+      nextStepHint: "Key press dispatched without attaching Chrome debugger. Observe again, read page state, or evaluate the field value to verify the intended effect.",
     })
+    assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), ["yunti_observe_page", "yunti_press_key"])
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -2491,8 +2436,10 @@ test("missing uid now points agents back to observe or snapshot", async () => {
     })
 
     const result = harness.posted.at(-1)
-    assert.equal(result.ok, false)
-    assert.match(result.error, /yunti_observe_page or yunti_take_snapshot/)
+    assert.equal(result.ok, true)
+    assert.equal(result.result.ok, false)
+    assert.match(result.result.error, /yunti_observe_page again/)
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }
@@ -2549,8 +2496,9 @@ test("latest observation replaces stale uid map", async () => {
       arguments: { uid: "yunti-1" },
     })
     const staleResult = harness.posted.at(-1)
-    assert.equal(staleResult.ok, false)
-    assert.match(staleResult.error, /yunti_observe_page or yunti_take_snapshot/)
+    assert.equal(staleResult.ok, true)
+    assert.equal(staleResult.result.ok, false)
+    assert.match(staleResult.result.error, /yunti_observe_page again/)
 
     await harness.dispatcher.executeToolRequest(123, session, {
       id: "req-new-click",
@@ -2569,8 +2517,9 @@ test("latest observation replaces stale uid map", async () => {
       target: { uid: "yunti-2", x: 230, y: 95 },
       ok: true,
       recoverable: false,
-      nextStepHint: "Click dispatched. Observe again or read page state to verify the intended change.",
+      nextStepHint: "Click dispatched without attaching Chrome debugger. Observe again or read page state to verify the intended change.",
     })
+    assert.deepEqual(harness.cdpCommands, [])
   } finally {
     harness.restore()
   }

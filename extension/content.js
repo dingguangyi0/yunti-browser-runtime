@@ -382,6 +382,8 @@ async function executeTool(tool, args) {
       return clickElement(args)
     case "yunti_click_at":
       return clickAt(args)
+    case "yunti_hover":
+      return hoverElement(args)
     case "yunti_fill":
       return fillElement(args)
     case "yunti_type_text":
@@ -548,10 +550,13 @@ function rollbackPreviewPatch(patchId) {
 }
 
 function clickElement(args) {
-  const element = mustFind(args.selector)
-  element.scrollIntoView({ block: "center", inline: "center" })
-  element.click()
-  return { clicked: true, element: describeElement(element) }
+  if (args.selector) {
+    const element = mustFind(args.selector)
+    element.scrollIntoView({ block: "center", inline: "center" })
+    element.click()
+    return { clicked: true, element: describeElement(element) }
+  }
+  return clickAt(args)
 }
 
 function clickAt(args) {
@@ -569,12 +574,36 @@ function clickAt(args) {
   }
 }
 
+function hoverElement(args) {
+  const element = resolveTargetElement(args)
+  if (!element) throw new Error("yunti_hover requires selector or x/y coordinates")
+  element.scrollIntoView({ block: "center", inline: "center" })
+  const rect = element.getBoundingClientRect()
+  const x = Number.isFinite(Number(args.x)) ? Number(args.x) : rect.left + rect.width / 2
+  const y = Number.isFinite(Number(args.y)) ? Number(args.y) : rect.top + rect.height / 2
+  focusElement(element)
+  dispatchHoverSequence(element, x, y)
+  return {
+    hovered: true,
+    x: Math.round(x),
+    y: Math.round(y),
+    element: describeElement(element),
+  }
+}
+
 function fillElement(args) {
-  const element = mustFind(args.selector)
+  const element = resolveTargetElement(args)
+  if (!element) throw new Error("yunti_fill requires selector or x/y coordinates")
   const value = String(args.value ?? "")
   element.scrollIntoView({ block: "center", inline: "center" })
   setEditableText(element, value, { replace: true })
-  return { filled: true, element: describeElement(element), valueLength: value.length }
+  return {
+    filled: true,
+    element: describeElement(element),
+    valueLength: value.length,
+    valueApplied: getEditableText(element) === value,
+    method: element.isContentEditable ? "contenteditable" : element instanceof HTMLSelectElement ? "select" : "dom",
+  }
 }
 
 function typeText(args) {
@@ -612,32 +641,55 @@ function pressKey(args) {
 }
 
 function selectElement(args) {
-  const element = mustFind(args.selector)
+  const element = resolveTargetElement(args)
+  if (!element) throw new Error("yunti_select requires selector or x/y coordinates")
   if (!(element instanceof HTMLSelectElement)) throw new Error("Target is not a select element")
   const value = String(args.value ?? "")
+  const text = String(args.text ?? "")
+  const matchMode = text ? "text" : "value"
+  const targetOption = text || value
   const options = Array.from(element.options)
-  const option = options.find((item) => item.value === value)
+  const option = options.find((item) => matchMode === "text" ? item.text.trim() === targetOption : item.value === targetOption)
+  if (!option) {
+    return {
+      selected: false,
+      element: describeElement(element),
+      value: element.value,
+      code: "OPTION_NOT_FOUND",
+      error: matchMode === "text" ? "Option text not found" : "Option value not found",
+      matchMode,
+      targetOption,
+      availableValues: options.map((item) => item.value).slice(0, 50),
+      availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
+      options: summarizeSelectOptions(options),
+    }
+  }
   if (option?.disabled) {
     return {
       selected: false,
       element: describeElement(element),
       value: element.value,
       code: "OPTION_DISABLED",
-      error: "Option value is disabled",
+      error: matchMode === "text" ? "Option text is disabled" : "Option value is disabled",
+      matchMode,
+      targetOption,
       disabledValue: option.value,
       disabledText: option.text.trim(),
-      options: options.slice(0, 50).map((item) => ({
-        value: item.value,
-        text: item.text.trim(),
-        disabled: Boolean(item.disabled),
-        selected: Boolean(item.selected),
-      })),
+      availableValues: options.map((item) => item.value).slice(0, 50),
+      availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
+      options: summarizeSelectOptions(options),
     }
   }
-  element.value = value
+  element.value = option.value
   element.dispatchEvent(new Event("input", { bubbles: true }))
   element.dispatchEvent(new Event("change", { bubbles: true }))
-  return { selected: true, element: describeElement(element), value: element.value }
+  return {
+    selected: true,
+    element: describeElement(element),
+    value: element.value,
+    text: option.text.trim(),
+    selectedIndex: element.selectedIndex,
+  }
 }
 
 function scrollPage(args) {
@@ -693,6 +745,15 @@ function resolveTargetElement(args = {}) {
   return null
 }
 
+function summarizeSelectOptions(options) {
+  return options.slice(0, 50).map((item) => ({
+    value: item.value,
+    text: item.text.trim(),
+    disabled: Boolean(item.disabled),
+    selected: Boolean(item.selected),
+  }))
+}
+
 function focusElement(element) {
   if (element && typeof element.focus === "function") {
     element.focus({ preventScroll: true })
@@ -716,6 +777,27 @@ function dispatchPointerMouseSequence(element, x, y) {
     }
   }
   for (const type of ["mouseover", "mousemove", "mousedown", "mouseup", "click"]) {
+    element.dispatchEvent(new MouseEvent(type, common))
+  }
+}
+
+function dispatchHoverSequence(element, x, y) {
+  const common = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    clientX: x,
+    clientY: y,
+    view: window,
+  }
+  for (const type of ["pointerover", "pointerenter", "pointermove"]) {
+    try {
+      element.dispatchEvent(new PointerEvent(type, { ...common, pointerType: "mouse", isPrimary: true }))
+    } catch {
+      break
+    }
+  }
+  for (const type of ["mouseover", "mouseenter", "mousemove"]) {
     element.dispatchEvent(new MouseEvent(type, common))
   }
 }

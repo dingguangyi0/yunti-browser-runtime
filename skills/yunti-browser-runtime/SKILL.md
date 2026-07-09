@@ -92,6 +92,8 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 
 ## CDP Rules
 
+- In `0.2.1+`, default observe-first page actions avoid automatic Chrome debugger attachment. `yunti_observe_page`, fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`, `yunti_scroll`, `yunti_type_text`, and `yunti_press_key` should be the first choice on anti-debug or anti-bot-sensitive pages.
+- Chrome may still show its debugger banner when using explicit low-level or advanced tools, including `yunti_cdp_send_command`, raw CDP event diagnostics, performance tracing, screenshot fallback paths, drag, upload, emulation, resize, and legacy snapshot compatibility. Use those only when the task truly needs them.
 - Never run CDP method names in a terminal or shell.
 - Always call CDP through `yunti_cdp_send_command`.
 - `yunti_cdp_send_command` requires `method`; `params` is optional but must be an object when provided.

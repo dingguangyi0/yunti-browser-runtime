@@ -1359,6 +1359,8 @@ export function toolUsageHints(args = {}) {
       "After yunti_new_page, use the returned browserSessionId for follow-up calls on the new tab.",
       "Sessions expire quickly when the extension stops polling; stale-session errors include the reason and recovery hint.",
       "If a tool call fails due to parameters, inspect this hint output and the tool schema before retrying.",
+      "In 0.2.1+, default observe-first page actions avoid automatic Chrome debugger attachment; prefer yunti_observe_page plus fresh-uid yunti_click/yunti_hover/yunti_fill/yunti_select/yunti_scroll/yunti_type_text/yunti_press_key on anti-debug-sensitive pages.",
+      "Chrome debugger banners may still appear for explicit low-level or advanced tools such as yunti_cdp_send_command, raw CDP diagnostics, performance tracing, screenshot fallback paths, drag, upload, emulation, resize, or legacy snapshot compatibility.",
       "Prefer sanitized diagnostics before raw CDP events; screenshots are visible pixels and are not DOM-redacted.",
     ],
     workflows: {
@@ -1397,6 +1399,7 @@ export function toolUsageHints(args = {}) {
         "Call yunti_get_tool_usage_hints when tool usage is uncertain.",
         "Call yunti_list_browser_targets and choose the intended browserSessionId.",
         "Call yunti_observe_page before page actions and use fresh uids whenever possible.",
+        "On anti-debug-sensitive pages, stay on the default observe-first action tools; do not switch to CDP unless explicitly needed.",
         "After every action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.",
         "For async rendering, validation, navigation, option loading, or infinite scroll, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
         "If a result has ok=false, code, recoveryHint, or nextStepHint, follow that guidance before retrying.",
@@ -1420,6 +1423,7 @@ export function toolUsageHints(args = {}) {
         "Ask me before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, or changing production data.",
         "Do not expose raw cookies, passwords, auth headers, tokens, private keys, or other secrets.",
         "Prefer sanitized diagnostics; use raw CDP or screenshots only when needed, and summarize safe findings.",
+        "On anti-debug-sensitive pages, use observe-first page actions because 0.2.1+ avoids automatic Chrome debugger attachment on the default action path.",
       ],
       minimalUseCases: {
         clickByUid: [

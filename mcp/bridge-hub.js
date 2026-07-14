@@ -43,6 +43,22 @@ function stripBrowserSessionId(args) {
   return next
 }
 
+function isBrowserControllerMeta(meta = {}) {
+  return meta?.kind === "browser_controller"
+}
+
+function isBrowserControllerSession(session) {
+  return isBrowserControllerMeta(session?.meta || {})
+}
+
+const BROWSER_CONTROLLER_TOOLS = new Set([
+  "yunti_list_browser_targets",
+  "yunti_list_pages",
+  "yunti_get_browser_target",
+  "yunti_cdp_send_command",
+  "yunti_new_page",
+])
+
 function summarizeObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { type: typeof value }
@@ -69,6 +85,7 @@ function summarizeSession(session, activeSessionId) {
     userId: redactLikelySensitiveText(meta.userId || "", 120),
     userName: redactLikelySensitiveText(meta.userName || "", 120),
     displayName: redactLikelySensitiveText(meta.displayName || "", 160),
+    kind: redactLikelySensitiveText(meta.kind || (isBrowserControllerMeta(meta) ? "browser_controller" : "page"), 80),
     title: redactLikelySensitiveText(meta.title || "", 240),
     url: meta.url ? sanitizeUrl(meta.url) : "",
     tabId: meta.tabId ?? null,
@@ -110,6 +127,7 @@ export class BridgeHub {
     this.nextActivityEventId = 1
     this.activeSessionId = null
     this.activeSessionByUser = new Map()
+    this.browserControllerByUser = new Map()
     this.sessionTtlMs = Math.max(5_000, Number(sessionTtlMs) || DEFAULT_SESSION_TTL_MS)
   }
 
@@ -164,6 +182,9 @@ export class BridgeHub {
     if (this.activeSessionId === browserSessionId) this.activeSessionId = null
     for (const [userId, activeSessionId] of this.activeSessionByUser.entries()) {
       if (activeSessionId === browserSessionId) this.activeSessionByUser.delete(userId)
+    }
+    for (const [userId, controllerSessionId] of this.browserControllerByUser.entries()) {
+      if (controllerSessionId === browserSessionId) this.browserControllerByUser.delete(userId)
     }
     for (const poller of session.pollers.splice(0)) {
       poller({ type: "noop", id: randomUUID(), stale: true, reason })
@@ -223,9 +244,13 @@ export class BridgeHub {
       registeredAt: meta.registeredAt || existing.meta.registeredAt || isoNow(now),
     })
     this.sessions.set(browserSessionId, existing)
-    this.activeSessionId = browserSessionId
     const userId = normalizeRouteUserId(existing.meta.userId)
-    if (userId) this.activeSessionByUser.set(userId, browserSessionId)
+    if (isBrowserControllerSession(existing)) {
+      if (userId) this.browserControllerByUser.set(userId, browserSessionId)
+    } else {
+      this.activeSessionId = browserSessionId
+      if (userId) this.activeSessionByUser.set(userId, browserSessionId)
+    }
     return existing.meta
   }
 
@@ -277,12 +302,22 @@ export class BridgeHub {
     const activeSessionId = userId
       ? this.activeSessionByUser.get(userId) || null
       : null
+    const browserControllerSessionId = userId
+      ? this.browserControllerByUser.get(userId) || null
+      : null
+    const controllerCount = sessions.filter((session) => isBrowserControllerMeta(session)).length
+    const pageSessionCount = sessions.length - controllerCount
     return {
       ok: true,
       name: "yunti-browser-runtime-bridge",
       activeSessionId,
+      browserControllerSessionId,
+      extensionConnected: controllerCount > 0 || pageSessionCount > 0,
+      pageSessionCount,
+      controllerCount,
       sessions,
       sessionCount: this.sessions.size,
+      visibleSessionCount: sessions.length,
     }
   }
 
@@ -304,7 +339,7 @@ export class BridgeHub {
     const sessions = [...this.sessions.values()].filter((session) => {
       return normalizeRouteUserId(session.meta?.userId) === userId
     })
-    const pages = sessions.map((session) => {
+    const pages = sessions.filter((session) => !isBrowserControllerSession(session)).map((session) => {
       const meta = session.meta || {}
       return {
         browserSessionId: session.browserSessionId,
@@ -328,6 +363,9 @@ export class BridgeHub {
       throw staleSessionError(browserSessionId, "not registered or heartbeat expired")
     }
     const meta = session.meta
+    if (isBrowserControllerSession(session)) {
+      throw new Error("yunti_select_page requires a concrete page session, not the browser controller route.")
+    }
     const routeUserId = requireRouteUserId(args, "yunti_select_page")
     if (normalizeRouteUserId(meta.userId) !== routeUserId) {
       throw new Error(`browser session is not owned by userId: ${routeUserId}`)
@@ -348,7 +386,7 @@ export class BridgeHub {
     }
   }
 
-  resolveSessionId(args) {
+  resolveSessionId(args, tool = "") {
     this.cleanupExpiredSessions()
     const userId =
       args && typeof args === "object" && !Array.isArray(args)
@@ -366,11 +404,26 @@ export class BridgeHub {
       if (normalizeRouteUserId(session.meta?.userId) !== userId) {
         throw new Error(`browser session is not owned by userId: ${userId}`)
       }
+      if (isBrowserControllerSession(session) && !BROWSER_CONTROLLER_TOOLS.has(tool)) {
+        throw new Error(`${tool || "This tool"} requires a concrete page session. The browser controller route is online for yunti_list_browser_targets, yunti_get_browser_target, yunti_new_page, and explicit CDP target routing.`)
+      }
       return explicit
+    }
+    const controllerSessionId = this.browserControllerByUser.get(userId)
+    if (BROWSER_CONTROLLER_TOOLS.has(tool) && controllerSessionId) {
+      const controllerSession = this.getLiveSession(controllerSessionId)
+      if (controllerSession && normalizeRouteUserId(controllerSession.meta?.userId) === userId) {
+        return controllerSessionId
+      }
     }
     const userSessionId = this.activeSessionByUser.get(userId)
     if (!userSessionId) {
-      throw new Error(`No Yunti browser tab is connected for userId: ${userId}. ${sessionRecoveryHint()}`)
+      if (controllerSessionId && this.getLiveSession(controllerSessionId)) {
+        throw new Error(
+          `Yunti extension is connected for userId: ${userId}, but no concrete page session is active yet. Call yunti_list_browser_targets to inspect open tabs; page operations need a registered http/https page session.`
+        )
+      }
+      throw new Error(`No Yunti browser route is connected for userId: ${userId}. ${sessionRecoveryHint()}`)
     }
     const session = this.getLiveSession(userSessionId)
     if (!session) {
@@ -383,7 +436,7 @@ export class BridgeHub {
   }
 
   async callTool(tool, args = {}, timeoutMs = DEFAULT_TOOL_TIMEOUT_MS) {
-    const browserSessionId = this.resolveSessionId(args)
+    const browserSessionId = this.resolveSessionId(args, tool)
     const session = this.sessions.get(browserSessionId)
     const requestId = randomUUID()
     const payload = {
@@ -764,6 +817,8 @@ export class BridgeHub {
     const sessions = [...this.sessions.values()]
       .filter((session) => !userId || normalizeRouteUserId(session.meta?.userId) === userId)
       .map((session) => summarizeSession(session, this.activeSessionId))
+    const controllerCount = sessions.filter((session) => isBrowserControllerMeta(session)).length
+    const pageSessionCount = sessions.length - controllerCount
     const browserSessionIds = new Set(sessions.map((session) => session.browserSessionId))
     const pendingRequests = [...this.pendingRequests.entries()]
       .filter(([, pending]) => browserSessionIds.has(pending.browserSessionId))
@@ -791,6 +846,10 @@ export class BridgeHub {
         expectedExtensionVersion: redactLikelySensitiveText(args.expectedExtensionVersion || "", 80),
       },
       sessionCount: sessions.length,
+      pageSessionCount,
+      controllerCount,
+      extensionConnected: controllerCount > 0 || pageSessionCount > 0,
+      browserControllerSessionId: userId ? this.browserControllerByUser.get(userId) || null : null,
       activeSessionId: userId ? this.activeSessionByUser.get(userId) || null : this.activeSessionId,
       sessions,
       pendingRequests,
@@ -810,11 +869,11 @@ export class BridgeHub {
       }),
       guidance: {
         noSessions:
-          "Keep this bridge running, load or reload the extension, and open an http/https page. Yunti will auto-register accessible tabs; refresh the target page only if it remains invisible.",
+          "Keep this bridge running and load or reload the extension. The background controller should connect before any page session appears; page registration happens on activation/update or when page tools need a concrete route.",
         staleSession:
-          "Call yunti_list_browser_targets to refresh live routes; Yunti will try to auto-register accessible tabs before listing. Refresh the page only as a fallback.",
+          "Call yunti_list_browser_targets to refresh live browser targets. Page actions need a concrete registered page route; refresh the page only as the final browser-limited fallback.",
         versionMismatch:
-          "Reload the unpacked extension from the current package directory. It will auto-register accessible open http/https pages; refresh only if a page remains invisible.",
+          "Reload the unpacked extension from the current package directory. The browser controller should reconnect automatically; page routes register on activation/update or page-tool use.",
         cancellation:
           "Cancel only clears runtime pending/queued requests; it does not undo browser-side effects that already happened.",
       },
@@ -824,14 +883,24 @@ export class BridgeHub {
 
 function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
   const warnings = []
+  const controllerCount = sessions.filter((session) => isBrowserControllerMeta(session)).length
+  const pageSessionCount = sessions.length - controllerCount
   if (sessions.length === 0) {
     warnings.push({
-      code: "NO_CONNECTED_PAGES",
+      code: "NO_EXTENSION_CONTROLLER",
       severity: "warning",
       message:
-        "No browser pages are connected. Load or reload the extension and open an http/https page; Yunti will auto-register accessible pages. Refresh only if the page remains invisible.",
+        "No browser controller is connected. Keep the bridge running and reload the Yunti extension; page refresh is not the first recovery step.",
     })
     return warnings
+  }
+  if (controllerCount > 0 && pageSessionCount === 0) {
+    warnings.push({
+      code: "NO_PAGE_SESSIONS",
+      severity: "info",
+      message:
+        "The Yunti extension controller is online, but no concrete page session is registered yet. Use yunti_list_browser_targets to inspect open tabs; page routes register on activation/update or page-tool use.",
+    })
   }
   const expected = String(expectedExtensionVersion || "").trim()
   if (!expected) return warnings

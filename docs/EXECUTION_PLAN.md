@@ -28,6 +28,7 @@
 | --- | --- | --- |
 | P0.1 | 已完成 | bridge token + CORS 收紧 |
 | P0.2 | 已完成 | session TTL / 心跳 / 快速恢复 |
+| P0.3 | 已完成 | browser controller 心跳 / 页面按需注册 |
 | P1.1 | 已完成 | doctor 增强 |
 | P1.2 | 已完成 | MCP config printer |
 | P1.3 | 已完成 | extension 打包脚本 |
@@ -428,7 +429,60 @@ Page Agent 克隆，保持 Yunti local-first、MCP-native、真实 Chrome/Edge�
 - 测试覆盖过期 session 被清理。
 - 测试覆盖旧 `browserSessionId` 快速失败。
 - 测试覆盖 list targets 恢复路径。
+
+## P0.3 browser controller 心跳 / 页面按需注册
+
+状态：已完成（2026-07-14）
+
+实现摘要：
+
+- extension background 注册稳定的 `browser_controller` session，并通过
+  controller polling 维持扩展在线状态。
+- bridge 将 controller session 与 page session 分离，新增
+  `browserControllerByUser`、`browserControllerSessionId`、`controllerCount`、
+  `pageSessionCount` 和 `extensionConnected` 状态。
+- `yunti_list_browser_targets`、`yunti_list_pages`、`yunti_get_browser_target`、
+  `yunti_new_page` 和显式 target/tab CDP 可以通过 controller 路由。
+- `yunti_observe_page`、`yunti_click`、`yunti_fill` 等页面内容工具仍要求具体
+  page session，避免把 controller 当页面误用。
+- controller heartbeat 不会覆盖 active page route，避免后台心跳抢占用户当前页。
+- doctor/console 文案区分“扩展控制器在线但暂无页面 session”和“扩展未连接”。
+
+### 背景
+
+`0.2.1` 仍容易出现 bridge 在线但没有检测到带 Yunti 扩展页面的提示，进而让
+Agent 要求用户刷新页面。根因是在线检测过度依赖页面 session。更合理的模型是：
+扩展背景页先维护浏览器级 controller 心跳，MCP 通过 controller 获取全浏览器
+targets；页面 session 只在 observe/click/fill 等页面内容能力需要时按需注册。
+
+### 目标
+
+- 安装扩展后不要求用户刷新页面来证明扩展在线。
+- MCP 可以先通过 controller 获取浏览器 targets。
+- 页面级工具仍保持 content-script 路径，不因 controller 引入默认 CDP。
+- doctor、console、README、skill、usage hints 不再把“没有页面 session”误导成
+  “扩展没装好”。
+
+### 验收标准
+
+- 单测覆盖 controller 注册、health 区分页/控制器 session、controller 路由
+  `yunti_list_browser_targets`、以及 controller 不抢 active page route。
+- `npm run check` 通过。
+- `npm test` 通过。
+- `npm run release:check` 通过后再发布 `0.2.2`。
 - `yunti_get_tool_usage_hints` 和 skill 同步更新。
+
+最新验证：
+
+- `npm run check` 通过。
+- `node --test tests/session-manager.test.js tests/bridge.test.js` 通过，82 个
+  node:test 用例全过。
+- `npm test` 通过，133 个 node:test 用例中 132 个通过，1 个真实浏览器 smoke
+  默认跳过。
+- `npm run release:check` 通过，包含公开文档/链接检查、version consistency
+  `0.2.2`、CLI smoke、doctor smoke、11 行 action-result coverage、npm package
+  contents 49 个文件、extension zip contents 13 个文件。
+- `YUNTI_E2E=1 npm run test:e2e` 通过，1 个真实浏览器 smoke 用例通过。
 
 ## P1.1 doctor 增强
 

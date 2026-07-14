@@ -4,7 +4,6 @@ export function createCdpController({
   postBridge,
   startPolling,
   forwardConsoleEvent,
-  ensureAllTabsRegistered,
 }) {
   const cdpAttachedTabs = new Set()
   const cdpEnabledDomains = new Map()
@@ -86,6 +85,11 @@ export function createCdpController({
     if (method === "Target.getTargetInfo") {
       return interceptTargetGetTargetInfo(targetParams)
     }
+    if (!Number.isFinite(Number(targetTabId)) || Number(targetTabId) <= 0) {
+      throw new Error(
+        "CDP command requires a concrete tabId or targetId when routed through the browser controller. Call yunti_list_browser_targets first, then pass the returned tabId or targetId."
+      )
+    }
 
     let attach = { attached: false, reused: cdpAttachedTabs.has(targetTabId) }
     if (args.attach !== false) {
@@ -160,9 +164,6 @@ export function createCdpController({
   }
 
   async function listBrowserTargets(session) {
-    if (typeof ensureAllTabsRegistered === "function") {
-      await ensureAllTabsRegistered({ reason: "list_browser_targets" }).catch(() => null)
-    }
     const cdpResult = await interceptTargetGetTargets(session)
     const targetInfos = Array.isArray(cdpResult?.result?.targetInfos)
       ? cdpResult.result.targetInfos

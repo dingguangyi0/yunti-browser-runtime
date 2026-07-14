@@ -1,3 +1,11 @@
+const BROWSER_CONTROLLER_TOOLS = new Set([
+  "yunti_list_browser_targets",
+  "yunti_list_pages",
+  "yunti_get_browser_target",
+  "yunti_cdp_send_command",
+  "yunti_new_page",
+])
+
 export function createToolDispatcher({
   sessionsByTab,
   pollers,
@@ -22,6 +30,7 @@ export function createToolDispatcher({
     let ok = true
     let error = null
     try {
+      assertConcretePageRoute(tabId, session, event)
       if (event.tool === "yunti_capture_visible_tab") {
         try {
           const dataUrl = await chrome.tabs.captureVisibleTab(session.windowId, {
@@ -130,6 +139,19 @@ export function createToolDispatcher({
       result,
       error,
     }).catch(() => {})
+  }
+
+  function assertConcretePageRoute(tabId, session, event) {
+    if (!isBrowserControllerSession(session)) return
+    if (BROWSER_CONTROLLER_TOOLS.has(event.tool)) return
+    if (Number.isFinite(Number(tabId)) && Number(tabId) > 0) return
+    throw new Error(
+      `${event.tool} needs a concrete page session. The browser controller route is online for whole-browser inventory and explicit CDP target routing; call yunti_list_browser_targets, select/register the intended page, then retry the page operation.`
+    )
+  }
+
+  function isBrowserControllerSession(session) {
+    return session?.kind === "browser_controller" || session?.tabId === null
   }
   
   async function navigatePage(tabId, session, args = {}) {

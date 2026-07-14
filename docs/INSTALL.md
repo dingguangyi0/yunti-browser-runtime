@@ -63,15 +63,16 @@ Development loading:
 2. Enable developer mode.
 3. Choose "Load unpacked".
 4. Select the project `extension/` directory.
-5. Open or keep any `http` or `https` page. The extension automatically tries
-   to inject and register accessible existing pages.
+5. Open or keep any `http` or `https` page. The extension first connects a
+   browser-level controller heartbeat to the bridge; concrete page sessions are
+   registered on activation, page load, or when page tools need a route.
 6. Do not open the extension popup unless you want to confirm status or
    customize settings.
 
 The extension defaults to `http://127.0.0.1:48887`. Local installs do not need a
-token, opening the popup, or saving popup settings. The extension registers
-browser pages with the local bridge. It does not create agent conversations or
-depend on a remote workspace.
+token, opening the popup, or saving popup settings. The extension maintains a
+browser controller route and registers page routes with the local bridge when
+needed. It does not create agent conversations or depend on a remote workspace.
 
 To create a distributable zip:
 
@@ -152,8 +153,8 @@ npm run print-config -- --agent cline --human
 
 Add the printed server entry to Cline's MCP settings. Keep the extension loaded
 in Chrome/Edge. The extension should register accessible `http`/`https` pages
-automatically; refresh the target page only if browser restrictions or a failed
-doctor check make it necessary.
+on activation, load, or page-tool use; refresh the target page only if browser
+restrictions or a failed doctor check make it necessary.
 
 ## Check Health
 
@@ -189,9 +190,11 @@ runs the unit test suite, and verifies the npm package contents with
 
 ## Common Recovery
 
-- If tools say no browser tab is connected, call `yunti_list_browser_targets`
-  or run doctor first; the extension will try to auto-register accessible pages.
-  Refresh the target page only as a fallback.
+- If tools say no browser route is connected, run doctor first. If the extension
+  controller is online but no page session is active, call
+  `yunti_list_browser_targets`, activate/open the target page, and use page
+  tools once a concrete route is available. Refresh the target page only as a
+  fallback.
 - If doctor reports `authorized: false` with `authRequired: true`, set
   `YUNTI_BROWSER_BRIDGE_TOKEN` and save the same token in the extension popup.
 - If an old `browserSessionId` fails, call `yunti_list_browser_targets` again
@@ -202,9 +205,10 @@ runs the unit test suite, and verifies the npm package contents with
   is rejected.
 - For closing a raw `tabId` or `targetId`, use `yunti_cdp_send_command` with
   `Target.closeTarget` instead of `yunti_close_page`.
-- If the extension was reloaded, it should scan and register accessible pages
-  automatically. Refresh browser pages only if the page cannot be injected or
-  remains invisible after the recovery check.
+- If the extension was reloaded, the browser controller should reconnect
+  automatically. Page routes register on activation, load, or page-tool use.
+  Refresh browser pages only if the page cannot be injected or remains invisible
+  after the recovery check.
 
 ## Real Browser Smoke Test
 

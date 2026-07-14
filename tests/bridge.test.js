@@ -304,6 +304,73 @@ test("poll heartbeat refreshes session expiry", async () => {
   assert.equal(hub.listSessions({ userId: "u1" }).length, 1)
 })
 
+test("browser controller heartbeat is distinct from page sessions", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+    url: "browser://yunti-runtime",
+  })
+
+  const health = hub.health({ userId: "u1" })
+  assert.equal(health.extensionConnected, true)
+  assert.equal(health.controllerCount, 1)
+  assert.equal(health.pageSessionCount, 0)
+  assert.equal(health.activeSessionId, null)
+  assert.equal(health.browserControllerSessionId, "controller-1")
+  assert.equal(hub.listPages({ userId: "u1" }).pages.length, 0)
+
+  const call = hub.callTool("yunti_list_browser_targets", { userId: "u1" }, 1000)
+  const event = await hub.poll("controller-1", 100)
+  assert.equal(event.tool, "yunti_list_browser_targets")
+  hub.submitResult({
+    browserSessionId: "controller-1",
+    requestId: event.id,
+    ok: true,
+    result: { browserSessionId: "controller-1", targets: [], total: 0 },
+  })
+  assert.equal((await call).browserSessionId, "controller-1")
+
+  await assert.rejects(
+    hub.callTool("yunti_observe_page", { browserSessionId: "controller-1", userId: "u1" }, 1000),
+    /requires a concrete page session/
+  )
+})
+
+test("browser controller heartbeat does not replace the active page route", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+  })
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", tabId: 1 })
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+  })
+
+  const health = hub.health({ userId: "u1" })
+  assert.equal(health.activeSessionId, "tab-1")
+  assert.equal(health.browserControllerSessionId, "controller-1")
+
+  const call = hub.callTool("yunti_get_page_snapshot", { userId: "u1" }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_get_page_snapshot")
+  hub.submitResult({
+    browserSessionId: "tab-1",
+    requestId: event.id,
+    ok: true,
+    result: { browserSessionId: "tab-1" },
+  })
+  assert.equal((await call).browserSessionId, "tab-1")
+})
+
 test("list targets can recover route after another fresh session registers", async () => {
   const hub = new BridgeHub({ sessionTtlMs: 10 })
   hub.registerSession({ browserSessionId: "stale-tab", userId: "u1" })
@@ -626,7 +693,7 @@ test("mcp entry injects the default local browser user scope", async () => {
   }, { mode: "owner", hub: new BridgeHub() })
 
   assert.equal(response.result.isError, true)
-  assert.match(response.result.content[0].text, /No Yunti browser tab is connected for userId: local/)
+  assert.match(response.result.content[0].text, /No Yunti browser route is connected for userId: local/)
 })
 
 test("mcp usage hints can be called without browser user scope", async () => {

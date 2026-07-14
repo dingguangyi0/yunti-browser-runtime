@@ -3,12 +3,17 @@
 ## Current Phase
 
 Release `yunti-browser-runtime@0.2.0` is complete and verified on the official
-npm registry. The current patch line is `0.2.1`, focused on making default
-observe-first page actions avoid automatic Chrome debugger attachment.
+npm registry. The current patch line is `0.2.2`, focused on making extension
+online detection browser-controller based instead of page-session based.
 
-Current implementation focus: `0.2.1` install/bridge recovery without default
-manual page refresh. The anti-debug-sensitive default action path is already in
-place: fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
+Current implementation focus: `0.2.2` install/bridge recovery without default
+manual page refresh. The extension background maintains a stable
+`browser_controller` heartbeat with the local bridge. `yunti_list_browser_targets`
+and related browser-inventory/CDP-target tools can route through that controller
+even when no concrete page session is registered yet. Page routes remain
+content-script based and register on tab activation, page load, popup refresh, or
+page-tool use. The anti-debug-sensitive default action path is still in place:
+fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
 `yunti_type_text`, and `yunti_press_key` dispatch through content script page
 events instead of CDP mouse/keyboard/runtime commands. Explicit CDP, trace,
 screenshot fallback, drag/upload/emulation/resize, and legacy snapshot
@@ -22,28 +27,38 @@ complete; P6.5 optional local runtime console is complete through real-browser
 validation. P6.6.4 store-candidate permission UX design is deferred to the
 post-0.2 store-candidate track.
 
-Active slice status: `0.2.1` install/bridge recovery has code and docs in
-progress. The extension background scans accessible `http` / `https` tabs after
-install/startup/background recovery, tab activation/update, popup refresh, and
-`yunti_list_browser_targets`; it pings existing content scripts, injects the
-packaged scripts when missing, and triggers registration automatically. Manual
-refresh is now documented as a last resort only for pages Chrome cannot inject
-into, unsupported protocols, missing permissions, or other browser-enforced
-limits.
+Active slice status: `0.2.2` controller-heartbeat recovery is complete in the
+working tree. The extension background registers a browser-level controller on
+install/startup/background recovery and keeps polling the bridge. The bridge now
+tracks `controllerCount`, `pageSessionCount`, `browserControllerSessionId`, and
+`extensionConnected` separately, so doctor/console can say “extension controller
+online, no page session yet” instead of telling users the extension is missing.
+Manual refresh remains a last resort only for pages Chrome cannot inject into,
+unsupported protocols, missing permissions, or other browser-enforced limits.
 
 Acceptance for this slice:
 
-- Add `scripting`-based auto injection / auto registration for existing
-  supported tabs.
-- Trigger recovery on extension install/startup, tab activation/update, popup
-  refresh, and list-targets style inventory recovery where feasible.
+- Add browser-controller heartbeat so extension online detection does not
+  require an already registered page session.
+- Route browser inventory and explicit target/CDP flows through the controller;
+  keep observe/click/fill on concrete page sessions.
+- Ensure controller heartbeat does not replace the active page route.
 - Keep the content-script observe/action path non-CDP by default.
 - Update README, install guide, skill, Tool Guide, and usage hints so agents no
   longer tell users to refresh as the default post-install step.
-- Doctor/no-session guidance should prefer automatic recovery and mention manual
-  refresh only as a fallback.
+- Doctor/no-session guidance should distinguish controller online vs page
+  session missing and mention manual refresh only as a fallback.
 - Verify with unit tests, release checks, and real-browser E2E if browser
   behavior changes.
+
+Latest `0.2.2` validation: `npm run check` passed; targeted
+`tests/session-manager.test.js` and `tests/bridge.test.js` passed with 82
+node:test cases; full `npm test` passed with 133 node:test cases total, 132
+passing and 1 default real-browser smoke skipped; `npm run release:check`
+passed, including public docs/link checks, version consistency `0.2.2`, CLI
+smoke, doctor smoke, 11 action-result coverage rows, npm package contents
+validation with 49 files, and extension zip contents validation with 13 files;
+`YUNTI_E2E=1 npm run test:e2e` passed with 1 real-browser smoke.
 
 Latest visible 0.2.0 phase split:
 

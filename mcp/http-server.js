@@ -298,11 +298,22 @@ export async function startBridgeServer({
 
       if (req.method === "GET" && url.pathname === "/sessions") {
         const userId = url.searchParams.get("userId")
-        const sessions = hub.listSessions({ userId })
-        const activeSessionId = normalizeRouteUserId(userId)
-          ? hub.activeSessionByUser.get(normalizeRouteUserId(userId)) || null
-          : null
-        sendJson(req, res, 200, { sessions, activeSessionId, sessionCount: hub.sessions.size }, { allowOrigins })
+        const health = hub.health({ userId })
+        sendJson(
+          req,
+          res,
+          200,
+          {
+            sessions: health.sessions,
+            activeSessionId: health.activeSessionId,
+            browserControllerSessionId: health.browserControllerSessionId,
+            sessionCount: health.sessionCount,
+            visibleSessionCount: health.visibleSessionCount,
+            pageSessionCount: health.pageSessionCount,
+            controllerCount: health.controllerCount,
+          },
+          { allowOrigins }
+        )
         return
       }
 

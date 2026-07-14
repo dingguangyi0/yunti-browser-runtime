@@ -3,6 +3,9 @@ import { installNetworkMonitor } from "./network-monitor.js"
 import { createSessionManager } from "./session-manager.js"
 import { createToolDispatcher } from "./tool-handlers.js"
 
+const BRIDGE_RECOVERY_ALARM_NAME = "yunti_bridge_recovery"
+const FAST_RECOVERY_DELAYS_MS = [1000, 3000, 8000, 15000, 30000]
+
 const sessionManager = createSessionManager()
 const {
   forwardConsoleEvent,
@@ -18,7 +21,6 @@ const cdp = createCdpController({
   postBridge,
   startPolling,
   forwardConsoleEvent,
-  ensureAllTabsRegistered: sessionManager.ensureAllTabsRegistered,
 })
 
 const { detachCdpTab, installCdpEventForwarder } = cdp
@@ -58,11 +60,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 })
 
 chrome.runtime.onInstalled.addListener(() => {
-  void sessionManager.ensureAllTabsRegistered({ reason: "extension_installed" }).catch(() => {})
+  recoverBrowserController("extension_installed")
 })
 
 chrome.runtime.onStartup.addListener(() => {
-  void sessionManager.ensureAllTabsRegistered({ reason: "browser_startup" }).catch(() => {})
+  recoverBrowserController("browser_startup")
+})
+
+chrome.alarms?.onAlarm?.addListener((alarm) => {
+  if (alarm?.name !== BRIDGE_RECOVERY_ALARM_NAME) return
+  recoverBrowserController("bridge_recovery_alarm")
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -72,4 +79,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true
 })
 
-void sessionManager.ensureAllTabsRegistered({ reason: "background_started" }).catch(() => {})
+function recoverBrowserController(reason) {
+  void sessionManager.registerBrowserController(reason).catch(() => {})
+}
+
+function scheduleBridgeRecovery() {
+  if (chrome.alarms?.create) {
+    chrome.alarms.create(BRIDGE_RECOVERY_ALARM_NAME, {
+      delayInMinutes: 0.5,
+      periodInMinutes: 0.5,
+    })
+  }
+  for (const delayMs of FAST_RECOVERY_DELAYS_MS) {
+    setTimeout(() => recoverBrowserController(`bridge_recovery_fast_${delayMs}`), delayMs)
+  }
+}
+
+recoverBrowserController("background_started")
+scheduleBridgeRecovery()

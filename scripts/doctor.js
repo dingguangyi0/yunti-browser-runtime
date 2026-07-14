@@ -60,7 +60,11 @@ async function checkBridge() {
     const authorized = health.json?.authorized !== false
     const authRequired = health.json?.auth?.required !== false && Boolean(health.json?.auth?.required)
     const sessions = Array.isArray(health.json?.sessions) ? health.json.sessions : []
+    const controllerSessions = sessions.filter((session) => session?.kind === "browser_controller")
+    const pageSessions = sessions.filter((session) => session?.kind !== "browser_controller")
     const activeSessionId = health.json?.activeSessionId || null
+    const browserControllerSessionId = health.json?.browserControllerSessionId || controllerSessions[0]?.browserSessionId || null
+    const extensionConnected = Boolean(health.json?.extensionConnected) || controllerSessions.length > 0 || pageSessions.length > 0
     return {
       ok: health.status === 200 && authorized,
       reachable: health.status === 200,
@@ -74,9 +78,13 @@ async function checkBridge() {
       userId: routeUserId,
       sessionCount: Number(health.json?.sessionCount || sessions.length || 0),
       visibleSessionCount: sessions.length,
+      pageSessionCount: Number(health.json?.pageSessionCount ?? pageSessions.length),
+      controllerCount: Number(health.json?.controllerCount ?? controllerSessions.length),
       activeSessionId,
+      browserControllerSessionId,
       activeSession: sessions.find((session) => session.browserSessionId === activeSessionId) || null,
-      extensionConnected: sessions.length > 0,
+      extensionConnected,
+      pageConnected: pageSessions.length > 0,
       raw: health.json,
     }
   } catch (error) {
@@ -93,9 +101,13 @@ async function checkBridge() {
       error: error.message,
       sessionCount: 0,
       visibleSessionCount: 0,
+      pageSessionCount: 0,
+      controllerCount: 0,
       activeSessionId: null,
+      browserControllerSessionId: null,
       activeSession: null,
       extensionConnected: false,
+      pageConnected: false,
     }
   }
 }
@@ -120,9 +132,12 @@ function buildNextSteps(checks) {
     steps.push("Save the same token in the extension popup.")
   }
   if (checks.bridge.ok && !checks.bridge.extensionConnected) {
-    steps.push("Load or reload the extension and open an http/https page; Yunti will auto-register accessible tabs.")
-    steps.push("If no page appears after a few seconds, refresh the target page as a fallback.")
+    steps.push("Load or reload the extension; the background controller should connect before any page session appears.")
     steps.push(`Open the optional local console for live status: ${checks.bridge.consoleUrl}.`)
+  }
+  if (checks.bridge.ok && checks.bridge.extensionConnected && !checks.bridge.pageConnected) {
+    steps.push("Extension controller is online. Call yunti_list_browser_targets to inspect open tabs; page operations need a concrete http/https page session.")
+    steps.push("Activate or open the target page if needed. Refresh the page only as the final fallback for browser-injection limits.")
   }
   if (!checks.mcpServer.ok) {
     steps.push(`Restore the MCP server file at ${checks.mcpServer.path}.`)
@@ -140,8 +155,8 @@ function humanSummary(report) {
     `- Bridge: ${report.checks.bridge.reachable ? report.checks.bridge.url : "not reachable"}`,
     `- Console: ${report.checks.bridge.reachable ? report.checks.bridge.consoleUrl : "not available until bridge starts"}`,
     `- Token: ${report.checks.bridge.authRequired ? report.checks.bridge.authorized ? "valid" : "missing or invalid" : "not required for local loopback"}`,
-    `- Sessions: ${report.checks.bridge.visibleSessionCount} visible, active ${report.checks.bridge.activeSessionId || "none"}`,
-    `- Extension: ${report.checks.bridge.extensionConnected ? "connected" : "not detected"}`,
+    `- Sessions: ${report.checks.bridge.visibleSessionCount} visible (${report.checks.bridge.pageSessionCount} page, ${report.checks.bridge.controllerCount} controller), active page ${report.checks.bridge.activeSessionId || "none"}`,
+    `- Extension: ${report.checks.bridge.extensionConnected ? "connected" : "not detected"}${report.checks.bridge.browserControllerSessionId ? `, controller ${report.checks.bridge.browserControllerSessionId}` : ""}`,
     `- MCP server: ${report.checks.mcpServer.ok ? "found" : "missing"}`,
     `- Skill: ${report.checks.skill.ok ? "found" : "missing"}`,
   ]

@@ -7,13 +7,29 @@ function installChromeMock(options = {}) {
   const messages = []
   const scripts = []
   const styles = []
+  const requests = []
+  const stored = { ...(options.storage || {}) }
   const reachableTabs = new Set(options.reachableTabs || [])
   const previousChrome = globalThis.chrome
   const previousFetch = globalThis.fetch
-  globalThis.fetch = async () => ({
-    ok: true,
-    json: async () => ({ ok: true }),
-  })
+  globalThis.fetch = async (url, init = {}) => {
+    requests.push({
+      url: String(url),
+      method: init.method || "GET",
+      body: init.body ? JSON.parse(init.body) : null,
+    })
+    if (String(url).includes("/extension/poll")) {
+      return new Promise((resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new Error("aborted")), {
+          once: true,
+        })
+      })
+    }
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    }
+  }
   globalThis.chrome = {
     runtime: {
       getManifest: () => ({ version: "0.2.1" }),
@@ -26,8 +42,11 @@ function installChromeMock(options = {}) {
           localUserName: "local",
           localUserId: "local",
           platformMatches: ["*"],
+          ...stored,
         }),
-        set: async () => {},
+        set: async (patch) => {
+          Object.assign(stored, patch)
+        },
       },
     },
     tabs: {
@@ -57,7 +76,9 @@ function installChromeMock(options = {}) {
   }
   return {
     messages,
+    requests,
     scripts,
+    stored,
     styles,
     restore() {
       globalThis.chrome = previousChrome
@@ -86,6 +107,62 @@ test("ensureAllTabsRegistered injects content scripts into existing http pages",
       ["content.js"],
     ])
     assert.equal(mock.messages.filter((item) => item.tabId === 1).length, 2)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("registerBrowserController maintains a browser-level route without a tab", async () => {
+  const mock = installChromeMock()
+  try {
+    const manager = createSessionManager()
+    const result = await manager.registerBrowserController("test")
+
+    assert.equal(result.ok, true)
+    assert.equal(result.session.kind, "browser_controller")
+    assert.equal(result.session.tabId, null)
+    assert.equal(result.session.windowId, null)
+    assert.ok(result.session.browserSessionId.startsWith("yunti-browser-"))
+    assert.equal(mock.stored.browserControllerId, result.session.browserSessionId)
+    await new Promise((resolve) => setImmediate(resolve))
+
+    const registerRequests = mock.requests.filter((request) =>
+      request.url.endsWith("/sessions/register")
+    )
+    assert.ok(registerRequests.length >= 1)
+    assert.equal(registerRequests[0].body.kind, "browser_controller")
+    assert.equal(registerRequests[0].body.tabId, null)
+    assert.ok(
+      mock.requests.some((request) =>
+        request.url.includes("/extension/poll?browserSessionId=")
+      )
+    )
+  } finally {
+    mock.restore()
+  }
+})
+
+test("registerBrowserController restarts polling when bridge URL changes", async () => {
+  const mock = installChromeMock()
+  try {
+    const manager = createSessionManager()
+    await manager.registerBrowserController("initial")
+    await new Promise((resolve) => setImmediate(resolve))
+
+    await globalThis.chrome.storage.local.set({ bridgeUrl: "http://127.0.0.1:49999" })
+    await manager.registerBrowserController("bridge_changed")
+    await new Promise((resolve) => setImmediate(resolve))
+
+    assert.ok(
+      mock.requests.some((request) =>
+        request.url.startsWith("http://127.0.0.1:48887/extension/poll?")
+      )
+    )
+    assert.ok(
+      mock.requests.some((request) =>
+        request.url.startsWith("http://127.0.0.1:49999/extension/poll?")
+      )
+    )
   } finally {
     mock.restore()
   }

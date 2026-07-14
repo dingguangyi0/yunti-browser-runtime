@@ -61,7 +61,8 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     assert.ok(consoleState.sessions.some((session) => session.browserSessionId === browserSessionId))
     const consoleSession = consoleState.sessions.find((session) => session.browserSessionId === browserSessionId)
     assert.equal(consoleSession.extensionVersion, packageJson.version)
-    assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_CONNECTED_PAGES"), false)
+    assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_EXTENSION_CONTROLLER"), false)
+    assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_PAGE_SESSIONS"), false)
     assert.equal(consoleState.warnings.some((warning) => warning.code === "EXTENSION_VERSION_MISMATCH"), false)
 
     const targets = await callTool(bridge, "yunti_list_browser_targets", { browserSessionId })
@@ -166,7 +167,9 @@ async function waitForBrowserSession(bridgeUrl) {
   while (Date.now() < deadline) {
     const response = await fetch(`${bridgeUrl}/health?userId=local`)
     const health = await response.json()
-    const active = health.sessions?.find((session) => session.active) || health.sessions?.[0]
+    const sessions = Array.isArray(health.sessions) ? health.sessions : []
+    const active = sessions.find((session) => session.active && session.kind !== "browser_controller")
+      || sessions.find((session) => session.kind !== "browser_controller")
     if (active?.browserSessionId) return active.browserSessionId
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
   }

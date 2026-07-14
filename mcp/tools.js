@@ -1006,7 +1006,9 @@ export function toolUsageHints(args = {}) {
       recommended: ["browserSessionId"],
       notes: [
         "Use for page counts, all tabs, finding a tab, or choosing a CDP target.",
+        "In 0.2.2+, this can route through the extension browser controller even when no concrete page session is registered yet.",
         "tabId and targetId are selectors; route CDP through the current user's browserSessionId.",
+        "Page actions such as observe, click, and fill still need a concrete page session; activate or open the target http/https page if only the controller is online.",
         "Use this to recover when a stored browserSessionId is stale.",
       ],
     },
@@ -1419,6 +1421,7 @@ export function toolUsageHints(args = {}) {
         "After each action or wait, observe again and verify the result before continuing.",
         "For async UI, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
         "If ok=false, code, recoveryHint, or nextStepHint appears, follow that guidance before retrying.",
+        "If doctor shows only the browser controller online, use yunti_list_browser_targets and select/register a concrete page before observe/click/fill.",
         "Use selector or coordinate fallback only as recovery/debugging paths.",
         "Ask me before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, or changing production data.",
         "Do not expose raw cookies, passwords, auth headers, tokens, private keys, or other secrets.",

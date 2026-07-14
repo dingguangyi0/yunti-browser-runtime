@@ -53,7 +53,8 @@ yunti-browser-runtime print-config -- --agent codex --human
 ```
 
 把输出的 MCP 配置加入 Agent 后，加载浏览器扩展并打开或保持任意 `http` / `https`
-页面即可。扩展会自动扫描可访问页面、注入内容脚本并注册到本地 bridge。
+页面即可。扩展背景页会先通过浏览器控制器心跳连接到本地 bridge；页面路由会在页面
+激活、加载完成或页面工具需要时按需注册。
 默认不需要填写 token，不需要打开扩展 popup，也不需要保存设置。
 
 需要独立调试 bridge 时，可以手动运行：
@@ -128,11 +129,11 @@ npm run doctor:json
 6. 引导我打开 Chrome/Edge 的扩展管理页，开启开发者模式，手动加载扩展目录：
    $(npm root -g)/yunti-browser-runtime/extension
 7. 告诉我：扩展默认 bridge URL 是 http://127.0.0.1:48887，本地默认不需要 token，不需要打开 popup，也不需要保存设置。
-8. 打开或保持任意 http/https 页面；扩展会自动尝试注入并注册已有页面。
+8. 打开或保持任意 http/https 页面；扩展会先用浏览器控制器心跳连上 bridge，页面会在激活/加载完成或页面工具需要时按需注册。
 9. 执行：yunti-browser-runtime doctor
-10. 如果 doctor 正常，再调用 yunti_list_browser_targets 或 yunti_get_tool_usage_hints 验证你能看到浏览器页面。
+10. 如果 doctor 显示 extension/controller connected，再调用 yunti_list_browser_targets 或 yunti_get_tool_usage_hints 验证你能看到浏览器 targets；页面操作前再选择/注册具体页面。
 
-注意：Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后会自动尝试接管已打开的 http/https 页面，不要默认要求我刷新页面、填写 token、打开 popup 或保存设置；只有 doctor/list targets 仍看不到页面，且确认是浏览器限制或页面未加载完成时，才把刷新目标页作为兜底。
+注意：Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后会自动维护浏览器控制器心跳，不要默认要求我刷新页面、填写 token、打开 popup 或保存设置；只有页面级工具无法接入目标页面，且确认是浏览器限制或页面未加载完成时，才把刷新目标页作为兜底。
 ```
 
 ## 安装浏览器扩展
@@ -150,12 +151,12 @@ $(npm root -g)/yunti-browser-runtime/extension
 3. 点击“加载已解压的扩展程序”。
 4. 选择本项目的 `extension/` 目录。
 5. 打开任意 `http` 或 `https` 页面。
-6. 扩展会自动扫描并注册可访问页面；如果 doctor 仍看不到页面，再刷新目标页作为兜底。
+6. 扩展会先注册浏览器控制器心跳；页面会在激活、加载完成或页面工具需要时按需注册。如果页面级工具仍无法接入目标页，再刷新目标页作为兜底。
 
 扩展默认使用 `http://127.0.0.1:48887`，本地安装不需要 token，不需要打开 popup，
 也不需要保存设置。扩展 popup 首屏只显示连接状态；自定义 bridge URL、页面匹配或
-可选 token 都收在高级设置里。扩展只负责把页面注册到本地 bridge，并执行 Agent
-发来的浏览器动作。
+可选 token 都收在高级设置里。扩展负责维持浏览器控制器心跳、按需注册页面路由，
+并执行 Agent 发来的浏览器动作。
 
 也可以生成 zip 包用于分发或归档：
 
@@ -324,9 +325,10 @@ token。
 
 ## 发布状态与后续事项
 
-- 当前源码版本：`yunti-browser-runtime@0.2.1`。
-- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.0`。
-- `0.2.1` 修复默认 observe-first 页面动作误触发 Chrome debugger 的问题；
+- 当前源码版本：`yunti-browser-runtime@0.2.2`。
+- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.1`。
+- `0.2.2` 将扩展在线状态从“必须有页面 session”调整为浏览器控制器心跳；
+  `0.2.1` 修复默认 observe-first 页面动作误触发 Chrome debugger 的问题；
   `0.2.0` 增强了 `yunti_observe_page`、fresh uid
   操作闭环、结构化恢复诊断、DOM/diagnostic 脱敏和可选本地控制台。
 - `0.2.0` 发布后验证已通过：`npm run release:verify-published`。

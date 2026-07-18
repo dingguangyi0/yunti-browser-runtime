@@ -488,7 +488,7 @@ targets；页面 session 只在 observe/click/fill 等页面内容能力需要�
 
 ## P0.4 单 controller 传输 / 页面 session 稳定恢复
 
-状态：开发与验证完成，等待提交；是否发布 `0.2.3` 由用户决定（2026-07-17）
+状态：已完成、已提交并随 `0.2.3` 发布（2026-07-18）
 
 线上反馈与实机诊断确认：`0.2.2` 虽然增加了 controller 心跳，但仍让每个 page
 session 建立独立的 25 秒 HTTP long poll。多标签页共享
@@ -2892,11 +2892,11 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P0.1-P7.2 已完成，`yunti-browser-runtime@0.2.2` 已发布到官方 npm registry。
-当前已完成 `P0.4` 单 controller 传输 / 页面 session 自动恢复和 `P0.5` CDP 一等
-能力策略，源码版本为 `0.2.3`；下一步是提交修复，再由用户决定是否发布。完整
-release check 已通过：146 个 node:test 用例中 145 个通过、1 个真实浏览器 smoke
-默认跳过；单独启用真实浏览器 E2E 后 1 个 smoke 用例通过。
+P0.1-P7.2、P0.4 和 P0.5 已完成，`yunti-browser-runtime@0.2.3` 已发布到官方 npm
+registry，`latest` 已确认指向 `0.2.3`。完整 release check 已通过：146 个
+node:test 用例中 145 个通过、1 个真实浏览器 smoke 默认跳过；单独启用真实浏览器
+E2E 后 1 个 smoke 用例通过。下一步进入 `0.2.3` 用户反馈观察，不再继续扩大该补丁
+范围；如仍出现 session 失效，应采集 bridge state 并按新的单 controller 不变量定位。
 
 ## P7.2 0.2.1 安装后自动注入 / 自动注册页面
 

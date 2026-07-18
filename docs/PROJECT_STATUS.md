@@ -2,9 +2,9 @@
 
 ## Current Phase
 
-Release `yunti-browser-runtime@0.2.2` is complete and verified on the official
-npm registry. The current source patch line is `0.2.3`, fixing page-session
-expiry under many open tabs and completing controller-driven page recovery.
+Release `yunti-browser-runtime@0.2.3` is complete and verified on the official
+npm registry. It fixes page-session expiry under many open tabs, completes
+controller-driven page recovery, and restores CDP as a first-class backend.
 
 Current implementation focus: one `browser_controller` long-poll transport per
 extension/browser instead of one long poll per page. Page sessions are metadata
@@ -25,8 +25,8 @@ complete; P6.5 optional local runtime console is complete through real-browser
 validation. P6.6.4 store-candidate permission UX design is deferred to the
 post-0.2 store-candidate track.
 
-Active slice status: `0.2.3` single-controller transport is implemented and
-fully validated in the working tree. The confirmed `0.2.2` failure
+Active slice status: `0.2.3` single-controller transport is released and fully
+validated. The confirmed `0.2.2` failure
 mode was 25-second per-page long polling competing for the browser's per-origin
 HTTP connection pool while Bridge expired sessions after 90 seconds. Live
 diagnosis reproduced 28 visible page sessions dropping to 14 while tabs stayed
@@ -67,6 +67,8 @@ with 49 files and extension zip validation with 13 files. A separate
 `YUNTI_E2E=1 npm run test:e2e` run passes the real-browser smoke, including the
 single-controller poller invariants and repeated page operations. `git diff
 --check` passes and the npm token residue scan returns no matches.
+Official registry verification confirms `version=0.2.3`, `latest=0.2.3`, and a
+valid public tarball containing 49 expected files.
 
 Latest visible 0.2.0 phase split:
 

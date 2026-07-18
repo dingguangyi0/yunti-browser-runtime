@@ -304,6 +304,19 @@ test("poll heartbeat refreshes session expiry", async () => {
   assert.equal(hub.listSessions({ userId: "u1" }).length, 1)
 })
 
+test("aborted extension poll is removed before it can consume a tool request", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "controller-1", userId: "u1", kind: "browser_controller" })
+  const controller = new AbortController()
+  const pendingPoll = hub.poll("controller-1", 10_000, controller.signal)
+  assert.equal(hub.sessions.get("controller-1").pollers.length, 1)
+
+  controller.abort()
+  const event = await pendingPoll
+  assert.equal(event.aborted, true)
+  assert.equal(hub.sessions.get("controller-1").pollers.length, 0)
+})
+
 test("browser controller heartbeat is distinct from page sessions", async () => {
   const hub = new BridgeHub()
   hub.registerSession({
@@ -337,6 +350,178 @@ test("browser controller heartbeat is distinct from page sessions", async () => 
     hub.callTool("yunti_observe_page", { browserSessionId: "controller-1", userId: "u1" }, 1000),
     /requires a concrete page session/
   )
+})
+
+test("0.2.3 controller is the single transport for page tools", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+    liveTabIds: [42],
+    capabilities: { singleControllerTransport: true },
+  })
+  hub.registerSession({
+    browserSessionId: "yunti-page-42-controller",
+    userId: "u1",
+    kind: "page",
+    tabId: 42,
+    active: true,
+  })
+
+  const call = hub.callTool("yunti_observe_page", {
+    browserSessionId: "yunti-page-42-controller",
+    userId: "u1",
+  }, 1000)
+  const event = await hub.poll("controller-1", 100)
+
+  assert.equal(event.tool, "yunti_observe_page")
+  assert.equal(event.route.browserSessionId, "yunti-page-42-controller")
+  assert.equal(event.route.tabId, 42)
+  assert.equal(event.route.viaController, true)
+  assert.equal(hub.sessions.get("yunti-page-42-controller").pollers.length, 0)
+
+  hub.submitResult({
+    browserSessionId: "controller-1",
+    requestId: event.id,
+    ok: true,
+    result: { browserSessionId: "yunti-page-42-controller", elementCount: 1 },
+  })
+  assert.equal((await call).elementCount, 1)
+})
+
+test("controller recovers a legacy stale page session by embedded tab id", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+    liveTabIds: [77],
+    capabilities: { singleControllerTransport: true },
+  })
+
+  const call = hub.callTool("yunti_observe_page", {
+    browserSessionId: "yunti-77-expired-random-id",
+    userId: "u1",
+  }, 1000)
+  const event = await hub.poll("controller-1", 100)
+
+  assert.equal(event.route.tabId, 77)
+  assert.equal(event.route.recoveredStaleRoute, true)
+  hub.submitResult({
+    browserSessionId: "controller-1",
+    requestId: event.id,
+    ok: true,
+    result: { recovered: true },
+  })
+  assert.equal((await call).recovered, true)
+})
+
+test("target inventory ignores a stale explicit page route when controller is online", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+  })
+
+  const call = hub.callTool("yunti_list_browser_targets", {
+    browserSessionId: "expired-page-without-parseable-tab",
+    userId: "u1",
+  }, 1000)
+  const event = await hub.poll("controller-1", 100)
+  assert.equal(event.route.recoveredStaleRoute, true)
+  assert.equal(event.route.browserSessionId, "controller-1")
+  hub.submitResult({
+    browserSessionId: "controller-1",
+    requestId: event.id,
+    ok: true,
+    result: { targets: [] },
+  })
+  assert.deepEqual(await call, { targets: [] })
+})
+
+test("controller routes a page tool to the active tab when no page session exists", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+    liveTabIds: [9],
+    capabilities: { singleControllerTransport: true },
+  })
+
+  const call = hub.callTool("yunti_observe_page", { userId: "u1" }, 1000)
+  const event = await hub.poll("controller-1", 100)
+  assert.equal(event.route.tabId, null)
+  assert.equal(event.route.viaController, true)
+  hub.submitResult({
+    browserSessionId: "controller-1",
+    requestId: event.id,
+    ok: true,
+    result: { browserSessionId: "fresh-page" },
+  })
+  assert.equal((await call).browserSessionId, "fresh-page")
+})
+
+test("one controller heartbeat keeps many live page metadata sessions without page pollers", () => {
+  const hub = new BridgeHub({ sessionTtlMs: 5000 })
+  for (let tabId = 1; tabId <= 30; tabId += 1) {
+    hub.registerSession({
+      browserSessionId: `yunti-page-${tabId}-controller`,
+      userId: "u1",
+      kind: "page",
+      tabId,
+    })
+  }
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+    liveTabIds: Array.from({ length: 30 }, (_, index) => index + 1),
+    capabilities: { singleControllerTransport: true },
+  })
+
+  const future = Date.now() + 10_000
+  assert.equal(hub.refreshPageSessionsForUser("u1", future, Array.from({ length: 30 }, (_, index) => index + 1)), 30)
+  hub.cleanupExpiredSessions(future + 4000)
+  const pages = hub.listSessions({ userId: "u1" }).filter((session) => session.kind !== "browser_controller")
+  assert.equal(pages.length, 30)
+  assert.ok(pages.every((session) => session.pollers === 0))
+})
+
+test("controller inventory removes closed tabs and fresh page registration replaces old tab route", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "old-page", userId: "u1", kind: "page", tabId: 5 })
+  hub.registerSession({ browserSessionId: "fresh-page", userId: "u1", kind: "page", tabId: 5 })
+  assert.equal(hub.sessions.has("old-page"), false)
+  assert.equal(hub.sessions.has("fresh-page"), true)
+
+  hub.registerSession({
+    browserSessionId: "controller-1",
+    userId: "u1",
+    kind: "browser_controller",
+    tabId: null,
+    liveTabIds: [],
+    capabilities: { singleControllerTransport: true },
+  })
+  assert.equal(hub.sessions.has("fresh-page"), false)
+})
+
+test("fresh controller registration replaces an older controller for the same user", () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "controller-old", userId: "u1", kind: "browser_controller" })
+  hub.registerSession({ browserSessionId: "controller-new", userId: "u1", kind: "browser_controller" })
+
+  assert.equal(hub.sessions.has("controller-old"), false)
+  assert.equal(hub.sessions.has("controller-new"), true)
+  assert.equal(hub.health({ userId: "u1" }).controllerCount, 1)
+  assert.equal(hub.health({ userId: "u1" }).browserControllerSessionId, "controller-new")
 })
 
 test("browser controller heartbeat does not replace the active page route", async () => {
@@ -726,7 +911,7 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
 
   assert.equal(fillResponse.result.isError, undefined)
   const fillPayload = JSON.parse(fillResponse.result.content[0].text)
-  assert.equal(fillPayload.version, "2026-07-05")
+  assert.equal(fillPayload.version, "2026-07-17")
   assert.equal(fillPayload.tools.yunti_fill.schema.required.includes("value"), true)
   assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /Coordinate-only fill is not supported/)
 
@@ -812,6 +997,43 @@ test("mcp usage hints include observe-first page operation guidance", async () =
   assert.ok(schema.properties.redaction.enum.includes("off"))
   assert.match(payload.tools.yunti_observe_page.notes.join("\n"), /fresh for the latest observation/)
   assert.match(payload.tools.yunti_observe_page.commonMistakes.join("\n"), /permanent selectors/)
+})
+
+test("mcp usage hints treat CDP as an unrestricted first-class backend", async () => {
+  const focusedResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_cdp_send_command" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(focusedResponse.result.isError, undefined)
+  const focusedPayload = JSON.parse(focusedResponse.result.content[0].text)
+  const cdpHints = focusedPayload.tools.yunti_cdp_send_command
+  assert.match(cdpHints.purpose, /first-class browser backend/)
+  assert.match(cdpHints.commonMistakes.join("\n"), /Do not avoid CDP merely because Chrome may show a debugger banner/)
+  assert.match(cdpHints.commonMistakes.join("\n"), /verify page state before replaying/)
+
+  const workflowResponse = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { topic: "workflow" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(workflowResponse.result.isError, undefined)
+  const workflowPayload = JSON.parse(workflowResponse.result.content[0].text)
+  assert.match(workflowPayload.coreRules.join("\n"), /CDP is not a restricted fallback/)
+  assert.match(workflowPayload.coreRules.join("\n"), /Use CDP proactively/)
+  assert.match(workflowPayload.workflows.defaultPageOperation.join("\n"), /switch to CDP freely/)
+  assert.match(workflowPayload.workflows.actionRecovery.join("\n"), /CDP does not require extra user confirmation by itself/)
+  assert.match(workflowPayload.workflows.copyableAgentPrompt.join("\n"), /complementary first-class backends/)
 })
 
 test("mcp usage hints document raw CDP and screenshot safety boundaries", async () => {

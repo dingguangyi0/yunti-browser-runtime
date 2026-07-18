@@ -1,8 +1,6 @@
 export function createCdpController({
   sessionsByTab,
-  pollers,
   postBridge,
-  startPolling,
   forwardConsoleEvent,
 }) {
   const cdpAttachedTabs = new Set()
@@ -170,17 +168,22 @@ export function createCdpController({
       : []
     const pages = targetInfos
       .filter((target) => target.type === "page")
-      .map((target) => ({
-        browserSessionId: session.browserSessionId,
-        routeBrowserSessionId: session.browserSessionId,
-        targetId: target.targetId || "",
-        tabId: target.tabId ?? null,
-        type: target.type || "",
-        url: target.url || "",
-        title: target.title || "",
-        active: Boolean(target.attached),
-        source: "Target.getTargets",
-      }))
+      .map((target) => {
+        const pageSession = sessionsByTab.get(Number(target.tabId)) || null
+        return {
+          browserSessionId: pageSession?.browserSessionId || null,
+          pageSessionId: pageSession?.browserSessionId || null,
+          routeBrowserSessionId: session.browserSessionId,
+          registered: Boolean(pageSession),
+          targetId: target.targetId || "",
+          tabId: target.tabId ?? null,
+          type: target.type || "",
+          url: target.url || "",
+          title: target.title || "",
+          active: Boolean(target.active),
+          source: "Target.getTargets",
+        }
+      })
     return {
       browserSessionId: session.browserSessionId,
       pages,
@@ -216,6 +219,8 @@ export function createCdpController({
     return {
       browserSessionId: session.browserSessionId,
       target,
+      pageSessionId: sessionsByTab.get(Number(target.tabId))?.browserSessionId || null,
+      registered: sessionsByTab.has(Number(target.tabId)),
       method: "Target.getTargets",
       source: inventory.source,
       listedAt: inventory.listedAt,
@@ -237,9 +242,6 @@ export function createCdpController({
     }
     await detachCdpTab(tabId, null, "target_closed").catch(() => {})
     await chrome.tabs.remove(tabId)
-    sessionsByTab.delete(tabId)
-    pollers.get(tabId)?.abort()
-    pollers.delete(tabId)
     return {
       browserSessionId: session?.browserSessionId || "",
       method: "Target.closeTarget",
@@ -253,20 +255,21 @@ export function createCdpController({
   async function interceptTargetCreateTarget(params = {}, parentSession = null) {
     const url = String(params.url || "about:blank")
     const tab = await chrome.tabs.create({ url, active: true })
-    const browserSessionId = `yunti-${tab.id}-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
+    const browserSessionId = stableChildPageSessionId(tab.id, parentSession)
     const sessionData = {
       browserSessionId,
+      kind: "page",
       userId: parentSession?.userId || "",
       displayName: parentSession?.displayName || "",
       tabId: tab.id,
       windowId: tab.windowId,
       url: tab.url || url,
       title: tab.title || "",
+      active: true,
       registeredAt: new Date().toISOString(),
     }
     sessionsByTab.set(tab.id, sessionData)
     await postBridge("/sessions/register", sessionData).catch(() => null)
-    startPolling(tab.id)
     return {
       browserSessionId,
       method: "Target.createTarget",
@@ -275,6 +278,15 @@ export function createCdpController({
       tabId: tab.id,
       sentAt: new Date().toISOString(),
     }
+  }
+
+  function stableChildPageSessionId(tabId, parentSession) {
+    const parentId = String(parentSession?.browserSessionId || "")
+    const suffix =
+      parentId.match(/^yunti-browser-(.+)$/)?.[1] ||
+      parentId.match(/^yunti-page-\d+-(.+)$/)?.[1] ||
+      (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()))
+    return `yunti-page-${tabId}-${suffix}`
   }
 
   async function interceptTargetAttachToTarget(params = {}, protocolVersion = "1.3") {

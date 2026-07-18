@@ -29,6 +29,8 @@
 | P0.1 | 已完成 | bridge token + CORS 收紧 |
 | P0.2 | 已完成 | session TTL / 心跳 / 快速恢复 |
 | P0.3 | 已完成 | browser controller 心跳 / 页面按需注册 |
+| P0.4 | 已完成 | 单 controller 传输 / 页面 session 稳定恢复 |
+| P0.5 | 已完成 | CDP 一等能力 / 成功率优先的后端选择策略 |
 | P1.1 | 已完成 | doctor 增强 |
 | P1.2 | 已完成 | MCP config printer |
 | P1.3 | 已完成 | extension 打包脚本 |
@@ -483,6 +485,75 @@ targets；页面 session 只在 observe/click/fill 等页面内容能力需要�
   `0.2.2`、CLI smoke、doctor smoke、11 行 action-result coverage、npm package
   contents 49 个文件、extension zip contents 13 个文件。
 - `YUNTI_E2E=1 npm run test:e2e` 通过，1 个真实浏览器 smoke 用例通过。
+
+## P0.4 单 controller 传输 / 页面 session 稳定恢复
+
+状态：开发与验证完成，等待提交；是否发布 `0.2.3` 由用户决定（2026-07-17）
+
+线上反馈与实机诊断确认：`0.2.2` 虽然增加了 controller 心跳，但仍让每个 page
+session 建立独立的 25 秒 HTTP long poll。多标签页共享
+`http://127.0.0.1:48887` 的连接池时，只有少数 poll 能并发，其余请求排队超过 Bridge
+的 90 秒 TTL。实机观察到 28 个 page session 在标签页未关闭时下降到 14 个，且
+controller 在线时 `yunti_list_browser_targets` 仍可能超时。
+
+实现摘要：
+
+- 扩展只保留一条 `browser_controller` poll，page session 不再启动 poll。
+- Bridge 将逻辑页面路由与实际 controller 传输分开；observe/click/fill 仍由
+  content script 执行，不切换为默认 CDP。
+- controller 心跳携带 `liveTabIds`，只续期真实存在的标签页元数据，并清理已关闭
+  tab；新 page session 会替换同用户同 tab 的旧路由。
+- page session id 由 controller id + tab id 稳定生成，MV3 worker 重启后同一 tab
+  可恢复同一逻辑 id。
+- 页面工具支持 page session、`tabId`、`targetId`、可解析 tab 的旧 session id，
+  或当前活动页；controller 自动 ping/inject content script 并注册页面。
+- `yunti_list_browser_targets` 的页面 `browserSessionId` / `pageSessionId` 未注册时为
+  null，`routeBrowserSessionId` 明确表示 controller 传输，不再冒充页面 id。
+- Bridge 保留对未声明 `singleControllerTransport` 的旧扩展页面 poll 兼容；升级后未
+  reload 的旧扩展会收到明确的版本恢复提示。
+
+验收标准：
+
+- 30 个页面只产生 1 条 controller poll，所有 page session `pollers=0`。
+- controller 心跳保持 live-tab 元数据，不让关闭 tab 永久存活。
+- 旧 `yunti-<tabId>-...` session、controller-only、无 page session 三种状态都能
+  自动执行页面工具。
+- target inventory 不返回伪造的页面 session id。
+- 完整单测、release check、真实浏览器 E2E 通过；E2E 断言 page poller 为 0、
+  inventory page id 正确、旧 session 实际恢复成功。
+
+## P0.5 CDP 一等能力 / 成功率优先的后端选择策略
+
+状态：已完成并通过完整验证（2026-07-17）
+
+决策背景：
+
+`0.2.1` 为避免普通 action 无意 attach debugger，逐步形成了“content script 优先、
+CDP 只在必要时使用”的 Agent 指引。该指引保护了无 CDP 操作能力，但也让 Agent 把
+CDP 误解为受限或不推荐能力，降低了跨域 iframe、Shadow DOM、Canvas、精确输入、
+browser target、网络控制、仿真和复杂页面诊断的成功率。
+
+实现摘要：
+
+- content script 与 CDP 定位为互补的一等后端，Agent 按可达性、可靠性和验证能力选择。
+- 不再因为 Chrome debugger banner 或页面可能存在反自动化逻辑而全局回避 CDP；
+  banner 仅作为运行状态提示。
+- `yunti_cdp_send_command` 的 schema 描述、usage hints、默认工作流、可复制提示词、
+  README、Tool Guide、Agent Workflow Contract 和 packaged skill 同步更新。
+- 明确 CDP 本身不触发额外用户确认；确认边界由提交、删除、付款、发布、敏感上传等
+  操作效果决定。
+- 不做 action 失败后的无条件跨后端自动重放。如果写操作可能已经执行但回执不确定，
+  Agent 必须先 observe/evaluate/screenshot 验证状态，再决定通过 DOM 或 CDP 重试，避免
+  双击、重复提交或重复写入。
+- raw CDP events 和截图的敏感数据边界保持不变；这是输出数据安全要求，不是 CDP
+  操作能力限制。
+
+验收标准：
+
+- usage hints 明确包含 first-class、proactive CDP、debugger banner 非限制三条规则。
+- 默认工作流允许 Agent 在 CDP 能提高成功率时直接切换，不要求额外用户确认。
+- recovery guidance 要求不确定的写操作先验证再跨后端重试。
+- 文档、skill 与 MCP 运行时提示保持一致，且完整 release check 通过。
 
 ## P1.1 doctor 增强
 
@@ -2821,11 +2892,15 @@ rg "/U[s]ers|C[o]deg|x[y]y|y[b]m100" README.md docs skills package.json
 
 ## 当前下一步
 
-P0.1-P7.1 已完成，`yunti-browser-runtime@0.2.0` 已发布到官方 npm registry。
+P0.1-P7.2 已完成，`yunti-browser-runtime@0.2.2` 已发布到官方 npm registry。
+当前已完成 `P0.4` 单 controller 传输 / 页面 session 自动恢复和 `P0.5` CDP 一等
+能力策略，源码版本为 `0.2.3`；下一步是提交修复，再由用户决定是否发布。完整
+release check 已通过：146 个 node:test 用例中 145 个通过、1 个真实浏览器 smoke
+默认跳过；单独启用真实浏览器 E2E 后 1 个 smoke 用例通过。
 
 ## P7.2 0.2.1 安装后自动注入 / 自动注册页面
 
-状态：实施中，代码与文档已完成，等待完整验证和提交。
+状态：已完成；后续 controller 架构由 P0.3、P0.4 接续并取代全页面持续注册策略。
 
 目标：
 

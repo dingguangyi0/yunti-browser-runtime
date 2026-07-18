@@ -13,12 +13,15 @@ Chrome/Edge 浏览器：查看标签页、读取页面、点击输入、截图�
 
 它的第一目标是：**部署简单、执行高效、和具体 Agent/平台解耦**。
 
-`0.2.1+` 默认页面操作路径优先走扩展 content script，不会自动 attach Chrome
-debugger：`yunti_observe_page`、fresh uid 的 `yunti_click` / `yunti_hover` /
-`yunti_fill` / `yunti_select` / `yunti_scroll` / `yunti_type_text` /
-`yunti_press_key` 应作为普通页面操作首选。显式 CDP、trace、部分截图 fallback、
-drag/upload/emulation/resize 和 legacy snapshot 兼容路径仍可能触发 Chrome 的调试横幅，
-只在确实需要低层能力时使用。
+Yunti 同时把 content script 和 CDP 作为一等浏览器操作能力。Agent 应按页面和任务选择
+成功率最高的路径：普通 DOM 交互可以使用 fresh uid action；跨域 iframe、Shadow DOM、
+Canvas、精确输入、浏览器 target、网络控制、仿真、追踪或 DOM 路径不可靠时，可以直接
+使用 `yunti_cdp_send_command`。Chrome 可能在 CDP attach 期间显示调试横幅，这只是运行
+状态提示，不应成为限制 CDP 或弱化操作能力的理由。
+
+`0.2.3+` 只维护一条浏览器 controller 通信通道。页面 session 不再各自占用
+HTTP 长轮询；即使页面闲置、扩展后台恢复或 Agent 保存了旧 session ID，普通页面工具
+也会通过 `tabId` / `targetId` 或当前活动页自动恢复内容脚本连接，不要求用户刷新页面。
 
 ## 当前定位
 
@@ -216,9 +219,11 @@ cp -R skills/yunti-browser-runtime ~/.codex/skills/
 
 1. 先调用 `yunti_get_tool_usage_hints`，确认工具规则。
 2. 调用 `yunti_list_browser_targets` 获取浏览器全貌。
-3. 保存当前页面返回的 `browserSessionId`。
-4. 后续页面/CDP 操作都带同一个 `browserSessionId`。
-5. 如果旧 `browserSessionId` 失效，重新调用 `yunti_list_browser_targets` 获取最新路由。
+3. 已注册页面保存其 `browserSessionId`；未注册页面保存 `tabId` 或 `targetId`。
+4. 后续页面操作优先带页面 `browserSessionId`，也可以直接带 `tabId` / `targetId`，
+   runtime 会自动建立或恢复 page session。
+5. 如果旧 `browserSessionId` 失效，`0.2.3+` 会从旧 ID 中恢复 `tabId` 并通过
+   controller 重建连接；仍失败时调用不带旧 ID 的 `yunti_list_browser_targets`。
 6. CDP 命令必须通过 `yunti_cdp_send_command` 调用，不要把 `Target.activateTarget` 之类的 CDP method 当 shell 命令执行。
 7. 涉及提交、删除、付款、上传敏感文件等写操作前，Agent 必须获得用户确认。
 
@@ -226,8 +231,8 @@ cp -R skills/yunti-browser-runtime ~/.codex/skills/
 
 - `yunti_click` / `yunti_hover` 需要 `uid`、`selector`，或同时提供 `x` 和 `y`。
 - `yunti_fill` 必须提供 `value`，并用 `uid` 或 `selector` 定位；不支持只传坐标。
-- 普通页面操作优先使用 `yunti_observe_page` 返回的 fresh uid；`0.2.1+` 的默认
-  fresh-uid action 路径不会自动 attach Chrome debugger。
+- fresh uid action 和 CDP 都是可用的操作路径；按目标页面的可达性、可靠性和验证需求
+  选择，不需要因为 CDP attach 或调试横幅主动回避 CDP。
 - `yunti_close_page` 按 `browserSessionId` 关闭页面；如只有 `tabId` / `targetId`，请用 `yunti_cdp_send_command` + `Target.closeTarget`。
 - `yunti_cdp_send_command` 必须提供 `method`；`params` 可选，但传入时必须是 object。
 - `yunti_forget_learning_memory` 需要 memory `id`，或使用 `all=true` 且 `confirmed=true` 删除全部。
@@ -321,13 +326,17 @@ token。
 
 ### 旧的 `browserSessionId` 失效怎么办？
 
-调用 `yunti_list_browser_targets` 获取最新浏览器路由，再用返回的 `browserSessionId` 继续操作。
+`0.2.3+` 会优先根据旧 session 对应的标签页自动恢复。也可以调用
+`yunti_list_browser_targets`，把目标页面的 `tabId` 或 `targetId` 直接传给
+`yunti_observe_page` 等页面工具；不需要用户刷新页面。
 
 ## 发布状态与后续事项
 
-- 当前源码版本：`yunti-browser-runtime@0.2.2`。
-- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.1`。
-- `0.2.2` 将扩展在线状态从“必须有页面 session”调整为浏览器控制器心跳；
+- 当前源码版本：`yunti-browser-runtime@0.2.3`。
+- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.2`。
+- `0.2.3` 将多页面独立长轮询收敛为单 controller 传输，并补齐旧 session、
+  MV3 后台恢复和目标页面按需注册；`0.2.2` 将扩展在线状态从“必须有页面 session”
+  调整为浏览器控制器心跳；
   `0.2.1` 修复默认 observe-first 页面动作误触发 Chrome debugger 的问题；
   `0.2.0` 增强了 `yunti_observe_page`、fresh uid
   操作闭环、结构化恢复诊断、DOM/diagnostic 脱敏和可选本地控制台。

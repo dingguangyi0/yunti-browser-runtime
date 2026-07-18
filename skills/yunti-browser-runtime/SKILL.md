@@ -14,7 +14,8 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 ## Default Page Operation Contract
 
 1. Call `yunti_get_tool_usage_hints` when tool usage is uncertain.
-2. Call `yunti_list_browser_targets` and choose the intended `browserSessionId`.
+2. Call `yunti_list_browser_targets`; use the intended page's
+   `browserSessionId` when registered, otherwise use its `tabId` / `targetId`.
 3. Call `yunti_observe_page` before page actions.
 4. Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations.
 5. After each action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.
@@ -28,7 +29,8 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 
 ### Click
 
-1. Call `yunti_list_browser_targets` and select the intended `browserSessionId`.
+1. Call `yunti_list_browser_targets` and select the intended page session or
+   target `tabId` / `targetId`.
 2. Call `yunti_observe_page` and choose the target element uid from the fresh observation.
 3. Call `yunti_click` with `browserSessionId` and `uid`.
 4. Read `ok`, `code`, `recoverable`, `recoveryHint`, and `nextStepHint`; if recoverable, follow the hint before retrying.
@@ -53,7 +55,8 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 ### Switch Tab
 
 1. Call `yunti_list_browser_targets` to inspect current tabs and browser targets.
-2. Choose the intended `browserSessionId` for Yunti page tools.
+2. Choose the intended page `browserSessionId`, or its `tabId` / `targetId` when
+   no page session is currently registered.
 3. Use `yunti_select_page` when switching to a registered Yunti page route.
 4. Use `yunti_cdp_send_command` with `Target.activateTarget` only for raw `targetId` / `tabId` browser target activation.
 5. After switching, call `yunti_observe_page` or `yunti_get_page_snapshot` to verify the active page before acting.
@@ -69,16 +72,20 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 ## Routing Rules
 
 - Treat `yunti_list_browser_targets` as the canonical live browser inventory.
-- In `0.2.2+`, the extension may expose a browser controller route before any
-  concrete page session is registered. Use that controller route for
-  `yunti_list_browser_targets`, `yunti_get_browser_target`, new tabs, and CDP
-  with explicit `tabId` / `targetId`; use page routes for observe/click/fill and
-  other content-script page actions.
+- In `0.2.3+`, the extension uses one browser-controller transport for browser
+  and page tools. Page actions remain content-script based; the controller
+  resolves the target tab and establishes the page session on demand.
+- A target inventory row has a page `browserSessionId` only when registered.
+  `routeBrowserSessionId` is the controller transport and must not be mistaken
+  for the page id.
 - Keep the returned `browserSessionId` for follow-up page and CDP calls.
-- If a stored `browserSessionId` fails or appears stale, call `yunti_list_browser_targets` again and retry with the latest route.
+- If a stored page `browserSessionId` is stale, retry once normally: `0.2.3+`
+  recovers legacy ids containing a live tab id. Otherwise list targets without
+  the stale id and pass the intended `tabId` / `targetId` to the page tool.
 - Stale-session errors include a reason and recovery hint; do not keep retrying the expired id.
 - New tabs may return a new `browserSessionId`; use that returned value for follow-up actions on the new tab.
-- Do not use raw `tabId` or `targetId` as a replacement for `browserSessionId`.
+- `tabId` / `targetId` may be passed to page tools specifically for automatic
+  route recovery; they do not become page session ids.
 - Local standalone mode defaults to `userId=local`; do not add `userId` unless the environment explicitly needs a different route user.
 
 ## Tool Choice
@@ -97,8 +104,11 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 
 ## CDP Rules
 
-- In `0.2.1+`, default observe-first page actions avoid automatic Chrome debugger attachment. `yunti_observe_page`, fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`, `yunti_scroll`, `yunti_type_text`, and `yunti_press_key` should be the first choice on anti-debug or anti-bot-sensitive pages.
-- Chrome may still show its debugger banner when using explicit low-level or advanced tools, including `yunti_cdp_send_command`, raw CDP event diagnostics, performance tracing, screenshot fallback paths, drag, upload, emulation, resize, and legacy snapshot compatibility. Use those only when the task truly needs them.
+- Treat CDP and content-script actions as complementary first-class backends. Choose whichever path can operate and verify the page most reliably.
+- Use CDP proactively for cross-origin frames, shadow DOM, canvas, precise input, browser targets, network control, emulation, tracing, or unreliable DOM paths.
+- Chrome may show a debugger banner while CDP is attached. Treat it as informational, not as a reason to avoid CDP or weaken the workflow.
+- CDP use does not require user confirmation by itself; confirmation depends on whether the action submits, deletes, purchases, publishes, uploads sensitive files, or changes production data.
+- If an action may already have executed but its result is uncertain, verify page state before replaying it through another backend.
 - Never run CDP method names in a terminal or shell.
 - Always call CDP through `yunti_cdp_send_command`.
 - `yunti_cdp_send_command` requires `method`; `params` is optional but must be an object when provided.
@@ -200,9 +210,9 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 ## Recovery
 
 - No connected route: run doctor first. If the extension controller is online
-  but no page session is active, call `yunti_list_browser_targets`, activate or
-  open the target `http`/`https` page, then use page tools once a concrete page
-  route is available. Ask the user to refresh only when browser restrictions or
+  but no page session is active, call `yunti_list_browser_targets` and pass the
+  intended `tabId` / `targetId` to the page tool; the controller establishes the
+  route automatically. Ask the user to refresh only when browser restrictions or
   a failed injection keep the target page invisible.
 - Stale session: call `yunti_list_browser_targets` and use the latest `browserSessionId`.
 - Stale or missing page uid: observe again once `yunti_observe_page` is available, or take a fresh snapshot for compatibility workflows.

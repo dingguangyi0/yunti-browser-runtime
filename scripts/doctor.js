@@ -136,8 +136,8 @@ function buildNextSteps(checks) {
     steps.push(`Open the optional local console for live status: ${checks.bridge.consoleUrl}.`)
   }
   if (checks.bridge.ok && checks.bridge.extensionConnected && !checks.bridge.pageConnected) {
-    steps.push("Extension controller is online. Call yunti_list_browser_targets to inspect open tabs; page operations need a concrete http/https page session.")
-    steps.push("Activate or open the target page if needed. Refresh the page only as the final fallback for browser-injection limits.")
+    steps.push("Extension controller is online. Call yunti_list_browser_targets, then pass the intended tabId/targetId to the page tool for automatic page registration.")
+    steps.push("Refresh the page only if Chrome explicitly blocks content-script injection.")
   }
   if (!checks.mcpServer.ok) {
     steps.push(`Restore the MCP server file at ${checks.mcpServer.path}.`)

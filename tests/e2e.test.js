@@ -60,14 +60,40 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     assert.equal(consoleState.runtime.expectedExtensionVersion, packageJson.version)
     assert.ok(consoleState.sessions.some((session) => session.browserSessionId === browserSessionId))
     const consoleSession = consoleState.sessions.find((session) => session.browserSessionId === browserSessionId)
+    const controllerSession = consoleState.sessions.find((session) => session.kind === "browser_controller")
     assert.equal(consoleSession.extensionVersion, packageJson.version)
+    assert.equal(consoleSession.pollers, 0)
+    assert.ok(controllerSession)
+    assert.ok(consoleState.sessions.every((session) =>
+      session.kind === "browser_controller" || session.pollers === 0
+    ))
+    assert.ok(consoleState.sessions.reduce((total, session) => total + session.pollers, 0) <= 1)
     assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_EXTENSION_CONTROLLER"), false)
     assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_PAGE_SESSIONS"), false)
     assert.equal(consoleState.warnings.some((warning) => warning.code === "EXTENSION_VERSION_MISMATCH"), false)
 
     const targets = await callTool(bridge, "yunti_list_browser_targets", { browserSessionId })
     assert.ok(targets.total >= 1)
-    assert.ok(targets.pages.some((target) => target.url === pageServer.url))
+    const pageTarget = targets.pages.find((target) => target.url === pageServer.url)
+    assert.ok(pageTarget)
+    assert.equal(pageTarget.browserSessionId, browserSessionId)
+    assert.equal(pageTarget.pageSessionId, browserSessionId)
+    assert.notEqual(pageTarget.routeBrowserSessionId, browserSessionId)
+    assert.equal(pageTarget.registered, true)
+
+    const recoveredObservation = await callTool(bridge, "yunti_observe_page", {
+      browserSessionId: `yunti-${pageTarget.tabId}-expired-legacy-session`,
+      redaction: "balanced",
+    })
+    assert.equal(recoveredObservation.browserSessionId, browserSessionId)
+    assert.match(recoveredObservation.textTree, /Click me/)
+
+    const tabObservation = await callTool(bridge, "yunti_observe_page", {
+      tabId: pageTarget.tabId,
+      redaction: "balanced",
+    })
+    assert.equal(tabObservation.browserSessionId, browserSessionId)
+    assert.match(tabObservation.textTree, /Click me/)
 
     const snapshot = await callTool(bridge, "yunti_get_page_snapshot", {
       browserSessionId,
@@ -75,6 +101,14 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     })
     assert.equal(snapshot.browserSessionId, browserSessionId)
     assert.match(snapshot.visibleText, /Yunti E2E Smoke/)
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const repeatedSnapshot = await callTool(bridge, "yunti_get_page_snapshot", {
+        browserSessionId,
+        mode: "compact",
+      })
+      assert.equal(repeatedSnapshot.browserSessionId, browserSessionId)
+      assert.match(repeatedSnapshot.visibleText, /Yunti E2E Smoke/)
+    }
 
     const observation = await callTool(bridge, "yunti_observe_page", {
       browserSessionId,
@@ -107,6 +141,14 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
       await page.screenshot({ path: join(artifactDir, "failure.png"), fullPage: true }).catch(() => {})
     }
     await writeFile(join(artifactDir, "error.log"), error?.stack || String(error))
+    await writeFile(
+      join(artifactDir, "bridge-state.json"),
+      JSON.stringify(bridge.hub?.consoleState({
+        userId: "local",
+        runtimeVersion: packageJson.version,
+        expectedExtensionVersion: packageJson.version,
+      }) || {}, null, 2)
+    ).catch(() => {})
     t.diagnostic(`E2E artifacts: ${artifactDir}`)
     throw error
   } finally {

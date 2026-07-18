@@ -10,25 +10,20 @@ const sessionManager = createSessionManager()
 const {
   forwardConsoleEvent,
   postBridge,
-  pollers,
   sessionsByTab,
-  startPolling,
 } = sessionManager
 
 const cdp = createCdpController({
   sessionsByTab,
-  pollers,
   postBridge,
-  startPolling,
   forwardConsoleEvent,
 })
 
 const { detachCdpTab, installCdpEventForwarder } = cdp
 const { executeToolRequest } = createToolDispatcher({
   sessionsByTab,
-  pollers,
   postBridge,
-  startPolling,
+  ensureTabRegistered: sessionManager.ensureTabRegistered,
   cdp,
 })
 
@@ -43,7 +38,7 @@ installCdpEventForwarder()
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   void detachCdpTab(tabId, null, "tab_removed").catch(() => {})
-  sessionManager.forgetTab(tabId)
+  void sessionManager.forgetTab(tabId, "tab_removed").catch(() => {})
 })
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
@@ -65,6 +60,12 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onStartup.addListener(() => {
   recoverBrowserController("browser_startup")
+})
+
+chrome.storage?.onChanged?.addListener((changes, areaName) => {
+  if (areaName !== "local") return
+  if (!changes.bridgeUrl && !changes.bridgeToken && !changes.localUserId) return
+  recoverBrowserController("bridge_settings_changed")
 })
 
 chrome.alarms?.onAlarm?.addListener((alarm) => {

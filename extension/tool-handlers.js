@@ -8,9 +8,8 @@ const BROWSER_CONTROLLER_TOOLS = new Set([
 
 export function createToolDispatcher({
   sessionsByTab,
-  pollers,
   postBridge,
-  startPolling,
+  ensureTabRegistered,
   cdp,
 }) {
   const {
@@ -26,10 +25,14 @@ export function createToolDispatcher({
   } = cdp
 
   async function executeToolRequest(tabId, session, event) {
+    const transportSession = session
     let result
     let ok = true
     let error = null
     try {
+      const route = await resolveToolPageRoute(tabId, session, event)
+      tabId = route.tabId
+      session = route.session
       assertConcretePageRoute(tabId, session, event)
       if (event.tool === "yunti_capture_visible_tab") {
         try {
@@ -133,7 +136,7 @@ export function createToolDispatcher({
     }
   
     await postBridge("/extension/result", {
-      browserSessionId: session.browserSessionId,
+      browserSessionId: transportSession.browserSessionId,
       requestId: event.id,
       ok,
       result,
@@ -152,6 +155,63 @@ export function createToolDispatcher({
 
   function isBrowserControllerSession(session) {
     return session?.kind === "browser_controller" || session?.tabId === null
+  }
+
+  async function resolveToolPageRoute(tabId, session, event) {
+    if (!isBrowserControllerSession(session)) {
+      return { tabId, session }
+    }
+    if (BROWSER_CONTROLLER_TOOLS.has(event.tool)) {
+      if (event.tool !== "yunti_cdp_send_command") return { tabId, session }
+      const routeTabId =
+        normalizeTabId(event.route?.tabId) ||
+        normalizeTabId(event.arguments?.tabId) ||
+        tabIdFromTargetId(event.route?.targetId) ||
+        tabIdFromTargetId(event.arguments?.targetId) ||
+        tabIdFromTargetId(event.arguments?.params?.targetId)
+      return {
+        tabId: routeTabId,
+        session: event.route?.browserSessionId
+          ? { ...session, browserSessionId: event.route.browserSessionId }
+          : session,
+      }
+    }
+    const targetTabId =
+      normalizeTabId(event.route?.tabId) ||
+      normalizeTabId(event.arguments?.tabId) ||
+      tabIdFromTargetId(event.route?.targetId) ||
+      tabIdFromTargetId(event.arguments?.targetId) ||
+      tabIdFromTargetId(event.arguments?.params?.targetId) ||
+      (await activeTabId())
+    if (!targetTabId) {
+      throw new Error(`${event.tool} could not resolve an active http/https browser tab.`)
+    }
+    const recovery = await ensureTabRegistered(targetTabId, {
+      reason: `tool_request_${event.tool}`,
+    })
+    const pageSession = recovery?.session || sessionsByTab.get(targetTabId) || null
+    if (!pageSession) {
+      throw new Error(
+        `${event.tool} could not establish a page session for tabId ${targetTabId}: ${recovery?.error || recovery?.reason || "registration failed"}`
+      )
+    }
+    return { tabId: targetTabId, session: pageSession }
+  }
+
+  async function activeTabId() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    return normalizeTabId(tab?.id)
+  }
+
+  function normalizeTabId(value) {
+    const normalized = Number(value)
+    return Number.isFinite(normalized) && normalized > 0 ? normalized : null
+  }
+
+  function tabIdFromTargetId(value) {
+    const targetId = String(value || "").trim()
+    if (targetId.startsWith("tab-")) return normalizeTabId(targetId.slice(4))
+    return /^\d+$/.test(targetId) ? normalizeTabId(targetId) : null
   }
   
   async function navigatePage(tabId, session, args = {}) {
@@ -1814,21 +1874,31 @@ export function createToolDispatcher({
     const url = String(args.url || "").trim()
     const active = args.active !== false
     const tab = await chrome.tabs.create({ url: url || undefined, active })
-    const browserSessionId = `yunti-${tab.id}-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
+    const browserSessionId = stableChildPageSessionId(tab.id, parentSession)
     const session = {
       browserSessionId,
+      kind: "page",
       userId: parentSession?.userId || "",
       displayName: parentSession?.displayName || "",
       tabId: tab.id,
       windowId: tab.windowId,
       url: tab.url || url,
       title: tab.title || "",
+      active,
       registeredAt: new Date().toISOString(),
     }
     sessionsByTab.set(tab.id, session)
     await postBridge("/sessions/register", session).catch(() => null)
-    startPolling(tab.id)
     return { created: true, browserSessionId, tabId: tab.id, windowId: tab.windowId, url: tab.url || url, title: tab.title || "" }
+  }
+
+  function stableChildPageSessionId(tabId, parentSession) {
+    const parentId = String(parentSession?.browserSessionId || "")
+    const suffix =
+      parentId.match(/^yunti-browser-(.+)$/)?.[1] ||
+      parentId.match(/^yunti-page-\d+-(.+)$/)?.[1] ||
+      (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()))
+    return `yunti-page-${tabId}-${suffix}`
   }
   
   async function closePage(tabId, session, args = {}) {
@@ -1841,9 +1911,6 @@ export function createToolDispatcher({
     }
     await detachCdpTab(tabId, session, "page_closed").catch(() => {})
     await chrome.tabs.remove(tabId)
-    sessionsByTab.delete(tabId)
-    pollers.get(tabId)?.abort()
-    pollers.delete(tabId)
     return { closed: true, browserSessionId: session.browserSessionId, tabId }
   }
   

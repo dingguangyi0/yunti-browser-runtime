@@ -36,6 +36,7 @@ const PROTECTED_BRIDGE_PATHS = new Set([
   "/sessions",
   "/sessions/register",
   "/sessions/activate",
+  "/sessions/unregister",
   "/extension/poll",
   "/extension/result",
   "/extension/network-event",
@@ -331,6 +332,13 @@ export async function startBridgeServer({
         return
       }
 
+      if (req.method === "POST" && url.pathname === "/sessions/unregister") {
+        const body = await readJson(req)
+        const outcome = hub.unregisterSession(String(body.browserSessionId || ""), body)
+        sendJson(req, res, 200, outcome, { allowOrigins })
+        return
+      }
+
       if (req.method === "GET" && url.pathname === "/extension/poll") {
         const browserSessionId = String(url.searchParams.get("browserSessionId") || "").trim()
         const timeoutMs = Number(url.searchParams.get("timeoutMs") || 25_000)
@@ -338,7 +346,14 @@ export async function startBridgeServer({
           sendJson(req, res, 400, { error: "browserSessionId is required" }, { allowOrigins })
           return
         }
-        const event = await hub.poll(browserSessionId, timeoutMs)
+        const pollController = new AbortController()
+        const abortDisconnectedPoll = () => {
+          if (!res.writableEnded) pollController.abort()
+        }
+        req.once("aborted", abortDisconnectedPoll)
+        res.once("close", abortDisconnectedPoll)
+        const event = await hub.poll(browserSessionId, timeoutMs, pollController.signal)
+        if (res.destroyed) return
         sendJson(req, res, 200, event, { allowOrigins })
         return
       }

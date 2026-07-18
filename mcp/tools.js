@@ -345,7 +345,7 @@ export const TOOLS = [
   {
     name: "yunti_cdp_send_command",
     description:
-      "Forward one low-level browser protocol command through the installed Yunti extension. The required userId is the isolation scope; browserSessionId routes the request to that user's extension/browser instance. Optional tabId or targetId selects the concrete Chrome/Edge target inside that browser, including targets listed by yunti_list_browser_targets that are not registered Yunti sessions. Browser method names such as Target.activateTarget, Runtime.evaluate, Page.navigate, Network.enable, and DOM.* are not terminal/shell commands; call them here through the method and params fields. For current-page or multi-step operations, pass both userId and browserSessionId from yunti_get_page_snapshot or the current Yunti browser route so Runtime.evaluate and follow-up calls stay on the same tab. For switching to a specific tab, use yunti_list_browser_targets with userId/browserSessionId to find tabId or targetId, then call Target.activateTarget through this tool.",
+      "Forward one Chrome DevTools Protocol command through the installed Yunti extension. CDP is a first-class browser-operation backend: use it whenever protocol-level observation, targeting, input, navigation, network, emulation, or diagnostics improve reliability. The required userId is the isolation scope; browserSessionId routes the request to that user's extension/browser instance. Optional tabId or targetId selects the concrete Chrome/Edge target inside that browser, including targets listed by yunti_list_browser_targets that are not registered Yunti sessions. Browser method names such as Target.activateTarget, Runtime.evaluate, Page.navigate, Network.enable, and DOM.* are not terminal/shell commands; call them here through the method and params fields. For current-page or multi-step operations, pass both userId and browserSessionId from yunti_get_page_snapshot or the current Yunti browser route so Runtime.evaluate and follow-up calls stay on the same tab. For switching to a specific tab, use yunti_list_browser_targets with userId/browserSessionId to find tabId or targetId, then call Target.activateTarget through this tool.",
     inputSchema: {
       type: "object",
       required: ["method"],
@@ -938,6 +938,18 @@ export const BROWSER_SCOPED_TOOLS = new Set(
   TOOLS.map((tool) => tool.name).filter((name) => !MEMORY_LOCAL_TOOLS.has(name) && !META_LOCAL_TOOLS.has(name))
 )
 
+const NON_PAGE_TARGET_TOOLS = new Set([
+  ...BRIDGE_LOCAL_TOOLS,
+  ...MEMORY_LOCAL_TOOLS,
+  ...META_LOCAL_TOOLS,
+  "yunti_list_browser_targets",
+  "yunti_list_pages",
+  "yunti_get_browser_target",
+  "yunti_cdp_send_command",
+  "yunti_new_page",
+  "yunti_close_page",
+])
+
 installBrowserIsolationSchemas()
 
 function installBrowserIsolationSchemas() {
@@ -949,6 +961,18 @@ function installBrowserIsolationSchemas() {
       type: "string",
       description:
         "Optional local route user id. Defaults to YUNTI_BROWSER_USER_ID or local in the standalone runtime.",
+    }
+    if (!NON_PAGE_TARGET_TOOLS.has(tool.name)) {
+      schema.properties.tabId ||= {
+        type: "integer",
+        description:
+          "Optional Chrome/Edge tab id from yunti_list_browser_targets. In 0.2.3+, the browser controller uses it to establish or recover the page session automatically.",
+      }
+      schema.properties.targetId ||= {
+        type: "string",
+        description:
+          "Optional target id from yunti_list_browser_targets. Use it when browserSessionId is unavailable or stale; Yunti resolves and recovers the page route automatically.",
+      }
     }
     tool.inputSchema = schema
   }
@@ -971,7 +995,7 @@ export function toolUsageHints(args = {}) {
       notes: [
         "Use this first for current-page work when browserSessionId is unknown.",
         "Keep the returned browserSessionId for follow-up current-tab tools.",
-        "If an old browserSessionId fails, call yunti_list_browser_targets to refresh the live route inventory.",
+        "In 0.2.3+, an old page browserSessionId with a live tab is recovered automatically; tabId or targetId can also select and recover a page directly.",
       ],
     },
     yunti_observe_page: {
@@ -1006,10 +1030,10 @@ export function toolUsageHints(args = {}) {
       recommended: ["browserSessionId"],
       notes: [
         "Use for page counts, all tabs, finding a tab, or choosing a CDP target.",
-        "In 0.2.2+, this can route through the extension browser controller even when no concrete page session is registered yet.",
-        "tabId and targetId are selectors; route CDP through the current user's browserSessionId.",
-        "Page actions such as observe, click, and fill still need a concrete page session; activate or open the target http/https page if only the controller is online.",
-        "Use this to recover when a stored browserSessionId is stale.",
+        "In 0.2.3+, this routes through the single extension browser controller even when no concrete page session is registered yet.",
+        "A page row's browserSessionId/pageSessionId is null until registered; routeBrowserSessionId is the controller transport, not a page id.",
+        "Pass a returned tabId or targetId directly to observe/click/fill when needed; the controller establishes the content-script page session automatically.",
+        "If a stale browserSessionId was supplied accidentally, target inventory falls back to the live controller route.",
       ],
     },
     yunti_list_pages: {
@@ -1022,7 +1046,7 @@ export function toolUsageHints(args = {}) {
       ],
     },
     yunti_cdp_send_command: {
-      purpose: "Send one low-level browser protocol command through the current user's browser route.",
+      purpose: "Use CDP as a first-class browser backend for reliable protocol-level observation and operation.",
       required: ["method"],
       recommended: ["browserSessionId", "method", "params"],
       examples: [
@@ -1043,7 +1067,9 @@ export function toolUsageHints(args = {}) {
         "params must be an object when provided; do not pass a string or array.",
         "For tab operations, pass top-level tabId or targetId together with browserSessionId.",
         "For Target.closeTarget, call yunti_list_browser_targets first, then pass a returned top-level tabId or targetId.",
-        "If browserSessionId is stale, refresh with yunti_list_browser_targets before retrying.",
+        "In 0.2.3+, stale legacy page ids and explicit tabId/targetId routes recover through the controller before CDP dispatch.",
+        "Do not avoid CDP merely because Chrome may show a debugger banner; choose the backend that best completes and verifies the browser task.",
+        "If another backend may already have executed a write action, verify page state before replaying the same action through CDP.",
       ],
     },
     yunti_get_cdp_events: {
@@ -1350,19 +1376,22 @@ export function toolUsageHints(args = {}) {
     }
   }
   return {
-    version: "2026-07-05",
+    version: "2026-07-17",
     coreRules: [
       "Every browser-facing yunti_* tool call requires userId.",
       "browserSessionId is the current user's browser route; tabId and targetId are selectors, not permissions.",
       "yunti_list_browser_targets is the canonical live browser inventory.",
       "yunti_list_pages is a compatibility alias for the same live target inventory.",
       "For page operations, prefer observe -> act by fresh uid -> observe/verify once yunti_observe_page is available.",
-      "If an old browserSessionId is disconnected or stale, call yunti_list_browser_targets with the current userId to recover the latest browserSessionId and live targets.",
+      "In 0.2.3+, one browser controller transports all browser and page tools; page sessions do not open independent long polls.",
+      "If an old page browserSessionId is stale, Yunti recovers its live tab automatically; otherwise list targets without the stale id and pass tabId or targetId to the page tool.",
       "After yunti_new_page, use the returned browserSessionId for follow-up calls on the new tab.",
-      "Sessions expire quickly when the extension stops polling; stale-session errors include the reason and recovery hint.",
+      "The controller heartbeat keeps metadata for tabs that still exist and removes routes for closed tabs.",
       "If a tool call fails due to parameters, inspect this hint output and the tool schema before retrying.",
-      "In 0.2.1+, default observe-first page actions avoid automatic Chrome debugger attachment; prefer yunti_observe_page plus fresh-uid yunti_click/yunti_hover/yunti_fill/yunti_select/yunti_scroll/yunti_type_text/yunti_press_key on anti-debug-sensitive pages.",
-      "Chrome debugger banners may still appear for explicit low-level or advanced tools such as yunti_cdp_send_command, raw CDP diagnostics, performance tracing, screenshot fallback paths, drag, upload, emulation, resize, or legacy snapshot compatibility.",
+      "Choose content-script actions, CDP, screenshots, network tools, or console tools according to which path can operate and verify the page most reliably; CDP is not a restricted fallback.",
+      "Chrome may show a debugger banner while CDP is attached. Treat that as informational, not as a reason to avoid CDP or weaken the browser workflow.",
+      "Use CDP proactively for cross-origin frames, shadow DOM, canvas, precise input, protocol-level navigation, browser targets, network control, emulation, tracing, and cases where DOM actions are unreliable.",
+      "Do not blindly replay a possibly completed write action through another backend; verify page state first when execution is uncertain.",
       "Prefer sanitized diagnostics before raw CDP events; screenshots are visible pixels and are not DOM-redacted.",
     ],
     workflows: {
@@ -1376,13 +1405,13 @@ export function toolUsageHints(args = {}) {
         "If you only have tabId or targetId, use yunti_cdp_send_command routed through the current browserSessionId.",
       ],
       recoverRoute: [
-        "When a saved browserSessionId fails as disconnected, stale, or not registered, do not keep retrying it.",
-        "Call yunti_list_browser_targets with the current userId; it can route through the current active browser session and returns the latest browserSessionId.",
-        "Use the returned browserSessionId as the route for subsequent yunti_* calls.",
+        "Retry a stale legacy page browserSessionId once; 0.2.3+ extracts its tab id and recovers through the controller.",
+        "If that cannot identify a live tab, call yunti_list_browser_targets without the stale id.",
+        "Use the page browserSessionId when registered, or pass the returned tabId/targetId directly to the page tool for automatic registration.",
       ],
       evaluate: [
         "Use yunti_evaluate_script with expression.",
-        "Use yunti_cdp_send_command Runtime.evaluate only when raw CDP options are required.",
+        "Use yunti_cdp_send_command Runtime.evaluate whenever CDP execution contexts, return options, isolated worlds, or protocol consistency make it the better path.",
       ],
       memoryDelete: [
         "Call yunti_get_learning_memory to find the id.",
@@ -1394,14 +1423,16 @@ export function toolUsageHints(args = {}) {
         "If the element may be outside the viewport, use observe scroll hints and yunti_scroll before falling back to coordinates.",
         "If the page is loading or changing, use yunti_wait_for or observe again instead of blind retries.",
         "For async UI transitions, use yunti_wait_for for expected text/selector/state, read ok/code/nextStepHint, then yunti_observe_page, then continue with a fresh uid instead of reusing the old target.",
-        "If the target tab is uncertain, call yunti_list_browser_targets and switch to the intended browserSessionId.",
+        "If the target tab is uncertain, call yunti_list_browser_targets and use its page browserSessionId or tabId/targetId.",
         "Use selector or coordinate fallbacks only as recovery/debugging paths, not as the default when fresh uids are available.",
+        "When DOM targeting or page events are unreliable, switch to yunti_cdp_send_command and use CDP DOM/Input/Runtime commands; CDP does not require extra user confirmation by itself.",
+        "If a write action may already have happened but its result is uncertain, observe or inspect state before retrying through DOM or CDP.",
       ],
       defaultPageOperation: [
         "Call yunti_get_tool_usage_hints when tool usage is uncertain.",
-        "Call yunti_list_browser_targets and choose the intended browserSessionId.",
+        "Call yunti_list_browser_targets and choose the intended page browserSessionId or tabId/targetId.",
         "Call yunti_observe_page before page actions and use fresh uids whenever possible.",
-        "On anti-debug-sensitive pages, stay on the default observe-first action tools; do not switch to CDP unless explicitly needed.",
+        "Select content-script actions or CDP based on expected reliability; switch to CDP freely when it offers better targeting, input, observation, or verification.",
         "After every action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.",
         "For async rendering, validation, navigation, option loading, or infinite scroll, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
         "If a result has ok=false, code, recoveryHint, or nextStepHint, follow that guidance before retrying.",
@@ -1416,17 +1447,18 @@ export function toolUsageHints(args = {}) {
       ],
       copyableAgentPrompt: [
         "Please operate my browser through Yunti Browser Runtime.",
-        "Call yunti_list_browser_targets, choose the intended browserSessionId, then use yunti_observe_page before page actions.",
+        "Call yunti_list_browser_targets, choose the intended page browserSessionId or tabId/targetId, then use yunti_observe_page before page actions.",
         "Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations.",
         "After each action or wait, observe again and verify the result before continuing.",
         "For async UI, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
         "If ok=false, code, recoveryHint, or nextStepHint appears, follow that guidance before retrying.",
-        "If doctor shows only the browser controller online, use yunti_list_browser_targets and select/register a concrete page before observe/click/fill.",
+        "If doctor shows only the browser controller online, pass the intended target tabId/targetId to observe/click/fill; the controller registers the page automatically.",
         "Use selector or coordinate fallback only as recovery/debugging paths.",
         "Ask me before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, or changing production data.",
         "Do not expose raw cookies, passwords, auth headers, tokens, private keys, or other secrets.",
-        "Prefer sanitized diagnostics; use raw CDP or screenshots only when needed, and summarize safe findings.",
-        "On anti-debug-sensitive pages, use observe-first page actions because 0.2.1+ avoids automatic Chrome debugger attachment on the default action path.",
+        "Use DOM actions and CDP as complementary first-class backends; choose whichever can complete and verify the task most reliably.",
+        "Raw CDP event payloads and screenshots may contain sensitive data, so summarize safe findings and clear raw diagnostics after use.",
+        "Do not repeat a possibly completed write action through another backend until page state has been checked.",
       ],
       minimalUseCases: {
         clickByUid: [

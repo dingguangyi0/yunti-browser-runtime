@@ -6,6 +6,7 @@ function createDispatcherHarness(options = {}) {
 const posted = []
 const sentMessages = []
 const cdpCommands = []
+const cdpDispatches = []
 const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
   const defaultContentToolResponses = {
     yunti_click: (message) => ({
@@ -64,6 +65,7 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
 
   globalThis.chrome = {
     tabs: {
+      query: async () => options.activeTab ? [options.activeTab] : [],
       sendMessage: async (tabId, message) => {
         sentMessages.push({ tabId, message })
         if (message.tool === "yunti_observe_page") {
@@ -80,13 +82,17 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
     },
   }
 
+  const sessionsByTab = new Map()
   const dispatcher = createToolDispatcher({
-    sessionsByTab: new Map(),
-    pollers: new Map(),
+    sessionsByTab,
     postBridge: async (_path, body) => {
       posted.push(body)
     },
-    startPolling: () => {},
+    ensureTabRegistered: async (tabId) => ({
+      ok: true,
+      registered: sessionsByTab.has(tabId),
+      session: sessionsByTab.get(tabId) || null,
+    }),
     cdp: {
       chromeDebuggerSendCommand: async (_target, method, params) => {
         cdpCommands.push({ method, params })
@@ -100,7 +106,10 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
       ensureCdpAttached: async () => {},
       getBrowserTarget: async () => ({}),
       listBrowserTargets: async () => ({}),
-      sendCdpCommand: async () => ({}),
+      sendCdpCommand: async (tabId, session, args) => {
+        cdpDispatches.push({ tabId, session, args })
+        return { browserSessionId: session.browserSessionId, tabId, method: args.method }
+      },
       startPerformanceTrace: async () => ({}),
       stopPerformanceTrace: async () => ({}),
     },
@@ -108,14 +117,84 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
 
   return {
     cdpCommands,
+    cdpDispatches,
     dispatcher,
     posted,
+    sessionsByTab,
     restore: () => {
       globalThis.chrome = originalChrome
     },
     sentMessages,
   }
 }
+
+test("controller transport resolves a concrete page before dispatching page tools", async () => {
+  const harness = createDispatcherHarness({
+    observations: [{
+      observationId: "obs-controller",
+      browserSessionId: "yunti-page-321-controller",
+      uidMapVersion: "observe-v1",
+      elements: [],
+      textTree: "Controller recovered page",
+    }],
+  })
+  try {
+    const pageSession = {
+      browserSessionId: "yunti-page-321-controller",
+      kind: "page",
+      tabId: 321,
+      userId: "local",
+    }
+    harness.sessionsByTab.set(321, pageSession)
+    await harness.dispatcher.executeToolRequest(null, {
+      browserSessionId: "yunti-browser-controller",
+      kind: "browser_controller",
+      tabId: null,
+      userId: "local",
+    }, {
+      id: "request-controller",
+      tool: "yunti_observe_page",
+      arguments: {},
+      route: { tabId: 321, viaController: true },
+    })
+
+    assert.equal(harness.sentMessages.at(-1).tabId, 321)
+    assert.equal(harness.posted.at(-1).browserSessionId, "yunti-browser-controller")
+    assert.equal(harness.posted.at(-1).ok, true)
+    assert.equal(harness.posted.at(-1).result.browserSessionId, "yunti-page-321-controller")
+  } finally {
+    harness.restore()
+  }
+})
+
+test("controller transport forwards the logical page tab to CDP without a duplicate tab argument", async () => {
+  const harness = createDispatcherHarness()
+  try {
+    await harness.dispatcher.executeToolRequest(null, {
+      browserSessionId: "yunti-browser-controller",
+      kind: "browser_controller",
+      tabId: null,
+      userId: "local",
+    }, {
+      id: "request-cdp-controller",
+      tool: "yunti_cdp_send_command",
+      arguments: { method: "Runtime.evaluate", params: { expression: "document.title" } },
+      route: {
+        browserSessionId: "yunti-page-654-controller",
+        tabId: 654,
+        viaController: true,
+      },
+    })
+
+    assert.equal(harness.cdpDispatches.length, 1)
+    assert.equal(harness.cdpDispatches[0].tabId, 654)
+    assert.equal(harness.cdpDispatches[0].session.browserSessionId, "yunti-page-654-controller")
+    assert.equal(harness.posted.at(-1).browserSessionId, "yunti-browser-controller")
+    assert.equal(harness.posted.at(-1).result.browserSessionId, "yunti-page-654-controller")
+  } finally {
+    harness.restore()
+  }
+})
 
 test("observe uid map feeds existing uid-based click path", async () => {
   const harness = createDispatcherHarness()

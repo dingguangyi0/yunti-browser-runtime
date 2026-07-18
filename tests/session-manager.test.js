@@ -32,7 +32,7 @@ function installChromeMock(options = {}) {
   }
   globalThis.chrome = {
     runtime: {
-      getManifest: () => ({ version: "0.2.1" }),
+      getManifest: () => ({ version: "0.2.3" }),
     },
     storage: {
       local: {
@@ -132,11 +132,81 @@ test("registerBrowserController maintains a browser-level route without a tab", 
     assert.ok(registerRequests.length >= 1)
     assert.equal(registerRequests[0].body.kind, "browser_controller")
     assert.equal(registerRequests[0].body.tabId, null)
+    assert.equal(registerRequests[0].body.capabilities.singleControllerTransport, true)
+    assert.deepEqual(registerRequests[0].body.liveTabIds, [])
     assert.ok(
       mock.requests.some((request) =>
         request.url.includes("/extension/poll?browserSessionId=")
       )
     )
+  } finally {
+    mock.restore()
+  }
+})
+
+test("concurrent controller recovery creates one controller id and one poll loop", async () => {
+  const mock = installChromeMock()
+  try {
+    const manager = createSessionManager()
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, index) => manager.registerBrowserController(`race_${index}`))
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+
+    assert.equal(new Set(results.map((result) => result.session.browserSessionId)).size, 1)
+    assert.equal(
+      new Set(
+        mock.requests
+          .filter((request) => request.url.includes("/extension/poll"))
+          .map((request) => request.url)
+      ).size,
+      1
+    )
+    assert.equal(
+      mock.requests.filter((request) => request.url.includes("/extension/poll")).length,
+      1
+    )
+  } finally {
+    mock.restore()
+  }
+})
+
+test("page sessions use stable ids and do not create per-tab long polls", async () => {
+  const tabs = Array.from({ length: 30 }, (_, index) => ({
+    id: index + 1,
+    active: index === 0,
+    url: `https://example.test/page-${index + 1}`,
+    title: `Page ${index + 1}`,
+    windowId: 1,
+  }))
+  const mock = installChromeMock({
+    tabs,
+    storage: { browserControllerId: "yunti-browser-stable-controller" },
+  })
+  try {
+    const manager = createSessionManager()
+    const firstRegistrations = []
+    for (const tab of tabs) {
+      firstRegistrations.push(await manager.handleMessage({
+        type: "yunti_content_ready",
+        page: { url: tab.url, title: tab.title },
+      }, { tab }))
+    }
+
+    assert.equal(firstRegistrations.length, 30)
+    assert.equal(firstRegistrations[0].session.browserSessionId, "yunti-page-1-stable-controller")
+    assert.equal(firstRegistrations[29].session.browserSessionId, "yunti-page-30-stable-controller")
+    assert.equal(
+      mock.requests.filter((request) => request.url.includes("/extension/poll")).length,
+      1
+    )
+
+    const restartedManager = createSessionManager()
+    const restarted = await restartedManager.handleMessage({
+      type: "yunti_content_ready",
+      page: { url: tabs[0].url, title: tabs[0].title },
+    }, { tab: tabs[0] })
+    assert.equal(restarted.session.browserSessionId, firstRegistrations[0].session.browserSessionId)
   } finally {
     mock.restore()
   }

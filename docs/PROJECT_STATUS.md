@@ -2,23 +2,21 @@
 
 ## Current Phase
 
-Release `yunti-browser-runtime@0.2.0` is complete and verified on the official
-npm registry. The current patch line is `0.2.2`, focused on making extension
-online detection browser-controller based instead of page-session based.
+Release `yunti-browser-runtime@0.2.2` is complete and verified on the official
+npm registry. The current source patch line is `0.2.3`, fixing page-session
+expiry under many open tabs and completing controller-driven page recovery.
 
-Current implementation focus: `0.2.2` install/bridge recovery without default
-manual page refresh. The extension background maintains a stable
-`browser_controller` heartbeat with the local bridge. `yunti_list_browser_targets`
-and related browser-inventory/CDP-target tools can route through that controller
-even when no concrete page session is registered yet. Page routes remain
-content-script based and register on tab activation, page load, popup refresh, or
-page-tool use. The anti-debug-sensitive default action path is still in place:
-fresh-uid `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`,
-`yunti_type_text`, and `yunti_press_key` dispatch through content script page
-events instead of CDP mouse/keyboard/runtime commands. Explicit CDP, trace,
-screenshot fallback, drag/upload/emulation/resize, and legacy snapshot
-compatibility remain low-level/advanced paths that may show the Chrome debugger
-banner.
+Current implementation focus: one `browser_controller` long-poll transport per
+extension/browser instead of one long poll per page. Page sessions are metadata
+bound to live `tabId` values; controller inventory heartbeats renew metadata for
+tabs that still exist and remove closed-tab routes. Page tools route through the
+controller, then resolve/inject the intended content-script page by page session,
+`tabId`, `targetId`, a legacy session id containing the tab id, or the active tab.
+Content-script actions and CDP are now documented as complementary first-class
+backends. Fresh-uid actions remain available without attaching the debugger, but
+agents are no longer told to reserve CDP for exceptional cases. They should use
+CDP whenever it improves targeting, input, observation, control, or verification;
+the Chrome debugger banner is informational rather than a product restriction.
 
 Post-0.2 planning remains active after this patch.
 P6.6.1 browser extension distribution readiness, P6.6.2 store-facing
@@ -27,23 +25,30 @@ complete; P6.5 optional local runtime console is complete through real-browser
 validation. P6.6.4 store-candidate permission UX design is deferred to the
 post-0.2 store-candidate track.
 
-Active slice status: `0.2.2` controller-heartbeat recovery is complete in the
-working tree. The extension background registers a browser-level controller on
-install/startup/background recovery and keeps polling the bridge. The bridge now
-tracks `controllerCount`, `pageSessionCount`, `browserControllerSessionId`, and
-`extensionConnected` separately, so doctor/console can say “extension controller
-online, no page session yet” instead of telling users the extension is missing.
-Manual refresh remains a last resort only for pages Chrome cannot inject into,
-unsupported protocols, missing permissions, or other browser-enforced limits.
+Active slice status: `0.2.3` single-controller transport is implemented and
+fully validated in the working tree. The confirmed `0.2.2` failure
+mode was 25-second per-page long polling competing for the browser's per-origin
+HTTP connection pool while Bridge expired sessions after 90 seconds. Live
+diagnosis reproduced 28 visible page sessions dropping to 14 while tabs stayed
+open, and a controller-routed inventory request timing out. `0.2.3` removes page
+pollers, adds stable page ids, separates logical page routing from controller
+transport, and recovers content scripts on demand. Manual refresh remains a last
+resort only for browser-enforced injection limits.
 
 Acceptance for this slice:
 
-- Add browser-controller heartbeat so extension online detection does not
-  require an already registered page session.
-- Route browser inventory and explicit target/CDP flows through the controller;
-  keep observe/click/fill on concrete page sessions.
-- Ensure controller heartbeat does not replace the active page route.
+- Keep exactly one controller polling channel regardless of open tab count.
+- Keep observe/click/fill content-script based while transporting requests
+  through the controller and resolving the concrete tab on demand.
+- Recover legacy stale page ids, controller-only state, and absent page sessions
+  without asking the user to refresh.
+- Return real page session ids (or null) from target inventory; never present the
+  controller id as a page id.
+- Reconcile live tab ids, deduplicate replacement sessions, and unregister
+  closed-tab routes.
 - Keep the content-script observe/action path non-CDP by default.
+- Treat CDP as an unrestricted first-class backend and select it whenever it is
+  the more reliable way to complete or verify a browser task.
 - Update README, install guide, skill, Tool Guide, and usage hints so agents no
   longer tell users to refresh as the default post-install step.
 - Doctor/no-session guidance should distinguish controller online vs page
@@ -51,14 +56,17 @@ Acceptance for this slice:
 - Verify with unit tests, release checks, and real-browser E2E if browser
   behavior changes.
 
-Latest `0.2.2` validation: `npm run check` passed; targeted
-`tests/session-manager.test.js` and `tests/bridge.test.js` passed with 82
-node:test cases; full `npm test` passed with 133 node:test cases total, 132
-passing and 1 default real-browser smoke skipped; `npm run release:check`
-passed, including public docs/link checks, version consistency `0.2.2`, CLI
-smoke, doctor smoke, 11 action-result coverage rows, npm package contents
-validation with 49 files, and extension zip contents validation with 13 files;
-`YUNTI_E2E=1 npm run test:e2e` passed with 1 real-browser smoke.
+Latest `0.2.3` validation: targeted bridge/session-manager/tool dispatcher tests
+pass, including 30-page zero-page-poller coverage, stale legacy id recovery,
+controller-only active-tab recovery, closed-tab reconciliation, controller
+startup race prevention, aborted-poller cleanup, and controller transport
+dispatch, plus the CDP first-class backend usage contract. `npm run
+release:check` passes with 146 node:test cases total, 145 passing and 1 default
+real-browser smoke skipped, plus package contents validation
+with 49 files and extension zip validation with 13 files. A separate
+`YUNTI_E2E=1 npm run test:e2e` run passes the real-browser smoke, including the
+single-controller poller invariants and repeated page operations. `git diff
+--check` passes and the npm token residue scan returns no matches.
 
 Latest visible 0.2.0 phase split:
 

@@ -25,7 +25,7 @@ function isoNow(ms = Date.now()) {
 }
 
 export function sessionRecoveryHint() {
-  return "Call yunti_list_browser_targets to refresh the live route inventory and use the latest browserSessionId."
+  return "Retry with a live tabId/targetId, or call yunti_list_browser_targets without the stale browserSessionId; Yunti 0.2.3+ recovers page routes through the browser controller."
 }
 
 export function staleSessionError(browserSessionId, reason = "stale or disconnected") {
@@ -49,6 +49,28 @@ function isBrowserControllerMeta(meta = {}) {
 
 function isBrowserControllerSession(session) {
   return isBrowserControllerMeta(session?.meta || {})
+}
+
+function supportsControllerPageRouting(session) {
+  return Boolean(session?.meta?.capabilities?.singleControllerTransport)
+}
+
+function normalizeTabId(value) {
+  const tabId = Number(value)
+  return Number.isFinite(tabId) && tabId > 0 ? tabId : null
+}
+
+function tabIdFromTargetId(value) {
+  const targetId = String(value || "").trim()
+  if (!targetId) return null
+  if (targetId.startsWith("tab-")) return normalizeTabId(targetId.slice(4))
+  return /^\d+$/.test(targetId) ? normalizeTabId(targetId) : null
+}
+
+function tabIdFromBrowserSessionId(value) {
+  const browserSessionId = String(value || "").trim()
+  const match = browserSessionId.match(/^yunti(?:-page)?-(\d+)(?:-|$)/)
+  return match ? normalizeTabId(match[1]) : null
 }
 
 const BROWSER_CONTROLLER_TOOLS = new Set([
@@ -169,6 +191,31 @@ export class BridgeHub {
     return session
   }
 
+  refreshPageSessionsForUser(userId, now = Date.now(), liveTabIds = null) {
+    const normalizedUserId = normalizeRouteUserId(userId)
+    if (!normalizedUserId) return 0
+    const liveTabs = Array.isArray(liveTabIds)
+      ? new Set(liveTabIds.map(normalizeTabId).filter(Boolean))
+      : null
+    let refreshed = 0
+    const staleSessionIds = []
+    for (const session of this.sessions.values()) {
+      if (isBrowserControllerSession(session)) continue
+      if (normalizeRouteUserId(session.meta?.userId) !== normalizedUserId) continue
+      const tabId = normalizeTabId(session.meta?.tabId)
+      if (liveTabs && tabId && !liveTabs.has(tabId)) {
+        staleSessionIds.push(session.browserSessionId)
+        continue
+      }
+      this.refreshSession(session, now, { heartbeatSource: "browser_controller" })
+      refreshed += 1
+    }
+    for (const browserSessionId of staleSessionIds) {
+      this.markSessionStale(browserSessionId, "browser tab no longer exists")
+    }
+    return refreshed
+  }
+
   markSessionStale(browserSessionId, reason = "disconnected") {
     const session = this.sessions.get(browserSessionId)
     if (!session) return null
@@ -227,6 +274,21 @@ export class BridgeHub {
     const browserSessionId = String(meta.browserSessionId || "").trim()
     if (!browserSessionId) throw new Error("browserSessionId is required")
     const routeUserId = requireRouteUserId(meta, "browser session registration")
+    const incomingTabId = normalizeTabId(meta.tabId)
+    if (isBrowserControllerMeta(meta)) {
+      for (const [existingSessionId, candidate] of this.sessions.entries()) {
+        if (existingSessionId === browserSessionId || !isBrowserControllerSession(candidate)) continue
+        if (normalizeRouteUserId(candidate.meta?.userId) !== routeUserId) continue
+        this.markSessionStale(existingSessionId, "replaced by a fresh browser controller")
+      }
+    } else if (incomingTabId) {
+      for (const [existingSessionId, candidate] of this.sessions.entries()) {
+        if (existingSessionId === browserSessionId || isBrowserControllerSession(candidate)) continue
+        if (normalizeRouteUserId(candidate.meta?.userId) !== routeUserId) continue
+        if (normalizeTabId(candidate.meta?.tabId) !== incomingTabId) continue
+        this.markSessionStale(existingSessionId, "replaced by a fresh page session for the same tab")
+      }
+    }
     const existing = this.sessions.get(browserSessionId) || {
       browserSessionId,
       queue: [],
@@ -247,11 +309,27 @@ export class BridgeHub {
     const userId = normalizeRouteUserId(existing.meta.userId)
     if (isBrowserControllerSession(existing)) {
       if (userId) this.browserControllerByUser.set(userId, browserSessionId)
+      this.refreshPageSessionsForUser(userId, now, existing.meta.liveTabIds)
     } else {
-      this.activeSessionId = browserSessionId
-      if (userId) this.activeSessionByUser.set(userId, browserSessionId)
+      const currentActiveId = userId ? this.activeSessionByUser.get(userId) : this.activeSessionId
+      const currentActive = currentActiveId ? this.getLiveSession(currentActiveId) : null
+      if (existing.meta.active === true || !currentActive) {
+        this.activeSessionId = browserSessionId
+        if (userId) this.activeSessionByUser.set(userId, browserSessionId)
+      }
     }
     return existing.meta
+  }
+
+  unregisterSession(browserSessionId, args = {}) {
+    const session = this.sessions.get(browserSessionId)
+    if (!session) return { ok: true, removed: false, browserSessionId }
+    const userId = requireRouteUserId(args, "browser session unregister")
+    if (normalizeRouteUserId(session.meta?.userId) !== userId) {
+      throw new Error(`browser session is not owned by userId: ${userId}`)
+    }
+    const meta = this.markSessionStale(browserSessionId, args.reason || "unregistered")
+    return { ok: true, removed: true, browserSessionId, meta }
   }
 
   activateSession(browserSessionId, args = {}) {
@@ -386,7 +464,25 @@ export class BridgeHub {
     }
   }
 
-  resolveSessionId(args, tool = "") {
+  resolveSessionId(args) {
+    this.cleanupExpiredSessions()
+    const userId = requireRouteUserId(args, "Yunti browser session routing")
+    const explicit = String(args?.browserSessionId || "").trim()
+    const browserSessionId = explicit || this.activeSessionByUser.get(userId) || ""
+    const session = browserSessionId ? this.getLiveSession(browserSessionId) : null
+    if (!session) {
+      throw staleSessionError(browserSessionId || "none", "no live page session is selected")
+    }
+    if (isBrowserControllerSession(session)) {
+      throw new Error("This operation requires a concrete page session, not the browser controller route.")
+    }
+    if (normalizeRouteUserId(session.meta?.userId) !== userId) {
+      throw new Error(`browser session is not owned by userId: ${userId}`)
+    }
+    return browserSessionId
+  }
+
+  resolveToolRoute(args, tool = "") {
     this.cleanupExpiredSessions()
     const userId =
       args && typeof args === "object" && !Array.isArray(args)
@@ -396,54 +492,167 @@ export class BridgeHub {
       args && typeof args === "object" && !Array.isArray(args)
         ? String(args.browserSessionId || "").trim()
         : ""
+    const requestedTabId =
+      normalizeTabId(args?.tabId) ||
+      tabIdFromTargetId(args?.targetId) ||
+      tabIdFromTargetId(args?.params?.targetId)
+    const controllerSessionId = this.browserControllerByUser.get(userId) || ""
+    const controllerSession = controllerSessionId
+      ? this.getLiveSession(controllerSessionId)
+      : null
+    const controllerCanRoutePages = supportsControllerPageRouting(controllerSession)
+
     if (explicit) {
       const session = this.getLiveSession(explicit)
       if (!session) {
+        if (controllerSession && BROWSER_CONTROLLER_TOOLS.has(tool)) {
+          return {
+            userId,
+            logicalSessionId: controllerSessionId,
+            transportSessionId: controllerSessionId,
+            targetTabId: requestedTabId,
+            requestedSessionId: explicit,
+            viaController: true,
+            recoveredStaleRoute: true,
+          }
+        }
+        const recoveredTabId = requestedTabId || tabIdFromBrowserSessionId(explicit)
+        if (controllerCanRoutePages && recoveredTabId) {
+          return {
+            userId,
+            logicalSessionId: explicit,
+            transportSessionId: controllerSessionId,
+            targetTabId: recoveredTabId,
+            requestedSessionId: explicit,
+            viaController: true,
+            recoveredStaleRoute: true,
+          }
+        }
         throw staleSessionError(explicit, "not registered or heartbeat expired")
       }
       if (normalizeRouteUserId(session.meta?.userId) !== userId) {
         throw new Error(`browser session is not owned by userId: ${userId}`)
       }
-      if (isBrowserControllerSession(session) && !BROWSER_CONTROLLER_TOOLS.has(tool)) {
-        throw new Error(`${tool || "This tool"} requires a concrete page session. The browser controller route is online for yunti_list_browser_targets, yunti_get_browser_target, yunti_new_page, and explicit CDP target routing.`)
+      if (isBrowserControllerSession(session)) {
+        if (!BROWSER_CONTROLLER_TOOLS.has(tool) && !supportsControllerPageRouting(session)) {
+          throw new Error(`${tool || "This tool"} requires a concrete page session. Reload the Yunti 0.2.3+ extension to enable automatic page recovery through the browser controller.`)
+        }
+        return {
+          userId,
+          logicalSessionId: explicit,
+          transportSessionId: explicit,
+          targetTabId: requestedTabId,
+          requestedSessionId: explicit,
+          viaController: true,
+        }
       }
-      return explicit
+      if (controllerCanRoutePages) {
+        return {
+          userId,
+          logicalSessionId: explicit,
+          transportSessionId: controllerSessionId,
+          targetTabId: requestedTabId || normalizeTabId(session.meta?.tabId),
+          requestedSessionId: explicit,
+          viaController: true,
+        }
+      }
+      return {
+        userId,
+        logicalSessionId: explicit,
+        transportSessionId: explicit,
+        targetTabId: requestedTabId || normalizeTabId(session.meta?.tabId),
+        requestedSessionId: explicit,
+        viaController: false,
+      }
     }
-    const controllerSessionId = this.browserControllerByUser.get(userId)
     if (BROWSER_CONTROLLER_TOOLS.has(tool) && controllerSessionId) {
-      const controllerSession = this.getLiveSession(controllerSessionId)
       if (controllerSession && normalizeRouteUserId(controllerSession.meta?.userId) === userId) {
-        return controllerSessionId
+        return {
+          userId,
+          logicalSessionId: controllerSessionId,
+          transportSessionId: controllerSessionId,
+          targetTabId: requestedTabId,
+          requestedSessionId: "",
+          viaController: true,
+        }
       }
     }
     const userSessionId = this.activeSessionByUser.get(userId)
     if (!userSessionId) {
-      if (controllerSessionId && this.getLiveSession(controllerSessionId)) {
-        throw new Error(
-          `Yunti extension is connected for userId: ${userId}, but no concrete page session is active yet. Call yunti_list_browser_targets to inspect open tabs; page operations need a registered http/https page session.`
-        )
+      if (controllerCanRoutePages) {
+        return {
+          userId,
+          logicalSessionId: controllerSessionId,
+          transportSessionId: controllerSessionId,
+          targetTabId: requestedTabId,
+          requestedSessionId: "",
+          viaController: true,
+        }
+      }
+      if (controllerSession) {
+        throw new Error(`Yunti extension is connected for userId: ${userId}, but the loaded extension cannot auto-recover page sessions. Reload the Yunti 0.2.3+ extension.`)
       }
       throw new Error(`No Yunti browser route is connected for userId: ${userId}. ${sessionRecoveryHint()}`)
     }
+    const staleCandidate = this.sessions.get(userSessionId)
+    const staleCandidateTabId = normalizeTabId(staleCandidate?.meta?.tabId)
     const session = this.getLiveSession(userSessionId)
     if (!session) {
+      if (controllerCanRoutePages && (requestedTabId || staleCandidateTabId)) {
+        return {
+          userId,
+          logicalSessionId: userSessionId,
+          transportSessionId: controllerSessionId,
+          targetTabId: requestedTabId || staleCandidateTabId,
+          requestedSessionId: userSessionId,
+          viaController: true,
+          recoveredStaleRoute: true,
+        }
+      }
       throw staleSessionError(userSessionId, "active route heartbeat expired")
     }
     if (normalizeRouteUserId(session.meta?.userId) !== userId) {
       throw new Error(`browser session is not owned by userId: ${userId}`)
     }
-    return userSessionId
+    if (controllerCanRoutePages) {
+      return {
+        userId,
+        logicalSessionId: userSessionId,
+        transportSessionId: controllerSessionId,
+        targetTabId: requestedTabId || normalizeTabId(session.meta?.tabId),
+        requestedSessionId: userSessionId,
+        viaController: true,
+      }
+    }
+    return {
+      userId,
+      logicalSessionId: userSessionId,
+      transportSessionId: userSessionId,
+      targetTabId: requestedTabId || normalizeTabId(session.meta?.tabId),
+      requestedSessionId: userSessionId,
+      viaController: false,
+    }
   }
 
   async callTool(tool, args = {}, timeoutMs = DEFAULT_TOOL_TIMEOUT_MS) {
-    const browserSessionId = this.resolveSessionId(args, tool)
-    const session = this.sessions.get(browserSessionId)
+    const route = this.resolveToolRoute(args, tool)
+    const browserSessionId = route.logicalSessionId
+    const transportSessionId = route.transportSessionId
+    const session = this.sessions.get(transportSessionId)
     const requestId = randomUUID()
     const payload = {
       type: "tool_request",
       id: requestId,
       tool,
       arguments: stripBrowserSessionId(args),
+      route: {
+        browserSessionId,
+        requestedBrowserSessionId: route.requestedSessionId,
+        tabId: route.targetTabId,
+        targetId: String(args?.targetId || args?.params?.targetId || ""),
+        viaController: route.viaController,
+        recoveredStaleRoute: Boolean(route.recoveredStaleRoute),
+      },
       createdAt: new Date().toISOString(),
     }
 
@@ -459,7 +668,14 @@ export class BridgeHub {
         })
         reject(new Error(`Timed out waiting for browser tool result: ${tool}`))
       }, timeoutMs)
-      this.pendingRequests.set(requestId, { resolve, reject, timer, browserSessionId, tool })
+      this.pendingRequests.set(requestId, {
+        resolve,
+        reject,
+        timer,
+        browserSessionId,
+        transportSessionId,
+        tool,
+      })
     })
 
     const poller = session.pollers.shift()
@@ -473,6 +689,7 @@ export class BridgeHub {
       tool,
       browserSessionId,
       status: poller ? "sent" : "queued",
+      summary: { transportSessionId, targetTabId: route.targetTabId },
     })
     return promise
   }
@@ -699,24 +916,47 @@ export class BridgeHub {
     }
   }
 
-  async poll(browserSessionId, timeoutMs = 25_000) {
+  async poll(browserSessionId, timeoutMs = 25_000, signal = null) {
     this.cleanupExpiredSessions()
     const session = this.getLiveSession(browserSessionId)
     if (!session) {
       throw staleSessionError(browserSessionId, "not registered or heartbeat expired")
     }
     this.refreshSession(session)
+    if (isBrowserControllerSession(session)) {
+      this.refreshPageSessionsForUser(
+        session.meta?.userId,
+        Date.now(),
+        session.meta?.liveTabIds
+      )
+    }
     if (session.queue.length > 0) return session.queue.shift()
 
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
+      let settled = false
+      const removePoller = () => {
         session.pollers = session.pollers.filter((poller) => poller !== finish)
-        resolve({ type: "noop", id: randomUUID() })
+      }
+      const cleanup = () => {
+        clearTimeout(timer)
+        signal?.removeEventListener?.("abort", onAbort)
+      }
+      const onAbort = () => finish({ type: "noop", id: randomUUID(), aborted: true })
+      const timer = setTimeout(() => {
+        finish({ type: "noop", id: randomUUID() })
       }, Math.max(1000, Math.min(timeoutMs, 30_000)))
       const finish = (value) => {
-        clearTimeout(timer)
+        if (settled) return
+        settled = true
+        removePoller()
+        cleanup()
         resolve(value)
       }
+      if (signal?.aborted) {
+        onAbort()
+        return
+      }
+      signal?.addEventListener?.("abort", onAbort, { once: true })
       session.pollers.push(finish)
     })
   }
@@ -724,7 +964,7 @@ export class BridgeHub {
   submitResult({ browserSessionId, requestId, ok, result, error }) {
     const pending = this.pendingRequests.get(requestId)
     if (!pending) return { accepted: false }
-    if (browserSessionId && pending.browserSessionId !== browserSessionId) {
+    if (browserSessionId && pending.transportSessionId !== browserSessionId) {
       return { accepted: false, error: "browserSessionId mismatch" }
     }
     clearTimeout(pending.timer)
@@ -869,9 +1109,9 @@ export class BridgeHub {
       }),
       guidance: {
         noSessions:
-          "Keep this bridge running and load or reload the extension. The background controller should connect before any page session appears; page registration happens on activation/update or when page tools need a concrete route.",
+          "Keep this bridge running and load or reload the extension. The background controller connects first and establishes page sessions automatically when page tools target a tab.",
         staleSession:
-          "Call yunti_list_browser_targets to refresh live browser targets. Page actions need a concrete registered page route; refresh the page only as the final browser-limited fallback.",
+          "Retry through the controller with a live tabId/targetId, or list browser targets without the stale id. Refresh the page only when Chrome explicitly blocks content-script injection.",
         versionMismatch:
           "Reload the unpacked extension from the current package directory. The browser controller should reconnect automatically; page routes register on activation/update or page-tool use.",
         cancellation:
@@ -899,7 +1139,7 @@ function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
       code: "NO_PAGE_SESSIONS",
       severity: "info",
       message:
-        "The Yunti extension controller is online, but no concrete page session is registered yet. Use yunti_list_browser_targets to inspect open tabs; page routes register on activation/update or page-tool use.",
+        "The Yunti extension controller is online, but no concrete page session is registered yet. Pass a tabId/targetId from yunti_list_browser_targets to a page tool; the controller will register it automatically.",
     })
   }
   const expected = String(expectedExtensionVersion || "").trim()

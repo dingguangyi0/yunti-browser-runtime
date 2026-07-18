@@ -4,16 +4,18 @@
 
 1. Call `yunti_get_tool_usage_hints` when unsure about parameters or routing.
 2. Call `yunti_list_browser_targets` to understand the live browser state.
-3. Keep the returned `browserSessionId` for follow-up page/CDP tools.
+3. Keep a registered page's `browserSessionId`; when it is `null`, pass the
+   target's `tabId` / `targetId` to the page tool for automatic recovery.
 4. Once `yunti_observe_page` is available in the connected runtime, prefer
    `observe -> act by fresh uid -> observe/verify` for page operations.
-5. If the session becomes stale, call `yunti_list_browser_targets` again and
-   retry with the latest route.
+5. If the session becomes stale, retry once so `0.2.3+` can recover its tab;
+   otherwise list targets without the stale id and use `tabId` / `targetId`.
 6. For multi-step page work, prefer one stable `browserSessionId` throughout the
    task.
 
-Sessions expire when the extension stops polling the local bridge. Stale-session
-errors include a reason and recovery hint; do not keep retrying an expired id.
+The browser controller owns the single bridge polling channel. Page sessions are
+live-tab metadata, not independent polling connections. Stale-session errors
+include a reason and recovery hint; do not repeatedly retry an unknown/closed tab.
 
 For the full P6.3.1 workflow contract and copyable prompt, see
 [Agent Workflow Contract](AGENT_WORKFLOW_CONTRACT.md).
@@ -133,24 +135,28 @@ taking an action whose effect cannot be verified from page state.
 - Standalone local mode defaults to `userId=local`.
 - Agents do not need to pass `userId` unless they intentionally override
   `YUNTI_BROWSER_USER_ID`.
-- `browserSessionId` identifies a registered browser page route.
-- `browserSessionId` expires without extension heartbeat; refresh live inventory
-  when a stale-session error appears.
+- `browserSessionId` identifies a registered browser page route; the controller
+  is a transport route and is not a page id.
+- In `0.2.3+`, one controller heartbeat keeps live-tab page metadata current.
+  Page tools automatically recover a stale session from its tab id, or accept a
+  `tabId` / `targetId` from `yunti_list_browser_targets` directly.
 - New tabs can return a new `browserSessionId`; use the returned value for
   follow-up calls on that tab.
-- Raw `targetId` or `tabId` is for CDP/tab operations, not a replacement for
-  `browserSessionId`.
+- Raw `targetId` or `tabId` remains the target selector for CDP and can also be
+  supplied to page tools for controller-driven session recovery.
 
 ## CDP Rules
 
-- In `0.2.1+`, normal observe-first page actions should not automatically
-  attach Chrome debugger. Prefer `yunti_observe_page` plus fresh uid
-  `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`, `yunti_scroll`,
-  `yunti_type_text`, and `yunti_press_key` on anti-debug-sensitive pages.
-- Chrome debugger banners may still appear for explicit low-level or advanced
-  tools such as `yunti_cdp_send_command`, raw CDP diagnostics, performance
-  tracing, screenshot fallback paths, drag, upload, emulation, resize, or
-  legacy snapshot compatibility.
+- CDP and content-script actions are complementary first-class backends. Choose
+  whichever offers better reach, reliability, and verification for the task.
+- Use CDP directly for cross-origin frames, shadow DOM, canvas, precise input,
+  browser targets, network control, emulation, tracing, or unreliable DOM paths.
+- Chrome may show a debugger banner while attached. This is informational and
+  should not cause an Agent to avoid CDP or reduce browser capability.
+- CDP itself does not require user confirmation. Confirmation is based on the
+  effect of an action, not the backend used to execute it.
+- If a write action may already have executed, verify state before replaying it
+  through either CDP or content script.
 - Do not run CDP method names in a shell.
 - Use `yunti_cdp_send_command` with `method` and optional `params`.
 - `params` must be an object when provided.

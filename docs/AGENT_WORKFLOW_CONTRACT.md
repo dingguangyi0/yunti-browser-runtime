@@ -10,8 +10,8 @@ planning and user judgment.
 Use this loop for normal page work:
 
 1. Call `yunti_get_tool_usage_hints` when the tool contract is uncertain.
-2. Call `yunti_list_browser_targets` and choose the intended
-   `browserSessionId`.
+2. Call `yunti_list_browser_targets` and choose the intended page
+   `browserSessionId`, or its `tabId` / `targetId` when not registered.
 3. Call `yunti_observe_page` for the current page state.
 4. Act with a fresh uid when possible.
 5. If the page is loading or changing, call `yunti_wait_for`.
@@ -23,8 +23,9 @@ Use this loop for normal page work:
 
 ## Recovery Rules
 
-- Stale route: call `yunti_list_browser_targets` and use the latest
-  `browserSessionId`.
+- Stale route: `0.2.3+` first recovers a live tab through the controller. If the
+  old id cannot identify a live tab, list targets without it and pass the
+  intended `tabId` / `targetId` to the page tool.
 - Stale uid: call `yunti_observe_page` again and use a fresh uid.
 - Async UI: call `yunti_wait_for`, then `yunti_observe_page`, then continue
   with a fresh uid.
@@ -38,16 +39,19 @@ Use this loop for normal page work:
 - Coordinates/selectors: use them as recovery or debugging paths when fresh
   uids are unavailable.
 
-## Debugger Boundary
+## Execution Backend
 
-- In `0.2.1+`, normal observe-first page actions should not automatically
-  attach Chrome debugger. Prefer `yunti_observe_page` plus fresh uid
-  `yunti_click`, `yunti_hover`, `yunti_fill`, `yunti_select`, `yunti_scroll`,
-  `yunti_type_text`, and `yunti_press_key` on anti-debug-sensitive pages.
-- Chrome debugger banners may still appear for explicit low-level or advanced
-  tools such as `yunti_cdp_send_command`, raw CDP diagnostics, performance
-  tracing, screenshot fallback paths, drag, upload, emulation, resize, or
-  legacy snapshot compatibility.
+- Content-script actions and CDP are complementary first-class backends. Choose
+  the path that can operate and verify the current page most reliably.
+- Use CDP proactively for cross-origin frames, shadow DOM, canvas, precise input,
+  browser targets, network control, emulation, tracing, or unreliable DOM paths.
+- Chrome may show a debugger banner while CDP is attached. The banner is
+  informational and is not a reason to avoid CDP.
+- CDP use does not require user confirmation by itself. Confirmation depends on
+  the effect of the action, such as submitting, deleting, purchasing, or
+  changing production data.
+- Do not blindly replay a possibly completed write action through another
+  backend. Observe or inspect page state first when execution is uncertain.
 
 ## Confirmation Boundary
 
@@ -67,7 +71,7 @@ Please operate my browser through Yunti Browser Runtime.
 
 Follow this workflow:
 1. Call yunti_get_tool_usage_hints if tool usage is uncertain.
-2. Call yunti_list_browser_targets and choose the intended browserSessionId.
+2. Call yunti_list_browser_targets and choose the intended page browserSessionId or tabId/targetId.
 3. Use yunti_observe_page before page actions.
 4. Prefer fresh uids from yunti_observe_page for click, hover, fill, select,
    scroll, type, press, upload, and drag operations.
@@ -80,9 +84,11 @@ Follow this workflow:
    guidance before retrying. Do not blindly repeat the same action.
 8. Use selector or coordinate fallback only when fresh uids are unavailable or
    as an explicit recovery/debugging path.
-9. Before submitting, deleting, approving, purchasing, publishing, uploading
+9. Use content-script actions or CDP according to which backend can complete and
+   verify the task most reliably. CDP is not a restricted fallback.
+10. Before submitting, deleting, approving, purchasing, publishing, uploading
    sensitive files, or changing production data, ask me for confirmation.
-10. Do not expose raw cookies, passwords, auth headers, tokens, private keys, or
+11. Do not expose raw cookies, passwords, auth headers, tokens, private keys, or
     other secrets. Remember that DOM observation redaction does not redact
     screenshots.
 ```

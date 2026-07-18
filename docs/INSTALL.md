@@ -153,8 +153,10 @@ npm run print-config -- --agent cline --human
 
 Add the printed server entry to Cline's MCP settings. Keep the extension loaded
 in Chrome/Edge. The extension should register accessible `http`/`https` pages
-on activation, load, or page-tool use; refresh the target page only if browser
-restrictions or a failed doctor check make it necessary.
+on activation, load, or page-tool use. In `0.2.3+`, page tools can take the
+`tabId` / `targetId` returned by `yunti_list_browser_targets` and recover the
+page route automatically; refresh only when browser injection is explicitly
+blocked.
 
 ## Check Health
 
@@ -192,13 +194,13 @@ runs the unit test suite, and verifies the npm package contents with
 
 - If tools say no browser route is connected, run doctor first. If the extension
   controller is online but no page session is active, call
-  `yunti_list_browser_targets`, activate/open the target page, and use page
-  tools once a concrete route is available. Refresh the target page only as a
-  fallback.
+  `yunti_list_browser_targets`, then pass the intended `tabId` or `targetId`
+  directly to the page tool. The controller will establish the page route.
 - If doctor reports `authorized: false` with `authRequired: true`, set
   `YUNTI_BROWSER_BRIDGE_TOKEN` and save the same token in the extension popup.
-- If an old `browserSessionId` fails, call `yunti_list_browser_targets` again
-  and use the latest returned session.
+- In `0.2.3+`, old page session IDs that contain a live tab id are recovered
+  automatically. If recovery still fails, call `yunti_list_browser_targets`
+  without the stale id and use the target's `tabId` / `targetId`.
 - If a parameter error appears, call `yunti_get_tool_usage_hints` with the
   failed tool name before retrying.
 - For `yunti_fill`, pass `value` plus `uid` or `selector`; coordinate-only fill
@@ -206,7 +208,8 @@ runs the unit test suite, and verifies the npm package contents with
 - For closing a raw `tabId` or `targetId`, use `yunti_cdp_send_command` with
   `Target.closeTarget` instead of `yunti_close_page`.
 - If the extension was reloaded, the browser controller should reconnect
-  automatically. Page routes register on activation, load, or page-tool use.
+  automatically. Page routes register on activation, load, or page-tool use;
+  the user does not need to refresh ordinary `http` / `https` pages.
   Refresh browser pages only if the page cannot be injected or remains invisible
   after the recovery check.
 

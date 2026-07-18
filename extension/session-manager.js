@@ -11,12 +11,12 @@ import {
 
 export function createSessionManager() {
   const sessionsByTab = new Map()
-  const pollers = new Map()
   const pendingTabRecovery = new Map()
   const lastInjectionAtByTab = new Map()
   let controllerPoller = null
   let controllerPollerRoute = ""
   let controllerSession = null
+  let browserControllerIdPromise = null
   let cachedPlatformMatches = null
   let toolRequestHandler = null
 
@@ -28,16 +28,23 @@ export function createSessionManager() {
     toolRequestHandler = typeof handler === "function" ? handler : null
   }
 
-  function forgetTab(tabId) {
+  async function forgetTab(tabId, reason = "tab_removed") {
+    const session = sessionsByTab.get(tabId)
     sessionsByTab.delete(tabId)
-    pollers.get(tabId)?.abort()
-    pollers.delete(tabId)
+    if (!session) return { ok: true, removed: false, tabId }
+    await postBridge("/sessions/unregister", {
+      browserSessionId: session.browserSessionId,
+      userId: session.userId || "",
+      reason,
+    }).catch(() => null)
+    return { ok: true, removed: true, tabId, browserSessionId: session.browserSessionId }
   }
 
   async function registerBrowserController(reason = "heartbeat") {
     const settings = await getSettings()
     cachedPlatformMatches = settings.platformMatches
     const browserSessionId = await getBrowserControllerId()
+    const liveTabIds = await currentLiveTabIds()
     const session = {
       browserSessionId,
       kind: "browser_controller",
@@ -47,7 +54,13 @@ export function createSessionManager() {
       windowId: null,
       url: "browser://yunti-runtime",
       title: "Yunti Browser Runtime",
+      liveTabIds,
       client: normalizeClientInfo(getBackgroundClientInfo()),
+      capabilities: {
+        singleControllerTransport: true,
+        onDemandPageRecovery: true,
+        stablePageSessionIds: true,
+      },
       auth: {
         state: "browser_controller",
         loggedIn: true,
@@ -59,17 +72,33 @@ export function createSessionManager() {
     }
     controllerSession = session
     await postBridge("/sessions/register", session).catch(() => null)
-    startControllerPolling(session, settings)
+    startControllerPolling(session, await getSettings())
     return { ok: true, session }
   }
 
   async function getBrowserControllerId() {
-    const stored = await chrome.storage.local.get(["browserControllerId"])
-    const existing = String(stored.browserControllerId || "").trim()
-    if (existing) return existing
-    const id = `yunti-browser-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
-    await chrome.storage.local.set({ browserControllerId: id }).catch(() => {})
-    return id
+    if (!browserControllerIdPromise) {
+      browserControllerIdPromise = (async () => {
+        const stored = await chrome.storage.local.get(["browserControllerId"])
+        const existing = String(stored.browserControllerId || "").trim()
+        if (existing) return existing
+        const id = `yunti-browser-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
+        await chrome.storage.local.set({ browserControllerId: id }).catch(() => {})
+        return id
+      })()
+    }
+    return browserControllerIdPromise
+  }
+
+  async function currentLiveTabIds() {
+    try {
+      const tabs = await chrome.tabs.query({})
+      return tabs
+        .map((tab) => Number(tab.id))
+        .filter((tabId) => Number.isFinite(tabId) && tabId > 0)
+    } catch {
+      return null
+    }
   }
 
   function startControllerPolling(session, settings) {
@@ -85,9 +114,17 @@ export function createSessionManager() {
     const loop = async () => {
       while (!controller.signal.aborted) {
         try {
+          const liveTabIds = await currentLiveTabIds()
+          if (controllerSession) controllerSession.liveTabIds = liveTabIds
           await postBridge("/sessions/register", controllerSession || session).catch(() => null)
           const settings = await getSettings()
           cachedPlatformMatches = settings.platformMatches
+          const currentRouteKey = `${settings.bridgeUrl}|${session.browserSessionId}`
+          if (currentRouteKey !== controllerPollerRoute) {
+            controller.abort()
+            void registerBrowserController("controller_route_changed").catch(() => {})
+            break
+          }
           const url = `${settings.bridgeUrl}/extension/poll?browserSessionId=${encodeURIComponent(
             session.browserSessionId
           )}&timeoutMs=25000`
@@ -160,19 +197,45 @@ export function createSessionManager() {
       return { ok: true, skipped: true, reason: "unsupported_tab" }
     }
     if (sessionsByTab.has(tabId)) {
-      await refreshTabRegistration(tabId).catch(() => null)
-      return { ok: true, registered: true, reason: "already_registered" }
+      const refreshed = await refreshTabRegistration(tabId).catch(() => null)
+      if (refreshed?.ok) {
+        return {
+          ok: true,
+          registered: true,
+          reason: "already_registered",
+          session: refreshed.session || sessionsByTab.get(tabId) || null,
+        }
+      }
+      sessionsByTab.delete(tabId)
     }
     const ping = await refreshTabRegistration(tabId).catch((error) => ({
       ok: false,
       error: error?.message || String(error),
     }))
     if (ping?.ok) {
-      return { ok: true, registered: true, reason: "content_script_present" }
+      return {
+        ok: true,
+        registered: true,
+        reason: "content_script_present",
+        session: ping.session || sessionsByTab.get(tabId) || null,
+      }
     }
     const lastInjectionAt = lastInjectionAtByTab.get(tabId) || 0
     if (Date.now() - lastInjectionAt < 5000) {
-      return { ok: true, skipped: true, reason: "recently_injected" }
+      for (let attempt = 0; attempt < 10 && !sessionsByTab.has(tabId); attempt += 1) {
+        await delay(25)
+      }
+      const refreshed = sessionsByTab.has(tabId)
+        ? null
+        : await refreshTabRegistration(tabId).catch(() => null)
+      const session = refreshed?.session || sessionsByTab.get(tabId) || null
+      return session
+        ? { ok: true, registered: true, reason: "recent_injection_completed", session }
+        : {
+            ok: false,
+            reason: "registration_pending",
+            error: "The content script was injected but has not registered the page yet.",
+          }
     }
     const injected = await injectContentScripts(tabId).catch((error) => ({
       ok: false,
@@ -182,9 +245,19 @@ export function createSessionManager() {
       return { ok: false, reason: "inject_failed", error: injected?.error || "inject failed" }
     }
     lastInjectionAtByTab.set(tabId, Date.now())
-    await delay(50)
-    await refreshTabRegistration(tabId).catch(() => null)
-    return { ok: true, injected: true, reason: options.reason || "auto_recovery" }
+    for (let attempt = 0; attempt < 10 && !sessionsByTab.has(tabId); attempt += 1) {
+      await delay(25)
+    }
+    if (!sessionsByTab.has(tabId)) {
+      const refreshed = await refreshTabRegistration(tabId).catch(() => null)
+      if (refreshed?.session) sessionsByTab.set(tabId, refreshed.session)
+    }
+    return {
+      ok: true,
+      injected: true,
+      reason: options.reason || "auto_recovery",
+      session: sessionsByTab.get(tabId) || null,
+    }
   }
 
   function isInjectableTab(tab, settings) {
@@ -253,17 +326,24 @@ export function createSessionManager() {
     if (!tab?.id || !isPlatformUrl(page?.url, settings)) {
       return { ok: false, error: "not an Yunti tab" }
     }
+    const browserControllerId = await getBrowserControllerId()
+    const controllerRouteKey = `${settings.bridgeUrl}|${browserControllerId}`
+    if (!controllerPoller || controllerPollerRoute !== controllerRouteKey) {
+      await registerBrowserController("page_registration")
+    }
     const browserSessionId =
       sessionsByTab.get(tab.id)?.browserSessionId ||
-      `yunti-${tab.id}-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
+      stablePageSessionId(tab.id, browserControllerId)
     const session = {
       browserSessionId,
+      kind: "page",
       userId: settings.localUserId || "",
       displayName: settings.localUserName || "",
       tabId: tab.id,
       windowId: tab.windowId,
       url: page.url,
       title: page.title || tab.title || platformLabelForUrl(page.url),
+      active: Boolean(tab.active),
       client: normalizeClientInfo({
         ...getBackgroundClientInfo(),
         ...(page.client || {}),
@@ -273,7 +353,6 @@ export function createSessionManager() {
     }
     sessionsByTab.set(tab.id, session)
     await postBridge("/sessions/register", session).catch(() => null)
-    startPolling(tab.id)
     return { ok: true, session, settings }
   }
 
@@ -285,38 +364,6 @@ export function createSessionManager() {
       supported: isPlatformUrl(page?.url, settings),
       settings,
     }
-  }
-
-  async function startPolling(tabId) {
-    if (pollers.has(tabId)) return
-    const controller = new AbortController()
-    pollers.set(tabId, controller)
-    const loop = async () => {
-      while (!controller.signal.aborted) {
-        const session = sessionsByTab.get(tabId)
-        if (!session) break
-        try {
-          const settings = await getSettings()
-          cachedPlatformMatches = settings.platformMatches
-          await postBridge("/sessions/register", session).catch(() => null)
-          const url = `${settings.bridgeUrl}/extension/poll?browserSessionId=${encodeURIComponent(
-            session.browserSessionId
-          )}&timeoutMs=25000`
-          const response = await fetch(url, {
-            signal: controller.signal,
-            headers: bridgeHeaders(settings),
-          })
-          const event = await response.json()
-          if (event?.type === "tool_request" && toolRequestHandler) {
-            await toolRequestHandler(tabId, session, event)
-          }
-        } catch {
-          if (!controller.signal.aborted) await delay(1500)
-        }
-      }
-      pollers.delete(tabId)
-    }
-    void loop()
   }
 
   async function forwardConsoleEvent(session, tabId, method, params = {}) {
@@ -430,7 +477,6 @@ export function createSessionManager() {
 
   return {
     sessionsByTab,
-    pollers,
     activateTab,
     ensureAllTabsRegistered,
     ensureTabRegistered,
@@ -441,8 +487,14 @@ export function createSessionManager() {
     postBridge,
     registerBrowserController,
     setToolRequestHandler,
-    startPolling,
   }
+}
+
+function stablePageSessionId(tabId, browserControllerId) {
+  const controllerSuffix = String(browserControllerId || "")
+    .replace(/^yunti-browser-/, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+  return `yunti-page-${tabId}-${controllerSuffix || "local"}`
 }
 
 function formatConsoleStackTrace(stackTrace) {

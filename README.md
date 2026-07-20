@@ -131,7 +131,7 @@ npm run doctor:json
 1. 确认我本机有 Node.js 22+。
 2. 执行：npm install -g yunti-browser-runtime
 3. 执行：yunti-browser-runtime print-config -- --agent 当前Agent名称 --human
-4. 根据输出，把 MCP server 配置加入当前 Agent 的 MCP 配置。
+4. 根据输出，把 MCP server 配置加入当前 Agent 的 MCP 配置；如果输出包含 Skill install 命令，替我执行该命令，并告诉我需要新建 Agent 会话后 skill 才会生效。如果当前 Agent 不直接支持 SKILL.md，则把 Skill source 中的 SKILL.md 加入项目或系统指令。
 5. 告诉我：当前 Agent 启动 MCP server 后会自动启动本地 bridge，一般不需要单独运行 bridge。
 6. 引导我打开 Chrome/Edge 的扩展管理页，开启开发者模式，手动加载扩展目录：
    $(npm root -g)/yunti-browser-runtime/extension
@@ -140,7 +140,7 @@ npm run doctor:json
 9. 执行：yunti-browser-runtime doctor
 10. 如果 doctor 显示 extension/controller connected，再调用 yunti_list_browser_targets 或 yunti_get_tool_usage_hints 验证你能看到浏览器 targets；页面操作前再选择/注册具体页面。
 
-注意：Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后会自动维护浏览器控制器心跳，不要默认要求我刷新页面、填写 token、打开 popup 或保存设置；只有页面级工具无法接入目标页面，且确认是浏览器限制或页面未加载完成时，才把刷新目标页作为兜底。
+注意：不要遗漏 packaged skill 的安装或接入。Chrome 扩展不能由 npm 静默安装，必须由我手动在浏览器扩展页加载。扩展加载完成后会自动维护浏览器控制器心跳，不要默认要求我刷新页面、填写 token、打开 popup 或保存设置；只有页面级工具无法接入目标页面，且确认是浏览器限制或页面未加载完成时，才把刷新目标页作为兜底。
 ```
 
 ## 安装浏览器扩展

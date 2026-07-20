@@ -65,6 +65,10 @@ function agentConfig(agent) {
 }
 
 function buildConfig(agent) {
+  const skillInstallCommand =
+    agent === "codex"
+      ? `mkdir -p ~/.codex/skills && cp -R "${skillPath}" ~/.codex/skills/`
+      : null
   return {
     ok: supportedAgents.includes(agent),
     agent,
@@ -81,7 +85,10 @@ function buildConfig(agent) {
     },
     skill: {
       sourcePath: skillPath,
-      installHint: "Copy the yunti-browser-runtime skill directory into your agent skills directory if the agent supports skills.",
+      installCommand: skillInstallCommand,
+      installHint: skillInstallCommand
+        ? "Run installCommand, then start a new agent session so the updated skill is loaded."
+        : "Copy sourcePath into this agent's skills directory if it supports SKILL.md packages; otherwise add SKILL.md to the agent's project or system instructions.",
     },
     config: agentConfig(agent),
   }
@@ -97,7 +104,10 @@ function humanOutput(payload) {
     `MCP server: ${payload.mcpServerPath}`,
     `Bridge port: ${payload.bridge.port} (started automatically by the MCP server)`,
     `Token: ${payload.bridge.tokenInstruction}`,
-    `Skill: ${payload.skill.sourcePath}`,
+    `Skill source: ${payload.skill.sourcePath}`,
+    payload.skill.installCommand
+      ? `Skill install: ${payload.skill.installCommand}`
+      : `Skill install: ${payload.skill.installHint}`,
     payload.ok ? "" : `Unsupported agent "${payload.agent}". Supported: ${payload.supportedAgents.join(", ")}`,
   ]
     .filter((line, index, lines) => line || lines[index - 1] !== "")

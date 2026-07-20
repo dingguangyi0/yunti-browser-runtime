@@ -140,7 +140,11 @@ function checkEdgeRecoveryGuidance() {
   const requirements = [
     {
       path: "README.md",
-      snippets: ["Edge 睡眠标签页", "不应默认要求用户刷新"],
+      snippets: [
+        "Edge 睡眠标签页",
+        "不应默认要求用户刷新",
+        "不要遗漏 packaged skill 的安装或接入",
+      ],
     },
     {
       path: "skills/yunti-browser-runtime/SKILL.md",
@@ -269,7 +273,10 @@ function checkPrintConfigSmoke() {
       !server.args[0]?.endsWith("mcp/server.js") ||
       env.YUNTI_BROWSER_BRIDGE_PORT !== "48887" ||
       payload?.bridge?.tokenEnv !== "YUNTI_BROWSER_BRIDGE_TOKEN" ||
-      !String(payload?.skill?.sourcePath || "").endsWith("skills/yunti-browser-runtime")
+      !String(payload?.skill?.sourcePath || "").endsWith("skills/yunti-browser-runtime") ||
+      (agent === "codex" &&
+        (!String(payload?.skill?.installCommand || "").includes("~/.codex/skills") ||
+          !String(payload?.skill?.installCommand || "").includes(payload.skill.sourcePath)))
     ) {
       console.error("print-config smoke check failed:")
       console.error(`- agent: ${agent}`)
@@ -292,6 +299,9 @@ function checkPrintConfigSmoke() {
     human.status !== 0 ||
     !human.stdout.includes("Yunti Browser Runtime MCP config for codex") ||
     !human.stdout.includes("YUNTI_BROWSER_BRIDGE_TOKEN") ||
+    !human.stdout.includes("Skill source:") ||
+    !human.stdout.includes("Skill install:") ||
+    !human.stdout.includes("~/.codex/skills") ||
     !human.stdout.includes("skills/yunti-browser-runtime")
   ) {
     console.error("print-config smoke check failed:")

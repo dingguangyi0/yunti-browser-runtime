@@ -1,5 +1,7 @@
 # Yunti Browser Runtime 0.2.4
 
+Published to npm with the `latest` tag on 2026-07-20.
+
 `0.2.4` is a focused Microsoft Edge session-recovery patch based on real Edge
 150 testing. It does not include the unfinished Phase 8 observation,
 actionability, benchmark, or self-healing feature work.

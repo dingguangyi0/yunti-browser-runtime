@@ -340,7 +340,7 @@ token。
 ## 发布状态与后续事项
 
 - 当前源码版本：`yunti-browser-runtime@0.2.4`。
-- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.3`。
+- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.4`。
 - `0.2.4` 修复 Edge 睡眠标签消息/注入卡死、controller poll 被页面工具阻塞和
   卡死 poller 无法替换的问题，并保持旧 session 自动恢复；
   `0.2.3` 将多页面独立长轮询收敛为单 controller 传输，并补齐旧 session、

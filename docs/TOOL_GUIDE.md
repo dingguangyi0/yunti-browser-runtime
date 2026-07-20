@@ -13,6 +13,12 @@
 6. For multi-step page work, prefer one stable `browserSessionId` throughout the
    task.
 
+In `0.2.4+`, Microsoft Edge sleeping tabs use bounded recovery. If background
+injection stalls, Yunti may briefly activate the target and then restore the
+previously active tab. Agents must not ask the user to refresh, switch tabs, or
+restart Edge before controller and explicit `tabId` / `targetId` recovery fail.
+One page timeout does not imply that the controller or whole browser is offline.
+
 The browser controller owns the single bridge polling channel. Page sessions are
 live-tab metadata, not independent polling connections. Stale-session errors
 include a reason and recovery hint; do not repeatedly retry an unknown/closed tab.

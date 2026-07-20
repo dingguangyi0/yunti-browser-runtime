@@ -82,6 +82,10 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 - If a stored page `browserSessionId` is stale, retry once normally: `0.2.3+`
   recovers legacy ids containing a live tab id. Otherwise list targets without
   the stale id and pass the intended `tabId` / `targetId` to the page tool.
+- In `0.2.4+`, Edge sleeping tabs are recovered automatically. The runtime may
+  briefly activate the target tab to restore the content-script route and then
+  return to the user's previously active tab. Do not ask the user to switch,
+  refresh, or reopen the page before this automatic recovery has failed.
 - Stale-session errors include a reason and recovery hint; do not keep retrying the expired id.
 - New tabs may return a new `browserSessionId`; use that returned value for follow-up actions on the new tab.
 - `tabId` / `targetId` may be passed to page tools specifically for automatic
@@ -212,9 +216,17 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 - No connected route: run doctor first. If the extension controller is online
   but no page session is active, call `yunti_list_browser_targets` and pass the
   intended `tabId` / `targetId` to the page tool; the controller establishes the
-  route automatically. Ask the user to refresh only when browser restrictions or
-  a failed injection keep the target page invisible.
-- Stale session: call `yunti_list_browser_targets` and use the latest `browserSessionId`.
+  route automatically. Edge sleeping tabs are activated and restored by the
+  runtime when background injection stalls. Ask the user to refresh only after
+  automatic recovery fails because the page is unsupported or browser access is
+  explicitly blocked.
+- Stale session: retry the page operation once so controller recovery can run.
+  If it still fails, call `yunti_list_browser_targets` without the stale id and
+  retry with the latest `browserSessionId`, `tabId`, or `targetId`. Do not ask the
+  user to refresh, switch tabs, or restart the browser as the default recovery.
+- Extension-side timeout: the controller remains available even when one page
+  operation times out. Inspect targets and retry the intended live tab once;
+  do not assume the whole browser session is disconnected.
 - Stale or missing page uid: observe again once `yunti_observe_page` is available, or take a fresh snapshot for compatibility workflows.
 - Wrong tab: use `yunti_list_browser_targets` to find the intended tab, then route CDP with that tab's `tabId` or `targetId`.
 - Parameter uncertainty: call `yunti_get_tool_usage_hints` with the specific tool name.

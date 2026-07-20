@@ -43,7 +43,7 @@ function installChromeMock(options = {}) {
   }
   globalThis.chrome = {
     runtime: {
-      getManifest: () => ({ version: "0.2.3" }),
+      getManifest: () => ({ version: "0.2.4" }),
     },
     storage: {
       local: {

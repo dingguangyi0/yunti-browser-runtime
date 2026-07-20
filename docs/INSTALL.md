@@ -201,6 +201,11 @@ runs the unit test suite, and verifies the npm package contents with
 - In `0.2.3+`, old page session IDs that contain a live tab id are recovered
   automatically. If recovery still fails, call `yunti_list_browser_targets`
   without the stale id and use the target's `tabId` / `targetId`.
+- In `0.2.4+`, Edge sleeping tabs are recovered with bounded probe/injection
+  timeouts. Yunti may briefly activate the target tab and then restore the
+  user's previous tab. Do not ask the user to switch, refresh, or reopen the
+  page before this automatic recovery and explicit `tabId` / `targetId` retry
+  have failed.
 - If a parameter error appears, call `yunti_get_tool_usage_hints` with the
   failed tool name before retrying.
 - For `yunti_fill`, pass `value` plus `uid` or `selector`; coordinate-only fill
@@ -210,8 +215,9 @@ runs the unit test suite, and verifies the npm package contents with
 - If the extension was reloaded, the browser controller should reconnect
   automatically. Page routes register on activation, load, or page-tool use;
   the user does not need to refresh ordinary `http` / `https` pages.
-  Refresh browser pages only if the page cannot be injected or remains invisible
-  after the recovery check.
+  A timed-out page operation does not disconnect the controller. Refresh browser
+  pages only if the page cannot be injected or remains invisible after bounded
+  controller, sleeping-tab, and explicit target recovery.
 
 ## Real Browser Smoke Test
 

@@ -26,6 +26,13 @@ Use this loop for normal page work:
 - Stale route: `0.2.3+` first recovers a live tab through the controller. If the
   old id cannot identify a live tab, list targets without it and pass the
   intended `tabId` / `targetId` to the page tool.
+- Edge sleeping tab: `0.2.4+` bounds content-script recovery and may briefly
+  activate the target tab before restoring the user's previous tab. Do not ask
+  the user to switch, refresh, or reopen the page unless this automatic recovery
+  has failed because browser access is explicitly blocked.
+- Extension-side timeout: the controller poll remains independent from the
+  timed-out page operation. List targets and retry the intended live tab once
+  instead of treating the whole browser as disconnected.
 - Stale uid: call `yunti_observe_page` again and use a fresh uid.
 - Async UI: call `yunti_wait_for`, then `yunti_observe_page`, then continue
   with a fresh uid.
@@ -84,13 +91,16 @@ Follow this workflow:
    guidance before retrying. Do not blindly repeat the same action.
 8. Use selector or coordinate fallback only when fresh uids are unavailable or
    as an explicit recovery/debugging path.
-9. Use content-script actions or CDP according to which backend can complete and
+9. Let Yunti recover stale routes and Edge sleeping tabs automatically. Do not
+   ask me to refresh, switch tabs, or restart the browser before controller and
+   tabId/targetId recovery have failed.
+10. Use content-script actions or CDP according to which backend can complete and
    verify the task most reliably. CDP is not a restricted fallback.
-10. Before submitting, deleting, approving, purchasing, publishing, uploading
+11. Before submitting, deleting, approving, purchasing, publishing, uploading
    sensitive files, or changing production data, ask me for confirmation.
-11. Do not expose raw cookies, passwords, auth headers, tokens, private keys, or
-    other secrets. Remember that DOM observation redaction does not redact
-    screenshots.
+12. Do not expose raw cookies, passwords, auth headers, tokens, private keys, or
+   other secrets. Remember that DOM observation redaction does not redact
+   screenshots.
 ```
 
 ## Minimal Use Case Index

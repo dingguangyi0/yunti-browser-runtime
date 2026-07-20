@@ -136,6 +136,49 @@ function checkVersionConsistency() {
   return true
 }
 
+function checkEdgeRecoveryGuidance() {
+  const requirements = [
+    {
+      path: "README.md",
+      snippets: ["Edge 睡眠标签页", "不应默认要求用户刷新"],
+    },
+    {
+      path: "skills/yunti-browser-runtime/SKILL.md",
+      snippets: ["Edge sleeping tabs", "Do not ask the user to switch"],
+    },
+    {
+      path: "docs/INSTALL.md",
+      snippets: ["Edge sleeping tabs", "A timed-out page operation does not disconnect"],
+    },
+    {
+      path: "docs/TOOL_GUIDE.md",
+      snippets: ["Microsoft Edge sleeping tabs", "One page timeout does not imply"],
+    },
+    {
+      path: "docs/AGENT_WORKFLOW_CONTRACT.md",
+      snippets: ["Edge sleeping tab", "Extension-side timeout"],
+    },
+    {
+      path: "mcp/tools.js",
+      snippets: ["Edge sleeping tabs use bounded automatic recovery", "A page-operation timeout does not imply"],
+    },
+  ]
+  const missing = []
+  for (const requirement of requirements) {
+    const text = readFileSync(join(rootDir, requirement.path), "utf8")
+    for (const snippet of requirement.snippets) {
+      if (!text.includes(snippet)) missing.push(`${requirement.path}: ${snippet}`)
+    }
+  }
+  if (missing.length) {
+    console.error("Edge recovery guidance check failed:")
+    for (const item of missing) console.error(`- missing ${item}`)
+    return false
+  }
+  console.error(`Edge recovery guidance check passed (${requirements.length} files).`)
+  return true
+}
+
 function checkCliSmoke() {
   const packageJson = readJsonFile("package.json")
   const binPath = packageJson.bin?.["yunti-browser-runtime"]
@@ -463,6 +506,7 @@ function checkExtensionZipContents() {
 let ok = checkPublicDocResidue()
 ok = checkMarkdownLinks() && ok
 ok = checkVersionConsistency() && ok
+ok = checkEdgeRecoveryGuidance() && ok
 ok = checkCliSmoke() && ok
 ok = checkPrintConfigSmoke() && ok
 ok = checkDoctorSmoke() && ok

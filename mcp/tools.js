@@ -996,6 +996,7 @@ export function toolUsageHints(args = {}) {
         "Use this first for current-page work when browserSessionId is unknown.",
         "Keep the returned browserSessionId for follow-up current-tab tools.",
         "In 0.2.3+, an old page browserSessionId with a live tab is recovered automatically; tabId or targetId can also select and recover a page directly.",
+        "In 0.2.4+, Edge sleeping tabs use bounded automatic recovery. Yunti may briefly activate the target and then restore the previously active tab; do not ask the user to refresh or switch tabs first.",
       ],
     },
     yunti_observe_page: {
@@ -1022,6 +1023,7 @@ export function toolUsageHints(args = {}) {
         "Do not treat observation uids as permanent selectors across refreshes or tabs.",
         "Do not use redaction=off unless the user explicitly wants local debugging.",
         "Do not blindly retry an action after no page change; observe, wait, scroll, or switch tabs based on hints.",
+        "A page-operation timeout does not imply that the browser controller is disconnected. List targets and retry the intended live tab once before asking the user to intervene.",
       ],
     },
     yunti_list_browser_targets: {
@@ -1034,6 +1036,7 @@ export function toolUsageHints(args = {}) {
         "A page row's browserSessionId/pageSessionId is null until registered; routeBrowserSessionId is the controller transport, not a page id.",
         "Pass a returned tabId or targetId directly to observe/click/fill when needed; the controller establishes the content-script page session automatically.",
         "If a stale browserSessionId was supplied accidentally, target inventory falls back to the live controller route.",
+        "In 0.2.4+, Edge sleeping-tab injection can briefly activate the target and restore the previous tab automatically; do not require a manual refresh, tab switch, or browser restart as the default recovery.",
       ],
     },
     yunti_list_pages: {

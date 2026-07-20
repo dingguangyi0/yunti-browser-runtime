@@ -23,6 +23,10 @@ Canvas、精确输入、浏览器 target、网络控制、仿真、追踪或 DOM
 HTTP 长轮询；即使页面闲置、扩展后台恢复或 Agent 保存了旧 session ID，普通页面工具
 也会通过 `tabId` / `targetId` 或当前活动页自动恢复内容脚本连接，不要求用户刷新页面。
 
+`0.2.4+` 补齐 Microsoft Edge 睡眠标签页恢复：页面消息或后台注入卡住时会有明确
+超时，controller 仍继续在线；必要时 runtime 会短暂激活目标标签完成注入，再恢复用户
+原来的活动标签。Agent 不应默认要求用户刷新、切换标签或重启 Edge。
+
 ## 当前定位
 
 当前版本是本地单用户 MVP：
@@ -224,8 +228,10 @@ cp -R skills/yunti-browser-runtime ~/.codex/skills/
    runtime 会自动建立或恢复 page session。
 5. 如果旧 `browserSessionId` 失效，`0.2.3+` 会从旧 ID 中恢复 `tabId` 并通过
    controller 重建连接；仍失败时调用不带旧 ID 的 `yunti_list_browser_targets`。
-6. CDP 命令必须通过 `yunti_cdp_send_command` 调用，不要把 `Target.activateTarget` 之类的 CDP method 当 shell 命令执行。
-7. 涉及提交、删除、付款、上传敏感文件等写操作前，Agent 必须获得用户确认。
+6. Edge 睡眠标签由 `0.2.4+` 自动恢复；不要在 controller/target 恢复失败前要求用户
+   刷新、手动切换标签或重启浏览器。
+7. CDP 命令必须通过 `yunti_cdp_send_command` 调用，不要把 `Target.activateTarget` 之类的 CDP method 当 shell 命令执行。
+8. 涉及提交、删除、付款、上传敏感文件等写操作前，Agent 必须获得用户确认。
 
 ### 参数规则速查
 
@@ -326,15 +332,18 @@ token。
 
 ### 旧的 `browserSessionId` 失效怎么办？
 
-`0.2.3+` 会优先根据旧 session 对应的标签页自动恢复。也可以调用
+`0.2.4+` 会优先根据旧 session 对应的标签页自动恢复，也能处理 Edge 睡眠标签页。
+页面操作超时不代表整个 controller 已断开。可以调用
 `yunti_list_browser_targets`，把目标页面的 `tabId` 或 `targetId` 直接传给
 `yunti_observe_page` 等页面工具；不需要用户刷新页面。
 
 ## 发布状态与后续事项
 
-- 当前源码版本：`yunti-browser-runtime@0.2.3`。
-- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.2`。
-- `0.2.3` 将多页面独立长轮询收敛为单 controller 传输，并补齐旧 session、
+- 当前源码版本：`yunti-browser-runtime@0.2.4`。
+- 当前已发布 npm 稳定版：`yunti-browser-runtime@0.2.3`。
+- `0.2.4` 修复 Edge 睡眠标签消息/注入卡死、controller poll 被页面工具阻塞和
+  卡死 poller 无法替换的问题，并保持旧 session 自动恢复；
+  `0.2.3` 将多页面独立长轮询收敛为单 controller 传输，并补齐旧 session、
   MV3 后台恢复和目标页面按需注册；`0.2.2` 将扩展在线状态从“必须有页面 session”
   调整为浏览器控制器心跳；
   `0.2.1` 修复默认 observe-first 页面动作误触发 Chrome debugger 的问题；

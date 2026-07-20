@@ -9,12 +9,35 @@ import {
   platformLabelForUrl,
 } from "./settings.js"
 
-export function createSessionManager() {
+const DEFAULT_CONTENT_SCRIPT_PROBE_TIMEOUT_MS = 1500
+const DEFAULT_CONTENT_SCRIPT_INJECTION_TIMEOUT_MS = 3000
+const DEFAULT_CONTROLLER_TOOL_TIMEOUT_MS = 25_000
+const DEFAULT_CONTROLLER_POLL_STALL_TIMEOUT_MS = 45_000
+
+export function createSessionManager(options = {}) {
+  const contentScriptProbeTimeoutMs = normalizeTimeout(
+    options.contentScriptProbeTimeoutMs,
+    DEFAULT_CONTENT_SCRIPT_PROBE_TIMEOUT_MS
+  )
+  const contentScriptInjectionTimeoutMs = normalizeTimeout(
+    options.contentScriptInjectionTimeoutMs,
+    DEFAULT_CONTENT_SCRIPT_INJECTION_TIMEOUT_MS
+  )
+  const controllerToolTimeoutMs = normalizeTimeout(
+    options.controllerToolTimeoutMs,
+    DEFAULT_CONTROLLER_TOOL_TIMEOUT_MS
+  )
+  const controllerPollStallTimeoutMs = normalizeTimeout(
+    options.controllerPollStallTimeoutMs,
+    DEFAULT_CONTROLLER_POLL_STALL_TIMEOUT_MS
+  )
   const sessionsByTab = new Map()
   const pendingTabRecovery = new Map()
   const lastInjectionAtByTab = new Map()
   let controllerPoller = null
   let controllerPollerRoute = ""
+  let controllerPollerLastProgressAt = 0
+  let controllerToolQueue = Promise.resolve()
   let controllerSession = null
   let browserControllerIdPromise = null
   let cachedPlatformMatches = null
@@ -103,7 +126,11 @@ export function createSessionManager() {
 
   function startControllerPolling(session, settings) {
     const routeKey = `${settings.bridgeUrl}|${session.browserSessionId}`
-    if (controllerPoller && controllerPollerRoute === routeKey) return
+    const pollerIsResponsive =
+      controllerPoller &&
+      controllerPollerRoute === routeKey &&
+      Date.now() - controllerPollerLastProgressAt < controllerPollStallTimeoutMs
+    if (pollerIsResponsive) return
     if (controllerPoller) {
       controllerPoller.abort()
       controllerPoller = null
@@ -111,6 +138,7 @@ export function createSessionManager() {
     const controller = new AbortController()
     controllerPoller = controller
     controllerPollerRoute = routeKey
+    controllerPollerLastProgressAt = Date.now()
     const loop = async () => {
       while (!controller.signal.aborted) {
         try {
@@ -133,11 +161,15 @@ export function createSessionManager() {
             headers: bridgeHeaders(settings),
           })
           const event = await response.json()
+          controllerPollerLastProgressAt = Date.now()
           if (event?.type === "tool_request" && toolRequestHandler) {
-            await toolRequestHandler(null, controllerSession || session, event)
+            queueControllerToolRequest(controllerSession || session, event)
           }
         } catch {
-          if (!controller.signal.aborted) await delay(1500)
+          if (!controller.signal.aborted) {
+            controllerPollerLastProgressAt = Date.now()
+            await delay(1500)
+          }
         }
       }
       if (controllerPoller === controller) {
@@ -146,6 +178,28 @@ export function createSessionManager() {
       }
     }
     void loop()
+  }
+
+  function queueControllerToolRequest(session, event) {
+    controllerToolQueue = controllerToolQueue
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await withTimeout(
+            toolRequestHandler(null, session, event),
+            controllerToolTimeoutMs,
+            `Browser tool execution timed out inside the extension: ${event.tool || "unknown"}`
+          )
+        } catch (error) {
+          await postBridge("/extension/result", {
+            browserSessionId: session.browserSessionId,
+            requestId: event.id,
+            ok: false,
+            error: error?.message || String(error),
+          }).catch(() => {})
+        }
+      })
+    void controllerToolQueue
   }
 
   async function activateTab(tabId) {
@@ -267,28 +321,73 @@ export function createSessionManager() {
   }
 
   async function refreshTabRegistration(tabId) {
-    return chrome.tabs.sendMessage(tabId, { type: "yunti_refresh_registration" })
+    return withTimeout(
+      chrome.tabs.sendMessage(tabId, { type: "yunti_refresh_registration" }),
+      contentScriptProbeTimeoutMs,
+      `Timed out probing content script for tabId ${tabId}`
+    )
   }
 
   async function injectContentScripts(tabId) {
     if (!chrome.scripting?.executeScript) {
       return { ok: false, error: "chrome.scripting permission is unavailable" }
     }
-    if (chrome.scripting.insertCSS) {
-      await chrome.scripting.insertCSS({
-        target: { tabId },
-        files: ["content.css"],
-      })
+    try {
+      await performContentScriptInjection(tabId)
+      return { ok: true }
+    } catch (error) {
+      if (!isTimeoutError(error)) throw error
+      return injectAfterTemporaryActivation(tabId, error)
     }
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["dom-observer.js"],
-    })
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["content.js"],
-    })
-    return { ok: true }
+  }
+
+  async function performContentScriptInjection(tabId) {
+    if (chrome.scripting.insertCSS) {
+      await withTimeout(
+        chrome.scripting.insertCSS({
+          target: { tabId },
+          files: ["content.css"],
+        }),
+        contentScriptInjectionTimeoutMs,
+        `Timed out inserting content CSS into tabId ${tabId}`
+      )
+    }
+    await withTimeout(
+      chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["dom-observer.js"],
+      }),
+      contentScriptInjectionTimeoutMs,
+      `Timed out injecting DOM observer into tabId ${tabId}`
+    )
+    await withTimeout(
+      chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["content.js"],
+      }),
+      contentScriptInjectionTimeoutMs,
+      `Timed out injecting content runtime into tabId ${tabId}`
+    )
+  }
+
+  async function injectAfterTemporaryActivation(tabId, originalError) {
+    if (!chrome.tabs?.update) throw originalError
+    const targetTab = await chrome.tabs.get(tabId).catch(() => null)
+    if (!targetTab?.windowId) throw originalError
+    const activeTabs = await chrome.tabs.query({ active: true, windowId: targetTab.windowId })
+    const previousActiveTabId = Number(activeTabs[0]?.id) || null
+    if (previousActiveTabId === tabId) throw originalError
+
+    await chrome.tabs.update(tabId, { active: true })
+    try {
+      await delay(150)
+      await performContentScriptInjection(tabId)
+      return { ok: true, temporarilyActivated: true }
+    } finally {
+      if (previousActiveTabId) {
+        await chrome.tabs.update(previousActiveTabId, { active: true }).catch(() => {})
+      }
+    }
   }
 
   async function handleMessage(message, sender) {
@@ -564,4 +663,27 @@ function normalizeBrowserFamily(value) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function normalizeTimeout(value, fallback) {
+  const timeoutMs = Number(value)
+  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : fallback
+}
+
+function isTimeoutError(error) {
+  return /timed out/i.test(error?.message || String(error || ""))
+}
+
+async function withTimeout(promise, timeoutMs, message) {
+  let timer = null
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
 }

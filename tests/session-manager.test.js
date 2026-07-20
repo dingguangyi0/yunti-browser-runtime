@@ -10,6 +10,10 @@ function installChromeMock(options = {}) {
   const requests = []
   const stored = { ...(options.storage || {}) }
   const reachableTabs = new Set(options.reachableTabs || [])
+  const hangingTabs = new Set(options.hangingTabs || [])
+  const pollEvents = [...(options.pollEvents || [])]
+  const hangingInjectionTabs = new Set(options.hangingInjectionTabs || [])
+  const updatedTabs = []
   const previousChrome = globalThis.chrome
   const previousFetch = globalThis.fetch
   globalThis.fetch = async (url, init = {}) => {
@@ -19,6 +23,13 @@ function installChromeMock(options = {}) {
       body: init.body ? JSON.parse(init.body) : null,
     })
     if (String(url).includes("/extension/poll")) {
+      if (pollEvents.length > 0) {
+        const event = pollEvents.shift()
+        return {
+          ok: true,
+          json: async () => event,
+        }
+      }
       return new Promise((resolve, reject) => {
         init.signal?.addEventListener("abort", () => reject(new Error("aborted")), {
           once: true,
@@ -51,7 +62,11 @@ function installChromeMock(options = {}) {
     },
     tabs: {
       query: async (query = {}) => {
-        if (query.active) return tabs.filter((tab) => tab.active)
+        if (query.active) {
+          return tabs.filter(
+            (tab) => tab.active && (!query.windowId || tab.windowId === query.windowId)
+          )
+        }
         return tabs
       },
       get: async (tabId) => {
@@ -61,13 +76,28 @@ function installChromeMock(options = {}) {
       },
       sendMessage: async (tabId, message) => {
         messages.push({ tabId, message })
+        if (hangingTabs.has(tabId)) return new Promise(() => {})
         if (!reachableTabs.has(tabId)) throw new Error("Could not establish connection")
         return { ok: true }
+      },
+      update: async (tabId, patch) => {
+        updatedTabs.push({ tabId, patch })
+        if (patch.active) {
+          const target = tabs.find((tab) => tab.id === tabId)
+          for (const tab of tabs) {
+            if (target && tab.windowId === target.windowId) tab.active = tab.id === tabId
+          }
+        }
+        return tabs.find((tab) => tab.id === tabId) || null
       },
     },
     scripting: {
       insertCSS: async (details) => {
         styles.push(details)
+        if (hangingInjectionTabs.has(details.target.tabId)) {
+          hangingInjectionTabs.delete(details.target.tabId)
+          return new Promise(() => {})
+        }
       },
       executeScript: async (details) => {
         scripts.push(details)
@@ -80,6 +110,7 @@ function installChromeMock(options = {}) {
     scripts,
     stored,
     styles,
+    updatedTabs,
     restore() {
       globalThis.chrome = previousChrome
       globalThis.fetch = previousFetch
@@ -107,6 +138,50 @@ test("ensureAllTabsRegistered injects content scripts into existing http pages",
       ["content.js"],
     ])
     assert.equal(mock.messages.filter((item) => item.tabId === 1).length, 2)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("content script probe timeout recovers an Edge tab whose sendMessage never settles", async () => {
+  const mock = installChromeMock({
+    hangingTabs: [8],
+    tabs: [{ id: 8, url: "https://example.test/edge", title: "Edge", windowId: 1 }],
+  })
+  try {
+    const manager = createSessionManager({ contentScriptProbeTimeoutMs: 10 })
+    const result = await manager.ensureTabRegistered(8, { reason: "edge_probe_timeout" })
+
+    assert.equal(result.ok, true)
+    assert.equal(result.injected, true)
+    assert.deepEqual(mock.scripts.map((item) => item.files), [
+      ["dom-observer.js"],
+      ["content.js"],
+    ])
+  } finally {
+    mock.restore()
+  }
+})
+
+test("sleeping Edge tab is temporarily activated when background injection stalls", async () => {
+  const mock = installChromeMock({
+    hangingInjectionTabs: [8],
+    tabs: [
+      { id: 7, active: true, url: "https://example.test/active", windowId: 1 },
+      { id: 8, active: false, url: "https://example.test/sleeping", windowId: 1 },
+    ],
+  })
+  try {
+    const manager = createSessionManager({ contentScriptInjectionTimeoutMs: 10 })
+    const result = await manager.ensureTabRegistered(8, { reason: "edge_sleeping_tab" })
+
+    assert.equal(result.ok, true)
+    assert.equal(result.injected, true)
+    assert.deepEqual(mock.updatedTabs, [
+      { tabId: 8, patch: { active: true } },
+      { tabId: 7, patch: { active: true } },
+    ])
+    assert.equal(mock.scripts.length, 2)
   } finally {
     mock.restore()
   }
@@ -165,6 +240,47 @@ test("concurrent controller recovery creates one controller id and one poll loop
     assert.equal(
       mock.requests.filter((request) => request.url.includes("/extension/poll")).length,
       1
+    )
+  } finally {
+    mock.restore()
+  }
+})
+
+test("controller polling continues while a browser tool is still executing", async () => {
+  const mock = installChromeMock({
+    pollEvents: [{ type: "tool_request", id: "edge-hang", tool: "yunti_observe_page" }],
+  })
+  try {
+    const manager = createSessionManager({ controllerToolTimeoutMs: 10 })
+    manager.setToolRequestHandler(() => new Promise(() => {}))
+    await manager.registerBrowserController("edge_tool_hang")
+    await new Promise((resolve) => setTimeout(resolve, 25))
+
+    assert.ok(
+      mock.requests.filter((request) => request.url.includes("/extension/poll")).length >= 2
+    )
+    const timeoutResult = mock.requests.find(
+      (request) => request.url.endsWith("/extension/result") && request.body.requestId === "edge-hang"
+    )
+    assert.equal(timeoutResult?.body.ok, false)
+    assert.match(timeoutResult?.body.error || "", /timed out inside the extension/)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("controller recovery replaces a poller that stopped making progress", async () => {
+  const mock = installChromeMock()
+  try {
+    const manager = createSessionManager({ controllerPollStallTimeoutMs: 10 })
+    await manager.registerBrowserController("initial")
+    await new Promise((resolve) => setTimeout(resolve, 15))
+    await manager.registerBrowserController("watchdog")
+    await new Promise((resolve) => setImmediate(resolve))
+
+    assert.equal(
+      mock.requests.filter((request) => request.url.includes("/extension/poll")).length,
+      2
     )
   } finally {
     mock.restore()

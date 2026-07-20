@@ -482,7 +482,12 @@ export function createToolDispatcher({
         uidMapVersion: observation.uidMapVersion,
       })
     }
-    return observation
+    return {
+      ...observation,
+      browserSessionId: session.browserSessionId,
+      url: observation?.url || session.url || "",
+      title: observation?.title || session.title || "",
+    }
   }
 
   function storePageUidMap(session, source, elements, meta = {}) {

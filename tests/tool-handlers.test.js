@@ -132,7 +132,7 @@ test("controller transport resolves a concrete page before dispatching page tool
   const harness = createDispatcherHarness({
     observations: [{
       observationId: "obs-controller",
-      browserSessionId: "yunti-page-321-controller",
+      browserSessionId: null,
       uidMapVersion: "observe-v1",
       elements: [],
       textTree: "Controller recovered page",

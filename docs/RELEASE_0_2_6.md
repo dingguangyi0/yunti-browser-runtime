@@ -89,5 +89,8 @@ Publication requires all of the following on the exact final source tree:
 
 ## Release State
 
-Release preparation is in progress. The publication result and final exact-tree
-acceptance artifact will be recorded here before the release commit is closed.
+`yunti-browser-runtime@0.2.6` was published to the official npm registry with
+the `latest` dist-tag on 2026-07-22. `npm run release:verify-published` passed
+for package name, version, repository, homepage, issues URL, and registry
+tarball. The published integrity is
+`sha512-4uCX1kdIyphV1ykBTkQuYOzZDon7sdB5G/O2ZIdOo1zOumZRX2OsMqK3SjpujZH5LfHbJFFuf8QyRpaTMTqorA==`.

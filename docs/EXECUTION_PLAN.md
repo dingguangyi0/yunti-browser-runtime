@@ -12,9 +12,10 @@
 
 1. 完成 38/38 benchmark 场景并拆分 attempt/tool-call/scenario 指标：已完成。
 2. 观察作用域 uid、deep wait 和开放 Shadow DOM 坐标操作：已完成。
-3. Edge 15 分钟全工具耐久测试与 p95/max 门禁：待最终版本树复测。
+3. Edge 15 分钟全工具耐久测试与 p95/max 门禁：候选验收通过；最终树超载诊断
+   通过功能、覆盖和 p95，max 受主机 load 115 影响失败，证据已保留。
 4. Skills、README、发布说明与版本引用同步：已完成。
-5. 完整 unit/release check、npm 发布和 registry 验证：进行中。
+5. 完整 unit/release check、npm 发布和 registry 验证：已完成，`latest=0.2.6`。
 
 本版本不新增 MCP 工具，不推进 remote mode，也不引入协议破坏。
 

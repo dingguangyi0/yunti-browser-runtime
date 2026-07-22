@@ -2,8 +2,8 @@
 
 ## 0.2.6 Dynamic Page Reliability
 
-`0.2.6` is the current release candidate. Its implementation and acceptance
-contract is recorded in [RELEASE_0_2_6.md](RELEASE_0_2_6.md).
+`0.2.6` is the active reliability release. Its implementation and acceptance
+record is documented in [RELEASE_0_2_6.md](RELEASE_0_2_6.md).
 
 Current status:
 
@@ -46,6 +46,12 @@ Current status:
 the `latest` dist-tag on 2026-07-22. Post-publication verification passed for
 the package name, version, repository, homepage, issues URL, and registry
 tarball.
+
+`yunti-browser-runtime@0.2.6` was published to the official npm registry with
+the `latest` dist-tag on 2026-07-22. Post-publication verification passed for
+the package name, version, repository, homepage, issues URL, and registry
+tarball; the published integrity is
+`sha512-4uCX1kdIyphV1ykBTkQuYOzZDon7sdB5G/O2ZIdOo1zOumZRX2OsMqK3SjpujZH5LfHbJFFuf8QyRpaTMTqorA==`.
 
 ## Current Phase
 

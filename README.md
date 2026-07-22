@@ -308,6 +308,7 @@ npm run test:soak -- --duration-seconds=180 --allow-short
 | [安装指南](docs/INSTALL.md) | Codex、Claude Code、Cursor、Cline 接入与故障恢复 |
 | [工具指南](docs/TOOL_GUIDE.md) | 工具列表、参数、路由规则和操作用例 |
 | [Agent 工作流契约](docs/AGENT_WORKFLOW_CONTRACT.md) | Agent 的默认操作、确认和恢复策略 |
+| [P8 稳定页面句柄计划](docs/STABLE_PAGE_HANDLE_PLAN.md) | 标签页长期身份、session 内部恢复与验收契约 |
 | [15 分钟耐久测试](docs/SOAK_TEST.md) | 复杂 fixture、覆盖契约、产物与通过标准 |
 | [安全说明](docs/SECURITY.md) | 权限、隐私、数据脱敏和本地边界 |
 | [0.2.6 发布说明](docs/RELEASE_0_2_6.md) | 当前版本目标、实现与验收 |

@@ -42,7 +42,7 @@
 | Edge session recovery hotfix | 本地已完成 | Edge sleeping tab 探测/注入超时、controller 非阻塞 poll、watchdog、旧 session 自动恢复 |
 | P8.0 | 已完成基线 | 30+ 场景 benchmark，记录 `0.2.3` 成功率、恢复率、错误动作、延迟和观察体积 |
 | P8.1 | 第一轮已完成 | Observation v2：find、delta、iframe/shadow 深层目标 |
-| P8.2 | 已启动，P8.2.1 完成 | 统一 actionability、typed events、bounded auto-wait、取消和后置验证 |
+| P8.2 | 已启动，P8.2.1-P8.2.3 完成 | 下一优先级 P8.2.4 stable page handle；随后补 typed lifecycle、取消和后置验证 |
 | P8.3 | 未开始 | 可验证语义目标 recipe 和安全自愈 |
 | P8.4 | 未开始 | 脱敏 trajectory、failure bundle 和 replay |
 | P8.5 | 未开始 | origin policy、不可信页面内容标记、注入攻击 fixtures |
@@ -56,10 +56,11 @@
 继续推进 Yunti Browser Runtime。先读取 docs/COMPETITOR_RESEARCH_2026.md、
 docs/PROJECT_STATUS.md、docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md。
 Page Agent 和 browser-use 是主参考，停更项目不进入优先级；不要把 Yunti 改成任何
-竞品的克隆。Edge sleeping-tab/session recovery hotfix 已完成本地真实验证，先保持该
-稳定性修复，不回退到要求用户刷新页面。下一步继续 P8.2.2：把 uid/coordinate 路径
-并入统一 actionability，并补 typed lifecycle/cancellation 的最小切片；每次只推进一个
-可验收改动，并用 benchmark 记录成功率、错误动作率、恢复率、重复写入和 p50/p95。
+竞品的克隆。`0.2.6` 已发布，P8.2.1-P8.2.3 已完成；不回退到要求用户刷新页面。
+下一步按 docs/STABLE_PAGE_HANDLE_PLAN.md 推进 P8.2.4a，只实现 additive 的
+`pageHandleId` 契约和共享 route resolver：现有 browserSessionId/tabId/targetId 保持兼容，
+不提前混入 P8.3。每个切片都用 benchmark 记录成功率、错误动作率、内部 session 恢复、
+重复写入和正常/恢复调用的 p50/p95/max。
 保留 local-first、existing-browser、MCP-native、单 controller、细粒度工具、
 redaction 和 unrestricted CDP。
 ```
@@ -88,6 +89,12 @@ P8 当前已完成切片：
   select 现在共享短等待和 readiness 检查，覆盖 presence、visibility、
   enabled/editable、tag expectation 和 receives-events。目标存在但暂时不可操作时，
   结构化失败会明确提示先 wait/observe 再重试，而不是把失败都折叠成同一种 selector miss。
+- P8.2.2 已完成：deep wait、观察作用域 uid 和 open-shadow coordinate action 已进入
+  `0.2.6`，38/38 benchmark 通过。
+- P8.2.3 已完成：soak runner 已加入 p95/max 延迟门禁、p99、逐工具分布和慢调用记录。
+- P8.2.4 方案已冻结：新增稳定 `pageHandleId`，把页面 session 轮换收进 runtime，
+  详细契约、非目标、五个实现切片和 100 次 session replacement 验收见
+  [STABLE_PAGE_HANDLE_PLAN.md](STABLE_PAGE_HANDLE_PLAN.md)。下一步只推进 P8.2.4a。
 - Edge session recovery hotfix 已完成本地实现和真实 Edge 150 验证：controller poll
   不再 await 整个工具执行；content-script probe/injection 和工具执行均有有界超时；
   recovery alarm 会通过 poll-progress watchdog 替换卡死 poller；Edge sleeping tab
@@ -99,13 +106,12 @@ P8.0 详细计划：
 
 - 基线文档已写入
   [RELIABILITY_BENCHMARK_PLAN.md](RELIABILITY_BENCHMARK_PLAN.md)。
-- 当前完成的是 benchmark 契约、场景矩阵、指标口径、artifact 规则、fixture 页面、
-  scenario manifest、runner 入口、npm 脚本和基础校验测试。
-- 尚未完成的是 30+ 场景的完整 runner 覆盖；首轮 `0.2.3` baseline 报告已完成。
-- 当前自然推进顺序不是回退重跑基线，而是继续 P8.2：
-  先把 uid/coordinate 路径也并入统一 actionability，再补 typed lifecycle /
-  cancellation / richer wait diagnostics，最后把这些改动纳入 benchmark runner 的更多
-  场景闭环。
+- benchmark 契约、38/38 场景矩阵、指标 v2、artifact 规则、fixture 页面、runner、
+  npm 脚本和验证测试均已完成；首轮 `0.2.3` baseline 与 `0.2.6` release-tree capture
+  都已记录。
+- 当前自然推进顺序不是回退重跑基线，而是先完成 P8.2.4 stable page handle：
+  contract/resolver -> navigation/context replacement -> restart recovery ->
+  typed lifecycle/cancellation -> Agent contract/endurance gate。P8.3 自愈 recipe 在此之后。
 
 维护规则：
 

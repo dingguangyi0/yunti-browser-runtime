@@ -257,6 +257,7 @@ The main post-0.2.3 gaps are visible directly in the current codebase:
 | G10 Context surface | 51 fine-grained tools are exposed to every MCP client | active MCP projects provide slim modes or CLI/skill alternatives | add `core`, `devtools`, and `full` profiles without removing tools |
 | G11 Distribution | npm/unpacked updates can still require manual extension reload | Page Agent provides a store extension; active MCP tools ship skills/plugins | prepare store update path while keeping unpacked fallback |
 | G12 Remote lifecycle | local existing-browser mode only | browser-use and active browser infrastructure vendors validate optional persistence and remote scale demand | define an optional provider boundary after local reliability work |
+| G13 Route lifetime | controller recovery exists, but agents still retain transient `browserSessionId` values | browser-use separates browser/session lifecycle from page execution details; Page Agent refreshes ephemeral page state instead of promising permanent execution handles | add a stable tab-scoped `pageHandleId` and keep session replacement inside the runtime |
 
 ## P8 Execution Plan
 
@@ -320,6 +321,22 @@ Scope and acceptance:
 - verify write outcomes before retry and fail closed when uncertain
 - ensure dynamic-render and overlay fixtures require no agent-authored sleep
   loop
+
+#### P8.2.4 - Stable Page Handle (P0, Next)
+
+Make the live browser tab the agent-facing continuity unit. Add an opaque,
+tab-scoped `pageHandleId` to target inventory and existing page tools while
+keeping `browserSessionId`, `tabId`, and `targetId` backward compatible.
+Navigation, reload, content-script replacement, MV3 restart, extension
+reconnect, Bridge restart, and Edge sleeping-tab recovery must replace internal
+sessions without changing the handle or asking the user to refresh.
+
+Writes remain dispatch-once and fail closed when their result is uncertain.
+Acceptance requires at least 100 forced internal session replacements, zero
+externally visible stale-session failures while the tab remains live, zero
+wrong-tab dispatches, zero duplicate writes, and no user-assisted recovery.
+The complete identity, lifecycle, compatibility, rollout, and endurance
+contract is in [STABLE_PAGE_HANDLE_PLAN.md](STABLE_PAGE_HANDLE_PLAN.md).
 
 ### P8.3 - Validated Target Recipes And Self-Healing (P1)
 
@@ -385,15 +402,18 @@ Scope and acceptance:
 
 ## Release Gates For The Next Version
 
-1. Publish the P8.0 baseline before implementing P8.1 behavior.
-2. Preserve all `0.2.3` controller/session recovery tests.
+1. Preserve the published `0.2.6` 38-scenario benchmark and latency metrics.
+2. Preserve all controller/session/Edge recovery tests from `0.2.3`-`0.2.6`.
 3. Preserve compatibility fields and the full MCP profile.
 4. Run deterministic tests and opt-in real-browser E2E.
-5. Report benchmark deltas against `0.2.3`.
+5. Report benchmark deltas against the `0.2.6` release-tree capture.
 6. Prove zero duplicate submissions in repeated guarded-write scenarios.
 7. Scan docs, logs, trajectories, and package contents for secret residue.
 8. Update Tool Guide, packaged skill, usage hints, status, and migration notes
    whenever the agent workflow changes.
+9. For P8.2.4, keep one `pageHandleId` across at least 100 internal session
+   replacements with zero user-assisted recovery, wrong-tab dispatches,
+   externally visible stale-session failures, or duplicate guarded writes.
 
 ## Deferred Or Rejected
 
@@ -409,14 +429,14 @@ Scope and acceptance:
 ## Recovery Prompt
 
 ```text
-Continue Yunti Browser Runtime after 0.2.3. First read
+Continue Yunti Browser Runtime after 0.2.6. First read
 docs/COMPETITOR_RESEARCH_2026.md, docs/PROJECT_STATUS.md,
-docs/EXECUTION_PLAN.md, and docs/NEXT_MAJOR_PLAN.md. Page Agent and browser-use
-are the primary references; use other actively maintained tools only as narrow
-supporting evidence and do not prioritize stale projects. Preserve Yunti's
-local-first, existing-browser, MCP-native, LLM-agnostic, fine-grained-tool,
-controller-recovery, redaction, and unrestricted-CDP strengths. Work on one P8
-slice at a time. Start with P8.0: establish the reliability benchmark and the
-0.2.3 baseline before changing observation or action behavior. Update status
-and evidence after each slice. Never blindly replay an uncertain write action.
+docs/EXECUTION_PLAN.md, docs/STABLE_PAGE_HANDLE_PLAN.md, and
+docs/NEXT_MAJOR_PLAN.md. Page Agent and browser-use are the primary references;
+use other actively maintained tools only as narrow evidence and do not
+prioritize stale projects. Preserve Yunti's local-first, existing-browser,
+MCP-native, LLM-agnostic, fine-grained-tool, controller-recovery, redaction, and
+unrestricted-CDP strengths. P8.0-P8.2.3 are complete. Start only P8.2.4a: add
+the compatible pageHandleId contract and shared route resolver, then update
+status and evidence. Do not begin P8.3 and never replay an uncertain write.
 ```

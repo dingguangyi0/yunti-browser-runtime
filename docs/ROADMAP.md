@@ -93,13 +93,17 @@ evidence-backed post-`0.2.3` plan.
 - Use Alibaba Page Agent and browser-use as the primary references.
 - Exclude stale projects from prioritization; use other active projects only as
   narrow evidence for actionability, diagnostics, evaluation, or security.
-- Start with P8.0 benchmark and the `0.2.3` baseline before changing runtime
-  behavior.
+- P8.0 benchmark, the `0.2.3` baseline, and the `0.2.6` release-tree capture
+  are complete; use them as gates for later runtime behavior changes.
 - The benchmark contract and 30+ scenario matrix now live in
   [RELIABILITY_BENCHMARK_PLAN.md](RELIABILITY_BENCHMARK_PLAN.md).
 - Follow with Observation v2, unified actionability/auto-wait, validated target
   recipes, sanitized trajectories, trust boundaries, capability profiles, and
   extension distribution.
+- Before semantic target recipes, add the P8.2.4 stable page handle contract:
+  agents select a live tab once, while navigation, reload, extension reconnect,
+  Bridge restart, and page-session replacement stay internal to the runtime.
+  See [STABLE_PAGE_HANDLE_PLAN.md](STABLE_PAGE_HANDLE_PLAN.md).
 - Keep remote browsers and advanced DevTools insight packs optional and later
   than measurable local reliability improvements.
 - Preserve local existing-browser operation, fine-grained MCP tools, the single

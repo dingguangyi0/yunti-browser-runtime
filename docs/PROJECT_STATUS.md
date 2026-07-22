@@ -19,7 +19,7 @@ Current status:
 - packaged skill and user-facing recovery guidance: updated
 - automated regression: 184 total tests, 183 passed, 1 opt-in browser smoke
   skipped by default, 0 failed
-- full `npm run release:check`: passing; package contains 64 files and extension
+- full `npm run release:check`: passing; package contains 65 files and extension
   zip contains 13 files
 - real Chromium extension E2E: passing
 - real Microsoft Edge extension E2E: passing
@@ -88,10 +88,13 @@ P8 status:
 - P8.2.3 Edge latency acceptance: complete locally with p95 <= 500 ms and
   max <= 10 seconds enforced by the soak runner; the qualifying run measured
   213 ms p95 and 956 ms max
+- P8.2.4 stable page handle: plan complete; next implementation slice is the
+  additive `pageHandleId` contract and shared route resolver in
+  [STABLE_PAGE_HANDLE_PLAN.md](STABLE_PAGE_HANDLE_PLAN.md)
 - Post-0.2.3 Edge sleeping-tab/session recovery hotfix: complete locally and
   validated against Microsoft Edge 150
-- P8.2 remaining typed lifecycle, uid/coordinate readiness, and cancellation:
-  planned
+- P8.2 remaining stable page handle, typed lifecycle, and cancellation: stable
+  handle is the next priority; implementation has not started
 - P8.3 validated semantic target recipes and self-healing: planned
 - P8.4 persistent history, sanitized trajectories, and failure replay: planned
 - P8.5 trust boundary and hostile-page fixtures: planned

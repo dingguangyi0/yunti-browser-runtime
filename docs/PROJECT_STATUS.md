@@ -33,9 +33,10 @@ Current status:
 - reusable post-installation endurance procedure: complete in
   [SOAK_TEST.md](SOAK_TEST.md)
 
-The user accepted the `0.2.5` experience build and requested publication on
-2026-07-22. Source, package, extension, and registry checks must still complete
-before the release is marked published.
+`yunti-browser-runtime@0.2.5` was published to the official npm registry with
+the `latest` dist-tag on 2026-07-22. Post-publication verification passed for
+the package name, version, repository, homepage, issues URL, and registry
+tarball.
 
 ## Current Phase
 

@@ -62,9 +62,12 @@ browser disconnects.
 
 Implementation, release checks, real Chromium, real Edge, and simultaneous
 Chromium-plus-Edge validation pass locally. The release extension package is
-`dist/yunti-browser-runtime-extension-0.2.5.zip`. The user accepted this build
-and requested publication on 2026-07-22; registry verification remains required
-before the release is marked published.
+`dist/yunti-browser-runtime-extension-0.2.5.zip`.
+
+`yunti-browser-runtime@0.2.5` was published to the official npm registry with
+the `latest` dist-tag on 2026-07-22. `npm run release:verify-published` passed
+for the published package identity, repository, homepage, issues URL, and
+registry tarball.
 
 The first qualifying soak completed for 900.655 seconds with 710 continuous
 cycles, 19,233/19,233 successful calls, 52/52 tools covered, 710 stale-route

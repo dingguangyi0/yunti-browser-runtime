@@ -35,6 +35,7 @@
   const ADDRESS_RE =
     /\b\d{1,6}\s+[\p{L}0-9 .'-]{2,}\s+(street|st|road|rd|avenue|ave|lane|ln|boulevard|blvd|drive|dr|way|court|ct)\b|[\p{Script=Han}]{1,20}(省|市|区|县|路|街|号楼|单元|室)/iu
   let lastObservationState = null
+  let uidGeneration = 0
 
   function observePage(args = {}) {
     const mode = args.mode === "fullPage" ? "fullPage" : "viewport"
@@ -51,6 +52,8 @@
       categories: [],
       screenshotRedacted: false,
     }
+    const uidScope = nextUidScope()
+    const observationId = `obs-${uidScope}`
 
     const scope = mode === "fullPage" ? "fullPage" : "viewport"
     const candidates = collectInteractiveCandidates()
@@ -67,7 +70,7 @@
       if (scope === "viewport" && !visible && !includeHidden) continue
 
       uidCounter += 1
-      const uid = `yunti-${uidCounter}`
+      const uid = `yunti-${uidScope}-${uidCounter}`
       const item = describeElement(element, uid, {
         includeRects,
         redaction,
@@ -84,12 +87,12 @@
       maxElements: Math.min(50, maxElements),
       redaction,
       redactions,
+      uidScope,
     })
     const hints = buildHints(elements, scrollableContainers)
     const warnings = []
     if (redaction === "off") warnings.push("DOM observation redaction is off; use only for explicit local debugging.")
     if (document.readyState === "loading") hints.push("Page is still loading; wait and observe again before acting.")
-    const observationId = `obs-${Date.now()}`
     const capturedAt = new Date().toISOString()
     const baseObservation = {
       observationId,
@@ -151,6 +154,7 @@
       categories: [],
       screenshotRedacted: false,
     }
+    const uidScope = nextUidScope()
 
     const candidates = collectInteractiveCandidates()
     const matches = []
@@ -163,7 +167,7 @@
       if (!includeHidden && !visible) continue
 
       uidCounter += 1
-      const item = describeElement(element, `yunti-${uidCounter}`, {
+      const item = describeElement(element, `yunti-${uidScope}-${uidCounter}`, {
         includeRects,
         redaction,
         redactions,
@@ -179,7 +183,7 @@
     }
 
     return {
-      observationId: `find-${Date.now()}`,
+      observationId: `find-${uidScope}`,
       browserSessionId: globalScope.__YUNTI_BROWSER_SESSION_ID__ || null,
       capturedAt: new Date().toISOString(),
       uidMapVersion: "observe-v1",
@@ -257,6 +261,11 @@
     } catch {
       return []
     }
+  }
+
+  function nextUidScope() {
+    uidGeneration += 1
+    return `${Date.now().toString(36)}-${uidGeneration.toString(36)}`
   }
 
   function getSameOriginIframeDocument(element) {
@@ -504,7 +513,7 @@
       if (isYuntiWidgetElement(element) || !isVisible(element) || !isScrollable(element)) continue
       uidCounter += 1
       containers.push(cleanObject({
-        uid: `scroll-${uidCounter}`,
+        uid: `scroll-${options.uidScope}-${uidCounter}`,
         tag: element.tagName.toLowerCase(),
         name: redactTextPreview(
           "scrollable container name",

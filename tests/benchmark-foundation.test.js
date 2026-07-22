@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { benchmarkScenarios, summarizeBenchmarkScenarios } from "../scripts/benchmark/manifest.js"
 import { startBenchmarkFixtureServer } from "../scripts/benchmark/fixture-server.js"
 
@@ -15,12 +16,30 @@ test("benchmark manifest marks guarded-write scenarios with repeat count 20", ()
   for (const scenario of guardedWrites) assert.equal(scenario.repeatCount, 20)
 })
 
-test("benchmark manifest summary exposes implemented and planned counts", () => {
+test("benchmark manifest exposes a complete 38-scenario suite", () => {
   const summary = summarizeBenchmarkScenarios()
-  assert.equal(summary.total, benchmarkScenarios.length)
-  assert.ok(summary.implemented >= 1)
-  assert.ok(summary.planned >= 1)
+  assert.equal(summary.total, 38)
+  assert.equal(summary.implemented, 38)
+  assert.equal(summary.planned, 0)
   assert.ok(summary.categories.includes("core-form"))
+  for (const scenario of benchmarkScenarios) {
+    assert.ok(Array.isArray(scenario.primaryTools) && scenario.primaryTools.length >= 1)
+  }
+})
+
+test("benchmark runner covers every manifest scenario and reports metric version 2", async () => {
+  const source = await readFile(new URL("../scripts/benchmark-baseline.js", import.meta.url), "utf8")
+  for (const scenario of benchmarkScenarios) {
+    assert.match(source, new RegExp(`\\n  async ${scenario.id}\\(`), `missing runner for ${scenario.id}`)
+  }
+  for (const field of [
+    "metricVersion: 2",
+    "p95AttemptDurationMs",
+    "p95ToolCallDurationMs",
+    "p95ScenarioDurationMs",
+  ]) {
+    assert.match(source, new RegExp(field))
+  }
 })
 
 test("benchmark fixture server serves index, html fixtures, and download payload", async () => {

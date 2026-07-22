@@ -37,7 +37,9 @@ For the full P6.3.1 workflow contract and copyable prompt, see
    `browserSessionId`.
 3. Call `yunti_observe_page` before page actions.
 4. Prefer fresh uids for click, hover, fill, select, scroll, type, press,
-   upload, and drag operations.
+   upload, and drag operations. In `0.2.6+`, each uid is scoped to the
+   observation that returned it; never reuse it after another observe/find,
+   wait, navigation, or rerender.
 5. After each action, verify by observing again or using snapshot, evaluate,
    screenshot, network, or console tools.
 6. For async rendering, validation, navigation, option loading, or infinite
@@ -130,7 +132,8 @@ taking an action whose effect cannot be verified from page state.
 - `yunti_get_page_snapshot`: lightweight page state and visible context.
 - `yunti_take_snapshot`: element-oriented snapshot for uid-based actions.
 - `yunti_wait_for`: wait for async text, selector, or URL state before
-  observing again and continuing with fresh uids.
+  observing again and continuing with fresh uids. Text and selector matching
+  traverses same-origin iframes and open shadow roots.
 - `yunti_click`, `yunti_fill`, `yunti_hover`: common DOM actions.
 - `yunti_cdp_send_command`: low-level CDP access routed through the extension.
 - `yunti_get_network_log`, `yunti_list_network_requests`: sanitized network

@@ -2218,6 +2218,40 @@ test("wait_for selector success returns structured result fields", async () => {
   }
 })
 
+test("wait_for traverses open shadow roots and same-origin iframe documents", async () => {
+  const harness = createDispatcherHarness({
+    cdpResponses: [
+      {
+        result: {
+          value: {
+            found: "text",
+            text: "Deep ready",
+          },
+        },
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-wait-deep-tree",
+      tool: "yunti_wait_for",
+      arguments: { text: "Deep ready", timeoutMs: 1000 },
+    })
+
+    const command = harness.cdpCommands.at(-1)
+    assert.equal(command.method, "Runtime.evaluate")
+    assert.match(command.params.expression, /node\.shadowRoot/)
+    assert.match(command.params.expression, /node\.contentDocument/)
+    assert.match(command.params.expression, /root\.textContent/)
+    assert.equal(harness.posted.at(-1).result.ok, true)
+    assert.equal(harness.posted.at(-1).result.condition, "text")
+  } finally {
+    harness.restore()
+  }
+})
+
 test("wait_for timeout returns structured recovery diagnostics", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }

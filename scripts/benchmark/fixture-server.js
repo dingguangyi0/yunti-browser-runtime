@@ -67,6 +67,12 @@ export async function startBenchmarkFixtureServer() {
         return
       }
 
+      if (url.pathname === "/api/diagnostic-failure") {
+        res.writeHead(503, { "content-type": "application/json; charset=utf-8" })
+        res.end(JSON.stringify({ ok: false, error: "benchmark diagnostic failure" }))
+        return
+      }
+
       if (url.pathname === "/" || url.pathname === "/index.html") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" })
         res.end(renderIndex())

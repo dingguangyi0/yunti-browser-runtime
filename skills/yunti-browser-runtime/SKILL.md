@@ -17,9 +17,9 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 2. Call `yunti_list_browser_targets`; use the intended page's
    `browserSessionId` when registered, otherwise use its `tabId` / `targetId`.
 3. Call `yunti_observe_page` before page actions.
-4. Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations.
+4. Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations. A uid belongs only to the observation that created it; never carry it across a later observe, find, wait, navigation, or rerender.
 5. After each action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.
-6. For async rendering, validation, navigation, option loading, or infinite scroll, call `yunti_wait_for`, then `yunti_observe_page`, then continue with a fresh uid.
+6. For async rendering, validation, navigation, option loading, or infinite scroll, call `yunti_wait_for`, then `yunti_observe_page`, then continue with a fresh uid. Text and selector waits can traverse same-origin iframes and open shadow roots.
 7. If a result has `ok: false`, read `retryable`, `retryBudget`,
    `recoveryAction`, and `resultUncertain`; retry only when explicitly allowed.
 8. Use selector or coordinate fallback only when fresh uids are unavailable or as an explicit recovery/debugging path.
@@ -99,6 +99,9 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
   return to the user's previously active tab. Do not ask the user to switch,
   refresh, or reopen the page before this automatic recovery has failed.
 - Stale-session errors include a reason and recovery hint; never retry the expired id itself.
+- Uids are observation-scoped in `0.2.6+`. A newer observe/find invalidates the
+  agent's previous uid choices even if a matching numeric position appears in
+  the new result. Select a uid from the newest result instead of replaying one.
 - New tabs may return a new `browserSessionId`; use that returned value for follow-up actions on the new tab.
 - `tabId` / `targetId` may be passed to page tools specifically for automatic
   route recovery; they do not become page session ids.
@@ -107,7 +110,7 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 ## Tool Choice
 
 - Use `yunti_get_page_snapshot` for lightweight page text, title, URL, selected text, and page state.
-- Once available in the connected runtime, use `yunti_observe_page` as the normal page-operation refresh step, then act by fresh uid and observe again to verify.
+- Once available in the connected runtime, use `yunti_observe_page` as the normal page-operation refresh step, then act by a uid from that exact observation and observe again to verify.
 - Observation elements may expose `editable`, `fillable`, `readOnly`, `fillBlockReason`, select `selectedIndex` / `selectedValue` / `selectedText`, and `options[]`; inspect those before filling or selecting when field state matters.
 - Use `yunti_take_snapshot` as the compatibility path before uid-based clicks, fills, or hovers.
 - Use `yunti_click`, `yunti_fill`, `yunti_hover`, `yunti_press_key`, and `yunti_type_text` for normal page actions.

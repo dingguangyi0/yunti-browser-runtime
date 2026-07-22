@@ -4,10 +4,17 @@
     <meta charset="utf-8" />
     <title>Benchmark Async UI</title>
     <style>
+      #overlay-case {
+        display: inline-block;
+        position: relative;
+      }
       #overlay {
-        position: fixed;
-        inset: 0;
+        align-items: center;
         background: rgba(0, 0, 0, 0.1);
+        display: flex;
+        inset: 0;
+        justify-content: center;
+        position: absolute;
       }
     </style>
   </head>
@@ -16,15 +23,22 @@
     <button id="render">Render later</button>
     <button id="delayed-enable" disabled>Delayed enable</button>
     <div id="spinner">Loading...</div>
-    <div id="overlay">Overlay</div>
+    <button id="spinner-submit" disabled>Submit after spinner</button>
+    <button id="navigate-later">Navigate later</button>
+    <div id="overlay-case">
+      <button id="overlay-target">Overlay target</button>
+      <div id="overlay">Overlay</div>
+    </div>
     <input id="search" />
     <output id="result"></output>
     <script>
       setTimeout(() => {
-        document.querySelector("#delayed-enable").disabled = false;
+        const button = document.querySelector("#delayed-enable");
+        button.disabled = false;
       }, 500);
       setTimeout(() => {
         document.querySelector("#spinner").remove();
+        document.querySelector("#spinner-submit").disabled = false;
       }, 700);
       setTimeout(() => {
         document.querySelector("#overlay").remove();
@@ -33,6 +47,21 @@
         setTimeout(() => {
           document.querySelector("#result").textContent = "Rendered later";
         }, 400);
+      });
+      document.querySelector("#delayed-enable").addEventListener("click", () => {
+        document.querySelector("#result").textContent = "Delayed enabled clicked";
+      });
+      document.querySelector("#spinner-submit").addEventListener("click", () => {
+        document.querySelector("#result").textContent = "Submitted after spinner";
+      });
+      document.querySelector("#navigate-later").addEventListener("click", () => {
+        setTimeout(() => {
+          history.pushState({}, "", "?state=ready");
+          document.querySelector("#result").textContent = "Navigation ready";
+        }, 350);
+      });
+      document.querySelector("#overlay-target").addEventListener("click", () => {
+        document.querySelector("#result").textContent = "Overlay target clicked";
       });
       document.querySelector("#search").addEventListener("input", (event) => {
         clearTimeout(window.__searchTimer);

@@ -8,9 +8,21 @@
     <h1>Guarded Submit</h1>
     <button id="submit">Submit once</button>
     <output id="result"></output>
+    <button id="async-submit">Async submit once</button>
+    <output id="async-result"></output>
+    <div id="drift-root">
+      <button id="drift-filler">Drift filler</button>
+      <button id="drift-submit">Drift submit once</button>
+    </div>
+    <output id="drift-result"></output>
+    <button id="timeout-submit">Timeout submit once</button>
+    <output id="timeout-result"></output>
     <script>
       window.__submitCount = 0;
       window.__submittedValues = [];
+      window.__asyncSubmitCount = 0;
+      window.__driftSubmitCount = 0;
+      window.__timeoutSubmitCount = 0;
       document.querySelector("#submit").addEventListener("click", () => {
         if (window.__submitCount > 0) return;
         window.__submitCount += 1;
@@ -19,6 +31,30 @@
         setTimeout(() => {
           document.querySelector("#result").textContent = "Submitted " + window.__submitCount;
         }, 400);
+      });
+      document.querySelector("#async-submit").addEventListener("click", () => {
+        if (window.__asyncSubmitCount > 0) return;
+        window.__asyncSubmitCount += 1;
+        document.querySelector("#async-submit").disabled = true;
+        setTimeout(() => {
+          document.querySelector("#async-result").textContent = "Async submitted " + window.__asyncSubmitCount;
+        }, 400);
+      });
+      document.querySelector("#drift-submit").addEventListener("click", () => {
+        if (window.__driftSubmitCount > 0) return;
+        window.__driftSubmitCount += 1;
+        document.querySelector("#drift-root").innerHTML = '<button id="drift-complete" disabled>Drift submitted</button>';
+        setTimeout(() => {
+          document.querySelector("#drift-result").textContent = "Drift submitted " + window.__driftSubmitCount;
+        }, 250);
+      });
+      document.querySelector("#timeout-submit").addEventListener("click", () => {
+        if (window.__timeoutSubmitCount > 0) return;
+        window.__timeoutSubmitCount += 1;
+        document.querySelector("#timeout-submit").disabled = true;
+        setTimeout(() => {
+          document.querySelector("#timeout-result").textContent = "Timeout submitted " + window.__timeoutSubmitCount;
+        }, 1200);
       });
     </script>
   </body>

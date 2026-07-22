@@ -9,11 +9,23 @@
     <input id="upload" type="file" />
     <input id="upload-secondary" type="file" multiple />
     <a id="download" href="/download.txt" download="download.txt">Download file</a>
+    <button id="visual-action">Change visual state</button>
+    <button id="diagnostic-action">Generate diagnostics</button>
     <output id="upload-result"></output>
+    <output id="visual-result"></output>
     <script>
       document.querySelector("#upload").addEventListener("change", (event) => {
         const file = event.target.files[0];
         document.querySelector("#upload-result").textContent = file ? file.name : "none";
+      });
+      document.querySelector("#visual-action").addEventListener("click", () => {
+        document.body.style.backgroundColor = "rgb(224, 247, 250)";
+        document.querySelector("#visual-result").textContent = "Visual state changed";
+      });
+      document.querySelector("#diagnostic-action").addEventListener("click", async () => {
+        console.error("YUNTI_BENCHMARK_DIAGNOSTIC");
+        const response = await fetch("/api/diagnostic-failure");
+        document.querySelector("#visual-result").textContent = "Diagnostic status " + response.status;
       });
     </script>
   </body>

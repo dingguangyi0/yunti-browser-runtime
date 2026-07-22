@@ -226,7 +226,7 @@ test("DOM observer returns fresh uids, text tree, and balanced redaction", () =>
 
   assert.equal(observation.browserSessionId, "tab-1")
   assert.equal(observation.uidMapVersion, "observe-v1")
-  assert.equal(observation.elements[0].uid, "yunti-1")
+  assert.match(observation.elements[0].uid, /^yunti-.+-1$/)
   assert.equal(observation.elements[0].name, "关键词")
   assert.equal(observation.elements[0].editable, true)
   assert.equal(observation.elements[0].fillable, true)
@@ -235,8 +235,8 @@ test("DOM observer returns fresh uids, text tree, and balanced redaction", () =>
   assert.equal(observation.elements[2].valuePreview, "[REDACTED]")
   assert.equal(observation.elements[2].visible, false)
   assert.equal(observation.elements[2].fillBlockReason, "hidden-or-not-visible")
-  assert.match(observation.textTree, /\[yunti-1\]<input/)
-  assert.match(observation.textTree, /\[yunti-4\]<button/)
+  assert.match(observation.textTree, /\[yunti-[^\]]+-1\]<input/)
+  assert.match(observation.textTree, /\[yunti-[^\]]+-4\]<button/)
   assert.equal(observation.redactions.mode, "balanced")
   assert.ok(observation.redactions.categories.includes("password"))
   assert.ok(observation.redactions.categories.includes("token"))
@@ -280,10 +280,27 @@ test("DOM observer returns document and container scroll metadata", () => {
   assert.equal(observation.scroll.pixelsBelow, 900)
   assert.equal(observation.scroll.pagesBelow, 1.5)
   assert.equal(observation.scrollableContainers.length, 1)
-  assert.equal(observation.scrollableContainers[0].uid, "scroll-1")
+  assert.match(observation.scrollableContainers[0].uid, /^scroll-.+-1$/)
   assert.equal(observation.scrollableContainers[0].pixelsBelow, 520)
   assert.ok(observation.hints.some((hint) => /content below/.test(hint)))
   assert.ok(observation.hints.some((hint) => /Scrollable containers/.test(hint)))
+})
+
+test("DOM observer generates fresh uids for every full observation", () => {
+  const button = new FakeElement("button", { id: "save" }, {
+    innerText: "Save",
+    rect: { x: 20, y: 20, width: 100, height: 32 },
+  })
+  const observer = loadObserver({
+    document: createDocument([button]),
+    location: new URL("https://example.test/fresh-uids"),
+  })
+
+  const first = observer.observePage()
+  const second = observer.observePage()
+
+  assert.notEqual(first.elements[0].uid, second.elements[0].uid)
+  assert.notEqual(first.observationId, second.observationId)
 })
 
 test("DOM observer excludes hidden and offscreen elements by default", () => {
@@ -353,20 +370,20 @@ test("DOM observer handles redaction edge modes conservatively", () => {
 
   const balanced = observer.observePage({ redaction: "balanced" })
   const balancedText = JSON.stringify(balanced)
-  assert.equal(balanced.elements.find((element) => element.uid === "yunti-1").valuePreview, "[REDACTED]")
-  assert.equal(balanced.elements.find((element) => element.uid === "yunti-2").valuePreview, "ordinary business text")
-  assert.equal(balanced.elements.find((element) => element.uid === "yunti-4").valuePreview, "[REDACTED]")
+  assert.equal(balanced.elements[0].valuePreview, "[REDACTED]")
+  assert.equal(balanced.elements[1].valuePreview, "ordinary business text")
+  assert.equal(balanced.elements[3].valuePreview, "[REDACTED]")
   assert.equal(balancedText.includes(tokenValue), false)
   assert.equal(balancedText.includes(longRandom), false)
   assert.equal(balancedText.includes("secret-api-key-value"), false)
   assert.ok(balanced.redactions.categories.includes("token"))
 
   const strict = observer.observePage({ redaction: "strict" })
-  assert.equal(strict.elements.find((element) => element.uid === "yunti-2").valuePreview, "[REDACTED]")
-  assert.equal(strict.elements.find((element) => element.uid === "yunti-3").valuePreview, "[REDACTED]")
+  assert.equal(strict.elements[1].valuePreview, "[REDACTED]")
+  assert.equal(strict.elements[2].valuePreview, "[REDACTED]")
 
   const off = observer.observePage({ redaction: "off" })
-  assert.equal(off.elements.find((element) => element.uid === "yunti-1").valuePreview, tokenValue.slice(0, 120))
+  assert.equal(off.elements[0].valuePreview, tokenValue.slice(0, 120))
   assert.equal(off.redactions.count, 0)
   assert.ok(off.warnings.some((warning) => /redaction is off/i.test(warning)))
 })
@@ -410,16 +427,16 @@ test("DOM observer strict redaction covers PII-like text surfaces", () => {
   })
 
   const balanced = observer.observePage({ redaction: "balanced" })
-  assert.equal(balanced.elements.find((element) => element.uid === "yunti-5").valuePreview, "ordinary business text")
+  assert.equal(balanced.elements[4].valuePreview, "ordinary business text")
 
   const strict = observer.observePage({ redaction: "strict" })
   const strictJson = JSON.stringify(strict)
   assert.equal(strict.page.title, "[REDACTED]")
-  assert.equal(strict.elements.find((element) => element.uid === "yunti-1").valuePreview, "[REDACTED]")
-  assert.equal(strict.elements.find((element) => element.uid === "yunti-2").name, "[REDACTED]")
-  assert.equal(strict.elements.find((element) => element.uid === "yunti-3").name, "[REDACTED]")
-  assert.equal(strict.elements.find((element) => element.uid === "yunti-3").valuePreview, "[REDACTED]")
-  const select = strict.elements.find((element) => element.uid === "yunti-4")
+  assert.equal(strict.elements[0].valuePreview, "[REDACTED]")
+  assert.equal(strict.elements[1].name, "[REDACTED]")
+  assert.equal(strict.elements[2].name, "[REDACTED]")
+  assert.equal(strict.elements[2].valuePreview, "[REDACTED]")
+  const select = strict.elements[3]
   assert.equal(select.selectedValue, "[REDACTED]")
   assert.equal(select.selectedText, "[REDACTED]")
   assert.equal(select.options[0].value, "[REDACTED]")
@@ -513,7 +530,7 @@ test("DOM observer can find bounded interactive matches without full observation
   const saveMatches = observer.findElements({ query: "save", role: "button" })
   assert.equal(saveMatches.matchCount, 1)
   assert.equal(saveMatches.matches[0].name, "Save draft")
-  assert.equal(saveMatches.matches[0].uid, "yunti-1")
+  assert.match(saveMatches.matches[0].uid, /^yunti-.+-1$/)
 
   const placeholderMatches = observer.findElements({ placeholder: "search", tag: "input" })
   assert.equal(placeholderMatches.matchCount, 1)

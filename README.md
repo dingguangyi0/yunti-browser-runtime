@@ -39,12 +39,12 @@ Yunti Browser Runtime 是一个面向 MCP Agent 的本地浏览器运行时。�
 | 数据边界 | Bridge 默认只监听 `127.0.0.1`，无远程服务、无平台账号、默认无 token |
 | Agent 行为 | 结构化错误、共享重试预算、写操作不确定性与恢复建议 |
 
-### 0.2.5 可靠性基线
+### 0.2.6 可靠性基线
 
-`0.2.5` 不靠简单 smoke test 宣称稳定。仓库内置的复杂页面耐久测试连续运行
-`900.655` 秒，完成 `710` 个业务循环和 `19,233/19,233` 次成功工具调用，覆盖
-全部 `52/52` 个 MCP 工具；期间完成 `710` 次 stale route 恢复、`237` 次子标签页
-创建与关闭、`178` 次 CDP detach/reattach，重复写入为 `0`。
+`0.2.6` 用 38 个确定性复杂场景和真实 Edge 15 分钟耐久测试验证动态页面能力。
+benchmark 通过 `38/38` 场景、`114` 次尝试和 `397` 次 MCP 调用；Edge 连续运行
+`900.168` 秒，完成 `840` 个业务循环和 `22,410/22,410` 次成功工具调用，覆盖
+全部 `52/52` 个 MCP 工具，重复写入为 `0`，调用 p95 / max 为 `213 / 956 ms`。
 
 [查看耐久测试设计与完整验收标准](docs/SOAK_TEST.md)
 
@@ -140,8 +140,8 @@ Agent 应能看到 Chrome / Edge 的可访问标签页，并可直接使用 `tab
 
 - 获取全部浏览器实例、标签页和 targets。
 - 读取轻量页面上下文、完整元素快照和可交互 DOM 观察结果。
-- 为每次观察生成 fresh uid，降低动态页面中的陈旧选择器风险。
-- 支持开放 Shadow DOM、同源 iframe、滚动容器和增量观察。
+- 为每次观察生成独立作用域的 fresh uid，重渲染后旧 uid 不会误命中新元素。
+- 支持开放 Shadow DOM、同源 iframe、滚动容器、深层等待和增量观察。
 - 对网络、控制台、DOM 和学习记忆中的敏感信息进行脱敏。
 
 ### 页面操作
@@ -255,6 +255,8 @@ yunti-browser-runtime soak-test
 
 ## 可靠性演进
 
+- **0.2.6**：38/38 复杂场景 benchmark、观察作用域 uid、同源 iframe / 开放
+  Shadow DOM 深层等待、Shadow DOM 坐标操作，以及 Edge p95 / 最大延迟门禁。
 - **0.2.5**：协议与 live version 门禁、多浏览器实例隔离、跨实例 tabId 路由、统一
   重试预算、新标签页 ready contract，以及 15 分钟全工具耐久测试。
 - **0.2.4**：Edge 睡眠标签页恢复、有界消息与注入、poll watchdog；Agent
@@ -308,7 +310,7 @@ npm run test:soak -- --duration-seconds=180 --allow-short
 | [Agent 工作流契约](docs/AGENT_WORKFLOW_CONTRACT.md) | Agent 的默认操作、确认和恢复策略 |
 | [15 分钟耐久测试](docs/SOAK_TEST.md) | 复杂 fixture、覆盖契约、产物与通过标准 |
 | [安全说明](docs/SECURITY.md) | 权限、隐私、数据脱敏和本地边界 |
-| [0.2.5 发布说明](docs/RELEASE_0_2_5.md) | 当前版本目标、实现与验收 |
+| [0.2.6 发布说明](docs/RELEASE_0_2_6.md) | 当前版本目标、实现与验收 |
 | [项目状态](docs/PROJECT_STATUS.md) | 阶段总览、实测证据和后续工作 |
 | [路线图](docs/ROADMAP.md) | 后续版本与能力规划 |
 | [发布手册](docs/RELEASE.md) | npm 发布、扩展打包与发布后验证 |

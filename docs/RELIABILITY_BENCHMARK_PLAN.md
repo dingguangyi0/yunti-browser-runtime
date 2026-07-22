@@ -1,13 +1,14 @@
-# P8.0 Reliability Benchmark Plan
+# P8 Reliability Benchmark Plan
 
 ## Status
 
-- Phase: P8.0
+- Phase: P8.0 complete; P8.1 metric and behavior validation complete locally
 - Scope: benchmark contract, scenario matrix, artifact plan, and acceptance
   rules
-- Runtime code changes: benchmark foundation now includes fixture pages,
-  scenario manifest, runner entry, and validation tests
-- Baseline target: `yunti-browser-runtime@0.2.3`
+- Runtime code changes: all 38 scenarios, deep wait support, observation-scoped
+  uids, open-shadow coordinate actions, latency instrumentation, and validation
+  tests are implemented on the candidate branch
+- Baseline target: released `yunti-browser-runtime@0.2.5`
 
 This document defines how Yunti should measure browser-operation quality before
 changing observation or action behavior in P8.1+.
@@ -75,6 +76,16 @@ Roll-up metrics:
 - p50 and p95 duration
 - median and p95 observation bytes
 - median and p95 estimated observation tokens
+
+Metric version 2 separates three latency populations:
+
+- attempt latency: one normal scenario run or one guarded-write repetition
+- tool-call latency: one MCP call through the real Bridge/extension boundary
+- scenario latency: total end-to-end cost, including all 20 guarded repetitions
+
+Scenario totals remain available for workload accounting, but they are not used
+as operational p95. This prevents a 20-attempt scenario from being mislabeled
+as one slow browser action.
 
 ## Scenario Matrix
 
@@ -186,11 +197,11 @@ P8.0 should measure Yunti at three layers without changing product behavior:
 3. Aggregated benchmark reporting
    - a small runner that executes scenarios and writes JSON results
 
-Recommended future commands:
+Commands:
 
 - `npm run test:e2e` remains smoke-level
-- add a future `npm run benchmark:baseline`
-- add a future `npm run benchmark:report`
+- `npm run benchmark:baseline` executes all 38 implemented scenarios
+- `npm run benchmark:list` prints the manifest and implementation count
 
 ## Artifact Plan
 
@@ -239,9 +250,9 @@ P8.0 is complete only when all of the following are true:
 5. The benchmark output format is stable enough to compare future P8 deltas.
 6. Status docs link to the benchmark report and summarize the baseline.
 
-## Next Implementation Step
+## Completion Evidence
 
-The benchmark foundation is now in place through:
+The benchmark suite is in place through:
 
 - `tests/fixtures/benchmark/`
 - `scripts/benchmark/manifest.js`
@@ -249,9 +260,21 @@ The benchmark foundation is now in place through:
 - `scripts/benchmark-baseline.js`
 - `tests/benchmark-foundation.test.js`
 
-After this foundation slice, the next work should be:
+The qualifying local capture is:
 
-1. expand the runner from implemented scenarios to the full matrix
-2. capture the first reproducible `0.2.3` baseline
-3. summarize the baseline in project status and release notes
-4. only then decide whether to begin P8.1 Observation v2
+- artifact: `.artifacts/benchmark/2026-07-22T06-24-26-684Z/`
+- scenarios: 38/38 passed
+- attempts: 114, including 80 guarded-write repetitions
+- MCP calls: 397
+- duplicate writes: 0
+- attempt p50/p95/max: 520/1501/1523 ms
+- tool-call p50/p95/max: 9/435/1406 ms
+- scenario p50/p95/max: 149/10595/29940 ms
+
+The next work should be:
+
+1. keep the 38/38 matrix as a release gate for future behavior changes
+2. add hostile-page and cross-origin-frame fixtures without weakening current
+   assertions
+3. compare future tool-call and attempt latency against metric version 2
+4. retain 20 repetitions for every guarded-write scenario

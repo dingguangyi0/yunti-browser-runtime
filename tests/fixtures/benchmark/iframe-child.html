@@ -6,10 +6,16 @@
   </head>
   <body>
     <button id="child-action">Child action</button>
+    <button id="child-async">Child async action</button>
     <output id="child-result"></output>
     <script>
       document.querySelector("#child-action").addEventListener("click", () => {
         document.querySelector("#child-result").textContent = "Child clicked";
+      });
+      document.querySelector("#child-async").addEventListener("click", () => {
+        setTimeout(() => {
+          document.querySelector("#child-result").textContent = "Iframe async ready";
+        }, 350);
       });
     </script>
   </body>

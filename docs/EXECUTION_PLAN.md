@@ -2,22 +2,21 @@
 
 本文档记录 Yunti Browser Runtime 从本地 MVP 走向可开源、可长期稳定使用版本的执行计划。
 
-## 0.2.5 当前执行锚点
+## 0.2.6 当前执行锚点
 
-`0.2.5` 暂停继续扩张 P8 新能力，先完成可靠性收敛。详细范围与验收见
-[RELEASE_0_2_5.md](RELEASE_0_2_5.md)。
+`0.2.6` 发布观察作用域 uid、deep wait、开放 Shadow DOM 坐标操作、完整 38
+场景 benchmark 和 Edge 延迟门禁。详细范围与验收见
+[RELEASE_0_2_6.md](RELEASE_0_2_6.md)。
 
 执行顺序：
 
-1. runtime/extension 实际版本与协议 fail-fast：已完成。
-2. Chrome、Edge、不同 profile controller 并存与页面归属隔离：已完成。
-3. 多浏览器 target 聚合、结构化重试预算、Skills/hints 同步：已完成。
-4. 完整 unit/release check：已完成。
-5. 生成体验包并完成真实 Chrome/Edge 及同时在线回归：已完成。
-6. 只有体验验证通过后才发布 npm；当前 npm 稳定版仍为 `0.2.4`。
+1. 完成 38/38 benchmark 场景并拆分 attempt/tool-call/scenario 指标：已完成。
+2. 观察作用域 uid、deep wait 和开放 Shadow DOM 坐标操作：已完成。
+3. Edge 15 分钟全工具耐久测试与 p95/max 门禁：待最终版本树复测。
+4. Skills、README、发布说明与版本引用同步：已完成。
+5. 完整 unit/release check、npm 发布和 registry 验证：进行中。
 
-本版本不新增 MCP 工具，不推进 remote mode，不把 P8.2.2 之后的新能力混入
-稳定性修复。
+本版本不新增 MCP 工具，不推进 remote mode，也不引入协议破坏。
 
 ## Post-0.2.3 / P8 当前执行锚点
 

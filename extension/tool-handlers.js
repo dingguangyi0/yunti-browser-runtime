@@ -1777,8 +1777,23 @@ export function createToolDispatcher({
   
       if (text || selector) {
         const expression = `(() => {
-          ${selector ? `const el = document.querySelector(${JSON.stringify(selector)}); if (el) { const rect = el.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) return { found: 'selector', selector: ${JSON.stringify(selector)} }; }` : ""}
-          ${text ? `if (document.body && document.body.innerText && document.body.innerText.includes(${JSON.stringify(text)})) return { found: 'text', text: ${JSON.stringify(text)} };` : ""}
+          const roots = [document];
+          const seen = new Set();
+          for (let index = 0; index < roots.length; index += 1) {
+            const root = roots[index];
+            if (!root || seen.has(root)) continue;
+            seen.add(root);
+            ${selector ? `const el = root.querySelector?.(${JSON.stringify(selector)}); if (el) { const rect = el.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) return { found: 'selector', selector: ${JSON.stringify(selector)} }; }` : ""}
+            ${text ? `const textSurface = root.body || root; const rootText = textSurface.innerText || root.textContent || ''; if (rootText.includes(${JSON.stringify(text)})) return { found: 'text', text: ${JSON.stringify(text)} };` : ""}
+            for (const node of root.querySelectorAll?.('*') || []) {
+              if (node.shadowRoot) roots.push(node.shadowRoot);
+              if (node.tagName === 'IFRAME') {
+                try {
+                  if (node.contentDocument) roots.push(node.contentDocument);
+                } catch {}
+              }
+            }
+          }
           return null;
         })()`
   

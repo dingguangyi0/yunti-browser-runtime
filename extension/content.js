@@ -1034,6 +1034,10 @@ function resolveElementFromViewportPoint(x, y, rootDocument = document) {
   const root = rootDocument || document
   const hit = typeof root.elementFromPoint === "function" ? root.elementFromPoint(x, y) : null
   if (!hit) return null
+  if (hit.shadowRoot && typeof hit.shadowRoot.elementFromPoint === "function") {
+    const shadowHit = resolveElementFromViewportPoint(x, y, hit.shadowRoot)
+    if (shadowHit && shadowHit !== hit) return shadowHit
+  }
   const frameDocument = getSameOriginFrameDocument(hit)
   if (!frameDocument) return hit
   const frameRect = hit.getBoundingClientRect()

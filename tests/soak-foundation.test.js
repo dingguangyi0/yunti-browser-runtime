@@ -67,3 +67,12 @@ test("extension network diagnostics cover both HTTP intranets and HTTPS pages", 
   assert.match(source, /"http:\/\/\*\/\*"/)
   assert.match(source, /"https:\/\/\*\/\*"/)
 })
+
+test("soak runner retains repeated screenshots and enforces tail latency budgets", async () => {
+  const source = await readFile(join(rootDir, "scripts", "soak-test.js"), "utf8")
+  assert.match(source, /SCREENSHOT_EVERY_CYCLES = 10/)
+  assert.match(source, /MAX_P95_CALL_DURATION_MS = 500/)
+  assert.match(source, /MAX_CALL_DURATION_MS = 10000/)
+  assert.match(source, /slowestCalls/)
+  assert.match(source, /perTool/)
+})

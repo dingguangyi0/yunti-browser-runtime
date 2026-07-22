@@ -17,6 +17,9 @@ import {
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const extensionDir = join(rootDir, "extension")
 const options = parseOptions(process.argv.slice(2))
+const SCREENSHOT_EVERY_CYCLES = 10
+const MAX_P95_CALL_DURATION_MS = 500
+const MAX_CALL_DURATION_MS = 10000
 
 await main()
 
@@ -97,6 +100,8 @@ async function main() {
     assert.equal(summary.duplicateWriteAttempts, 0)
     assert.ok(summary.cycles >= 1)
     assert.ok(summary.elapsedMs >= options.durationMs)
+    assert.ok(summary.p95CallDurationMs <= MAX_P95_CALL_DURATION_MS)
+    assert.ok(summary.maxCallDurationMs <= MAX_CALL_DURATION_MS)
     summary.ok = true
     await persistSummary(artifactDir, summary)
     process.stdout.write(`${JSON.stringify({ ok: true, artifactDir, summary }, null, 2)}\n`)
@@ -380,7 +385,7 @@ async function runContinuousCycle(runtime) {
   await call(runtime, "yunti_list_network_requests", { browserSessionId: session, limit: 40 })
   await call(runtime, "yunti_get_cdp_events", { browserSessionId: session, limit: 40 })
 
-  if (cycle % 2 === 0) {
+  if (cycle % SCREENSHOT_EVERY_CYCLES === 0) {
     await call(runtime, "yunti_take_screenshot", { browserSessionId: session, format: "jpeg", quality: 35 })
   }
   if (cycle % 3 === 0) {
@@ -488,6 +493,36 @@ async function buildSummary(runtime, executablePath) {
   const elapsedMs = runtime.startedAtMs > 0
     ? Math.max(0, runtime.finishedAtMs - runtime.startedAtMs)
     : 0
+  const perTool = Object.values(runtime.operations.reduce((accumulator, operation) => {
+    const item = accumulator[operation.tool] || { tool: operation.tool, calls: 0, failures: 0, durations: [] }
+    item.calls += 1
+    if (!operation.ok) item.failures += 1
+    item.durations.push(operation.durationMs)
+    accumulator[operation.tool] = item
+    return accumulator
+  }, {})).map((item) => {
+    item.durations.sort((a, b) => a - b)
+    return {
+      tool: item.tool,
+      calls: item.calls,
+      failures: item.failures,
+      p50DurationMs: percentile(item.durations, 0.5),
+      p95DurationMs: percentile(item.durations, 0.95),
+      maxDurationMs: item.durations.at(-1) || 0,
+      overOneSecond: item.durations.filter((durationMs) => durationMs >= 1000).length,
+    }
+  }).sort((a, b) => b.maxDurationMs - a.maxDurationMs)
+  const slowestCalls = [...runtime.operations]
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, 20)
+    .map(({ sequence, cycle, tool, startedAt, ok, durationMs }) => ({
+      sequence,
+      cycle,
+      tool,
+      startedAt,
+      ok,
+      durationMs,
+    }))
   return {
     ok: false,
     runtimeVersion: packageJson.version,
@@ -503,7 +538,16 @@ async function buildSummary(runtime, executablePath) {
     failedCalls: runtime.operations.filter((operation) => !operation.ok).length,
     p50CallDurationMs: percentile(durations, 0.5),
     p95CallDurationMs: percentile(durations, 0.95),
+    p99CallDurationMs: percentile(durations, 0.99),
     maxCallDurationMs: durations.at(-1) || 0,
+    callsOverOneSecond: durations.filter((durationMs) => durationMs >= 1000).length,
+    latencyBudget: {
+      maxP95CallDurationMs: MAX_P95_CALL_DURATION_MS,
+      maxCallDurationMs: MAX_CALL_DURATION_MS,
+    },
+    screenshotEveryCycles: SCREENSHOT_EVERY_CYCLES,
+    perTool,
+    slowestCalls,
     staleRecoveries: runtime.staleRecoveries,
     childTabsCreated: runtime.childTabsCreated,
     detachCount: runtime.detachCount,
@@ -527,7 +571,10 @@ async function persistSummary(artifactDir, summary) {
     `- Calls: ${summary.successfulCalls}/${summary.totalCalls} successful`,
     `- Duplicate write attempts: ${summary.duplicateWriteAttempts}`,
     `- Stale-route recoveries: ${summary.staleRecoveries}`,
-    `- Call latency p50/p95/max: ${summary.p50CallDurationMs}/${summary.p95CallDurationMs}/${summary.maxCallDurationMs} ms`,
+    `- Call latency p50/p95/p99/max: ${summary.p50CallDurationMs}/${summary.p95CallDurationMs}/${summary.p99CallDurationMs}/${summary.maxCallDurationMs} ms`,
+    `- Calls over 1 second: ${summary.callsOverOneSecond}`,
+    `- Latency budget p95/max: ${summary.latencyBudget.maxP95CallDurationMs}/${summary.latencyBudget.maxCallDurationMs} ms`,
+    `- Screenshot cadence: every ${summary.screenshotEveryCycles} cycles`,
     "",
     summary.toolCoverage.missing.length ? `Missing tools: ${summary.toolCoverage.missing.join(", ")}` : "All published MCP tools were invoked.",
   ].join("\n") + "\n")

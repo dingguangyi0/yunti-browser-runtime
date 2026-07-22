@@ -21,6 +21,7 @@ class FakeElement {
     this.children = options.children || []
     this.contentDocument = options.contentDocument || null
     this.contentWindow = options.contentWindow || (this.contentDocument ? { document: this.contentDocument } : null)
+    this.shadowRoot = options.shadowRoot || null
     this.style = options.style || { display: "block", visibility: "visible", opacity: "1" }
     this.scrollLeft = options.scrollLeft || 0
     this.scrollTop = options.scrollTop || 0
@@ -29,6 +30,7 @@ class FakeElement {
     this.clientWidth = options.clientWidth || 100
     this.clientHeight = options.clientHeight || 100
     this.rect = options.rect || { x: 0, y: 0, width: 100, height: 100 }
+    this.events = []
     for (const child of this.children) child.parentElement = this
   }
 
@@ -57,7 +59,8 @@ class FakeElement {
     this.clicked = true
   }
 
-  dispatchEvent() {
+  dispatchEvent(event) {
+    if (event?.type) this.events.push(event.type)
     return true
   }
 
@@ -96,6 +99,12 @@ function createContentHarness({ elementFromPoint, documentScrollTop = 0 } = {}) 
       constructor(type, options = {}) {
         this.type = type
         this.bubbles = Boolean(options.bubbles)
+      }
+    },
+    MouseEvent: class FakeMouseEvent {
+      constructor(type, options = {}) {
+        this.type = type
+        Object.assign(this, options)
       }
     },
     HTMLSelectElement: FakeElement,
@@ -234,6 +243,25 @@ test("content scroll resolves same-origin iframe coordinate targets", () => {
   })
   assert.equal(result.scrollContainerFound, false)
   assert.equal(result.coordinateScrollFallback, "document")
+})
+
+test("content coordinate actions pierce open shadow roots", () => {
+  const shadowButton = new FakeElement("button", { id: "shadow-action" }, {
+    innerText: "Shadow action",
+  })
+  const shadowRoot = {
+    elementFromPoint: (x, y) => (x === 160 && y === 90 ? shadowButton : null),
+  }
+  const host = new FakeElement("div", { id: "shadow-host" }, { shadowRoot })
+  const context = createContentHarness({
+    elementFromPoint: (x, y) => (x === 160 && y === 90 ? host : null),
+  })
+
+  const result = context.clickAt({ x: 160, y: 90 })
+
+  assert.equal(result.clicked, true)
+  assert.ok(shadowButton.events.includes("click"))
+  assert.equal(result.element.selector, "#shadow-action")
 })
 
 test("content click selector auto-waits for element appearance", async () => {

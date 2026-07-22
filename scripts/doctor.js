@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import http from "node:http"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -13,6 +13,17 @@ const bridgeTokenHeader = "x-yunti-browser-token"
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const mcpServerPath = join(rootDir, "mcp", "server.js")
 const skillPath = join(rootDir, "skills", "yunti-browser-runtime", "SKILL.md")
+const packageVersion = readJson(join(rootDir, "package.json")).version || ""
+const expectedExtensionVersion = readJson(join(rootDir, "extension", "manifest.json")).version || packageVersion
+const expectedProtocolVersion = 1
+
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"))
+  } catch {
+    return {}
+  }
+}
 
 function normalizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "")
@@ -57,6 +68,9 @@ async function checkBridge() {
     const health = await getJson(
       `${bridgeUrl}/health?userId=${encodeURIComponent(routeUserId)}`
     )
+    const consoleState = await getJson(
+      `${bridgeUrl}/console/state?userId=${encodeURIComponent(routeUserId)}`
+    ).catch(() => null)
     const authorized = health.json?.authorized !== false
     const authRequired = health.json?.auth?.required !== false && Boolean(health.json?.auth?.required)
     const sessions = Array.isArray(health.json?.sessions) ? health.json.sessions : []
@@ -65,8 +79,38 @@ async function checkBridge() {
     const activeSessionId = health.json?.activeSessionId || null
     const browserControllerSessionId = health.json?.browserControllerSessionId || controllerSessions[0]?.browserSessionId || null
     const extensionConnected = Boolean(health.json?.extensionConnected) || controllerSessions.length > 0 || pageSessions.length > 0
+    const compatibilitySessions = controllerSessions.length ? controllerSessions : sessions
+    const extensionVersions = [...new Set(compatibilitySessions
+      .map((session) => String(session?.client?.extensionVersion || session?.extensionVersion || "").trim())
+      .filter(Boolean))]
+    const protocolVersions = [...new Set(compatibilitySessions
+      .map((session) => Number(session?.protocolVersion ?? session?.client?.protocolVersion))
+      .filter((value) => Number.isInteger(value) && value > 0))]
+    const versionCompatible = !extensionConnected || (
+      extensionVersions.length > 0 &&
+      extensionVersions.every((version) => version === expectedExtensionVersion)
+    )
+    const protocolCompatible = !extensionConnected || (
+      protocolVersions.length > 0 &&
+      protocolVersions.every((version) => version === expectedProtocolVersion)
+    )
+    const runningRuntimeVersion = String(
+      health.json?.runtime?.version || consoleState?.json?.runtime?.version || ""
+    ).trim()
+    const runtimeCompatible = runningRuntimeVersion === packageVersion
+    const compatibility = {
+      ok: runtimeCompatible && versionCompatible && protocolCompatible && health.json?.compatibility?.ok !== false,
+      runtimeVersion: packageVersion,
+      runningRuntimeVersion: runningRuntimeVersion || null,
+      runtimeCompatible,
+      expectedExtensionVersion,
+      expectedProtocolVersion,
+      extensionVersions,
+      protocolVersions,
+      bridge: health.json?.compatibility || null,
+    }
     return {
-      ok: health.status === 200 && authorized,
+      ok: health.status === 200 && authorized && compatibility.ok,
       reachable: health.status === 200,
       authorized,
       authRequired,
@@ -85,6 +129,7 @@ async function checkBridge() {
       activeSession: sessions.find((session) => session.browserSessionId === activeSessionId) || null,
       extensionConnected,
       pageConnected: pageSessions.length > 0,
+      compatibility,
       raw: health.json,
     }
   } catch (error) {
@@ -108,6 +153,17 @@ async function checkBridge() {
       activeSession: null,
       extensionConnected: false,
       pageConnected: false,
+      compatibility: {
+        ok: false,
+        runtimeVersion: packageVersion,
+        runningRuntimeVersion: null,
+        runtimeCompatible: false,
+        expectedExtensionVersion,
+        expectedProtocolVersion,
+        extensionVersions: [],
+        protocolVersions: [],
+        bridge: null,
+      },
     }
   }
 }
@@ -130,6 +186,30 @@ function buildNextSteps(checks) {
   if (checks.bridge.reachable && checks.bridge.authRequired && !checks.bridge.authorized) {
     steps.push("Set YUNTI_BROWSER_BRIDGE_TOKEN to the token used by the running bridge.")
     steps.push("Save the same token in the extension popup.")
+  }
+  if (
+    checks.bridge.reachable &&
+    checks.bridge.authorized &&
+    checks.bridge.extensionConnected &&
+    !checks.bridge.compatibility?.ok
+  ) {
+    if (!checks.bridge.compatibility.runtimeCompatible) {
+      steps.push(
+        `Restart the Yunti MCP/bridge process: running bridge is ${checks.bridge.compatibility.runningRuntimeVersion || "unknown"}, but this package is ${checks.bridge.compatibility.runtimeVersion}.`
+      )
+    }
+    const actualVersions = checks.bridge.compatibility.extensionVersions.join(", ") || "unknown"
+    if (
+      actualVersions !== checks.bridge.compatibility.expectedExtensionVersion ||
+      !checks.bridge.compatibility.protocolVersions.includes(
+        checks.bridge.compatibility.expectedProtocolVersion
+      )
+    ) {
+      steps.push(
+        `Reload the unpacked Yunti extension: browser is running ${actualVersions}, but this runtime requires ${checks.bridge.compatibility.expectedExtensionVersion} with protocol ${checks.bridge.compatibility.expectedProtocolVersion}.`
+      )
+    }
+    steps.push("Do not retry browser tools until doctor reports matching bridge, extension, and protocol versions.")
   }
   if (checks.bridge.ok && !checks.bridge.extensionConnected) {
     steps.push("Load or reload the extension; the background controller should connect before any page session appears.")
@@ -157,6 +237,7 @@ function humanSummary(report) {
     `- Token: ${report.checks.bridge.authRequired ? report.checks.bridge.authorized ? "valid" : "missing or invalid" : "not required for local loopback"}`,
     `- Sessions: ${report.checks.bridge.visibleSessionCount} visible (${report.checks.bridge.pageSessionCount} page, ${report.checks.bridge.controllerCount} controller), active page ${report.checks.bridge.activeSessionId || "none"}`,
     `- Extension: ${report.checks.bridge.extensionConnected ? "connected" : "not detected"}${report.checks.bridge.browserControllerSessionId ? `, controller ${report.checks.bridge.browserControllerSessionId}` : ""}`,
+    `- Compatibility: ${report.checks.bridge.compatibility?.ok ? "ok" : "mismatch"} (runtime ${packageVersion}, expected extension ${expectedExtensionVersion}, protocol ${expectedProtocolVersion})`,
     `- MCP server: ${report.checks.mcpServer.ok ? "found" : "missing"}`,
     `- Skill: ${report.checks.skill.ok ? "found" : "missing"}`,
   ]

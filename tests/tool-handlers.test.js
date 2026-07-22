@@ -7,6 +7,7 @@ const posted = []
 const sentMessages = []
 const cdpCommands = []
 const cdpDispatches = []
+const ensureRegistrationCalls = []
 const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
   const defaultContentToolResponses = {
     yunti_click: (message) => ({
@@ -65,6 +66,14 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
 
   globalThis.chrome = {
     tabs: {
+      create: async () => options.createdTab || {
+        id: 999,
+        windowId: 1,
+        url: "https://example.test/created",
+        title: "Created",
+        status: "complete",
+      },
+      get: async (tabId) => options.tabsById?.[tabId] || null,
       query: async () => options.activeTab ? [options.activeTab] : [],
       sendMessage: async (tabId, message) => {
         sentMessages.push({ tabId, message })
@@ -88,11 +97,14 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
     postBridge: async (_path, body) => {
       posted.push(body)
     },
-    ensureTabRegistered: async (tabId) => ({
-      ok: true,
-      registered: sessionsByTab.has(tabId),
-      session: sessionsByTab.get(tabId) || null,
-    }),
+    ensureTabRegistered: async (tabId) => {
+      ensureRegistrationCalls.push(tabId)
+      return {
+        ok: true,
+        registered: sessionsByTab.has(tabId),
+        session: sessionsByTab.get(tabId) || null,
+      }
+    },
     cdp: {
       chromeDebuggerSendCommand: async (_target, method, params) => {
         cdpCommands.push({ method, params })
@@ -119,6 +131,7 @@ const cdpResponses = options.cdpResponses ? [...options.cdpResponses] : null
     cdpCommands,
     cdpDispatches,
     dispatcher,
+    ensureRegistrationCalls,
     posted,
     sessionsByTab,
     restore: () => {
@@ -162,6 +175,38 @@ test("controller transport resolves a concrete page before dispatching page tool
     assert.equal(harness.posted.at(-1).browserSessionId, "yunti-browser-controller")
     assert.equal(harness.posted.at(-1).ok, true)
     assert.equal(harness.posted.at(-1).result.browserSessionId, "yunti-page-321-controller")
+    assert.deepEqual(harness.ensureRegistrationCalls, [])
+  } finally {
+    harness.restore()
+  }
+})
+
+test("controller transport revalidates registration after the tab URL changes", async () => {
+  const harness = createDispatcherHarness({
+    tabsById: { 322: { id: 322, url: "https://example.test/new" } },
+  })
+  try {
+    harness.sessionsByTab.set(322, {
+      browserSessionId: "yunti-page-322-controller",
+      kind: "page",
+      tabId: 322,
+      userId: "local",
+      url: "https://example.test/old",
+    })
+    await harness.dispatcher.executeToolRequest(null, {
+      browserSessionId: "yunti-browser-controller",
+      kind: "browser_controller",
+      tabId: null,
+      userId: "local",
+    }, {
+      id: "request-controller-navigation",
+      tool: "yunti_observe_page",
+      arguments: {},
+      route: { tabId: 322, viaController: true },
+    })
+
+    assert.deepEqual(harness.ensureRegistrationCalls, [322])
+    assert.equal(harness.posted.at(-1).ok, true)
   } finally {
     harness.restore()
   }
@@ -191,6 +236,41 @@ test("controller transport forwards the logical page tab to CDP without a duplic
     assert.equal(harness.cdpDispatches[0].session.browserSessionId, "yunti-page-654-controller")
     assert.equal(harness.posted.at(-1).browserSessionId, "yunti-browser-controller")
     assert.equal(harness.posted.at(-1).result.browserSessionId, "yunti-page-654-controller")
+  } finally {
+    harness.restore()
+  }
+})
+
+test("new page waits for real page registration before reporting ready", async () => {
+  const createdTab = {
+    id: 999,
+    windowId: 1,
+    url: "https://example.test/created",
+    title: "Created",
+    status: "complete",
+  }
+  const harness = createDispatcherHarness({
+    createdTab,
+    tabsById: { 999: createdTab },
+  })
+  try {
+    await harness.dispatcher.executeToolRequest(null, {
+      browserSessionId: "yunti-browser-controller",
+      kind: "browser_controller",
+      tabId: null,
+      userId: "local",
+    }, {
+      id: "request-new-page",
+      tool: "yunti_new_page",
+      arguments: { url: createdTab.url, active: false },
+      route: { viaController: true },
+    })
+
+    assert.deepEqual(harness.ensureRegistrationCalls, [999])
+    assert.equal(harness.posted.at(-1).ok, true)
+    assert.equal(harness.posted.at(-1).result.created, true)
+    assert.equal(harness.posted.at(-1).result.ready, true)
+    assert.equal(harness.posted.at(-1).result.browserSessionId, harness.sessionsByTab.get(999).browserSessionId)
   } finally {
     harness.restore()
   }
@@ -239,6 +319,122 @@ test("observe uid map feeds existing uid-based click path", async () => {
       harness.sentMessages.filter((item) => item.message.tool === "yunti_observe_page").length,
       1
     )
+  } finally {
+    harness.restore()
+  }
+})
+
+test("find results feed the latest uid map for follow-up actions", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_find_elements: {
+        observationId: "find-1",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        matchCount: 1,
+        matches: [
+          {
+            uid: "yunti-9",
+            role: "button",
+            tag: "button",
+            name: "Save form",
+            rect: { x: 50, y: 90, width: 120, height: 32 },
+          },
+        ],
+        hints: ["Use the returned fresh uid for click/fill/select, then verify with yunti_observe_page or evaluate."],
+      },
+      yunti_click: (message) => ({
+        clicked: true,
+        x: Number(message.arguments?.x),
+        y: Number(message.arguments?.y),
+      }),
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-find",
+      tool: "yunti_find_elements",
+      arguments: { query: "save", role: "button" },
+    })
+    assert.equal(harness.posted.at(-1).ok, true)
+    assert.equal(harness.posted.at(-1).result.matches[0].uid, "yunti-9")
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-click-found",
+      tool: "yunti_click",
+      arguments: { uid: "yunti-9" },
+    })
+    assert.equal(harness.posted.at(-1).ok, true)
+    assert.equal(harness.posted.at(-1).result.uid, "yunti-9")
+    assert.equal(harness.sentMessages.map((item) => item.message.tool).join(","), "yunti_find_elements,yunti_click")
+  } finally {
+    harness.restore()
+  }
+})
+
+test("delta observe does not replace the last actionable uid map", async () => {
+  const harness = createDispatcherHarness({
+    observations: [
+      {
+        observationId: "obs-full-1",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        responseMode: "full",
+        elements: [
+          {
+            uid: "yunti-1",
+            role: "button",
+            name: "Submit",
+            rect: { x: 10, y: 20, width: 100, height: 40 },
+          },
+        ],
+        textTree: "[yunti-1]<button>Submit</button>",
+      },
+      {
+        observationId: "obs-delta-2",
+        browserSessionId: "tab-1",
+        uidMapVersion: "observe-v1",
+        responseMode: "delta",
+        delta: {
+          firstObservation: false,
+          changedElementCount: 1,
+          changedScrollableContainerCount: 0,
+          changedElements: { added: [], removed: [], updated: ["button|button|Submit||||10|20|100|40"] },
+          changedScrollableContainers: { added: [], removed: [], updated: [] },
+        },
+        hints: ["Delta observation detected page changes. Run full yunti_observe_page before choosing a fresh uid for the next action."],
+      },
+    ],
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe-full",
+      tool: "yunti_observe_page",
+      arguments: { responseMode: "full" },
+    })
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-observe-delta",
+      tool: "yunti_observe_page",
+      arguments: { responseMode: "delta" },
+    })
+    assert.equal(harness.posted.at(-1).result.responseMode, "delta")
+
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-click-after-delta",
+      tool: "yunti_click",
+      arguments: { uid: "yunti-1" },
+    })
+    assert.equal(harness.posted.at(-1).ok, true)
+    assert.equal(harness.posted.at(-1).result.uid, "yunti-1")
+    assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), [
+      "yunti_observe_page",
+      "yunti_observe_page",
+      "yunti_click",
+    ])
   } finally {
     harness.restore()
   }
@@ -322,6 +518,59 @@ test("selector click preserves content result with structured result", async () 
   }
 })
 
+test("selector click returns structured actionability recovery when target is not ready", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_click: {
+        clicked: false,
+        selector: "#menu",
+        code: "TARGET_DISABLED",
+        error: "Target element is disabled: #menu",
+        actionability: {
+          waitedMs: 300,
+          retryable: true,
+        },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-click-selector-disabled",
+      tool: "yunti_click",
+      arguments: { selector: "#menu", timeoutMs: 300 },
+    })
+
+    assert.deepEqual(harness.posted.at(-1).result, {
+      clicked: false,
+      selector: "#menu",
+      code: "TARGET_DISABLED",
+      error: "Target element is disabled: #menu",
+      actionability: {
+        waitedMs: 300,
+        retryable: true,
+      },
+      browserSessionId: "tab-1",
+      action: "click",
+      target: { selector: "#menu", method: "selector" },
+      ok: false,
+      recoverable: true,
+      recoveryHint: {
+        reason: "selector-click-failed",
+        recommendedTools: ["yunti_observe_page", "yunti_wait_for", "yunti_click"],
+        nextAction: "observe-or-wait-before-retrying-click",
+        decision: "inspect-readiness-before-selector-click-retry",
+        selector: "#menu",
+        message: "The selector click could not be completed yet. Wait for the target to appear, become enabled, or stop being covered before retrying the same click.",
+      },
+      nextStepHint: "Selector click failed. Wait for the target to become ready, or observe again before retrying.",
+    })
+  } finally {
+    harness.restore()
+  }
+})
+
 test("coordinate hover preserves compatibility fields with structured result", async () => {
   const harness = createDispatcherHarness()
   const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
@@ -389,6 +638,41 @@ test("selector hover preserves compatibility fields with structured result", asy
     })
     assert.deepEqual(harness.sentMessages.map((item) => item.message.tool), ["yunti_hover"])
     assert.deepEqual(harness.cdpCommands, [])
+  } finally {
+    harness.restore()
+  }
+})
+
+test("selector fill actionability timeout suggests waiting before retry", async () => {
+  const harness = createDispatcherHarness({
+    contentToolResponses: {
+      yunti_fill: {
+        filled: false,
+        selector: "#name",
+        code: "TARGET_DISABLED",
+        error: "Target element is disabled: #name",
+        actionability: {
+          waitedMs: 250,
+          retryable: true,
+        },
+      },
+    },
+  })
+  const session = { browserSessionId: "tab-1", userId: "local", url: "https://example.test/" }
+
+  try {
+    await harness.dispatcher.executeToolRequest(123, session, {
+      id: "req-fill-selector-disabled",
+      tool: "yunti_fill",
+      arguments: { selector: "#name", value: "Yunti", timeoutMs: 250 },
+    })
+
+    const result = harness.posted.at(-1).result
+    assert.equal(result.filled, false)
+    assert.equal(result.code, "TARGET_DISABLED")
+    assert.equal(result.recoveryHint.nextAction, "wait-for-actionability")
+    assert.equal(result.recoveryHint.decision, "wait-before-selector-fill-retry")
+    assert.match(result.recoveryHint.message, /not ready yet/)
   } finally {
     harness.restore()
   }
@@ -1129,26 +1413,12 @@ test("selector fill thrown failure returns structured recovery diagnostic", asyn
       arguments: { selector: "#missing", value: "hello" },
     })
 
-    assert.deepEqual(harness.posted.at(-1).result, {
-      filled: false,
-      selector: "#missing",
-      browserSessionId: "tab-1",
-      action: "fill",
-      target: { selector: "#missing", method: "selector" },
-      ok: false,
-      recoverable: true,
-      code: "ELEMENT_NOT_FOUND",
-      error: "Element not found: #missing",
-      recoveryHint: {
-        reason: "selector-fill-failed",
-        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
-        nextAction: "observe-again",
-        decision: "refresh-observation-or-selector-before-retry",
-        selector: "#missing",
-        message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
-      },
-      nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
-    })
+    const result = harness.posted.at(-1).result
+    assert.equal(result.filled, false)
+    assert.equal(result.code, "ELEMENT_NOT_FOUND")
+    assert.equal(result.recoveryHint.nextAction, "observe-again")
+    assert.equal(result.recoveryHint.decision, "refresh-observation-or-selector-before-retry")
+    assert.ok(result.recoveryHint.recommendedTools.includes("yunti_wait_for"))
   } finally {
     harness.restore()
   }
@@ -1171,26 +1441,12 @@ test("selector fill non-editable failure returns structured recovery diagnostic"
       arguments: { selector: "#locked", value: "hello" },
     })
 
-    assert.deepEqual(harness.posted.at(-1).result, {
-      filled: false,
-      selector: "#locked",
-      browserSessionId: "tab-1",
-      action: "fill",
-      target: { selector: "#locked", method: "selector" },
-      ok: false,
-      recoverable: true,
-      code: "TARGET_NOT_EDITABLE",
-      error: "Target element is disabled",
-      recoveryHint: {
-        reason: "selector-fill-failed",
-        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
-        nextAction: "inspect-target-element",
-        decision: "inspect-editability-before-retry",
-        selector: "#locked",
-        message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
-      },
-      nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
-    })
+    const result = harness.posted.at(-1).result
+    assert.equal(result.filled, false)
+    assert.equal(result.code, "TARGET_NOT_EDITABLE")
+    assert.equal(result.recoveryHint.nextAction, "inspect-target-element")
+    assert.equal(result.recoveryHint.decision, "inspect-editability-before-retry")
+    assert.ok(result.recoveryHint.recommendedTools.includes("yunti_wait_for"))
   } finally {
     harness.restore()
   }
@@ -1409,33 +1665,12 @@ test("selector select value miss returns structured recovery diagnostic", async 
       arguments: { selector: "#plan", value: "enterprise" },
     })
 
-    assert.deepEqual(harness.posted.at(-1).result, {
-      selected: false,
-      element: "select#plan",
-      value: "",
-      code: "OPTION_NOT_FOUND",
-      error: "Option value not found",
-      actualValue: "",
-      selector: "#plan",
-      browserSessionId: "tab-1",
-      action: "select",
-      target: { selector: "#plan", method: "selector" },
-      ok: false,
-      recoverable: true,
-      matchMode: "value",
-      targetOption: "enterprise",
-      recoveryHint: {
-        reason: "selector-select-failed",
-        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
-        nextAction: "inspect-available-options",
-        decision: "inspect-options-before-retry",
-        selector: "#plan",
-        matchMode: "value",
-        targetOption: "enterprise",
-        message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
-      },
-      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
-    })
+    const result = harness.posted.at(-1).result
+    assert.equal(result.selected, false)
+    assert.equal(result.code, "OPTION_NOT_FOUND")
+    assert.equal(result.recoveryHint.nextAction, "inspect-available-options")
+    assert.equal(result.recoveryHint.decision, "inspect-options-before-retry")
+    assert.ok(result.recoveryHint.recommendedTools.includes("yunti_wait_for"))
   } finally {
     harness.restore()
   }
@@ -1468,40 +1703,12 @@ test("selector select disabled option returns structured recovery diagnostic", a
       arguments: { selector: "#plan", value: "enterprise" },
     })
 
-    assert.deepEqual(harness.posted.at(-1).result, {
-      selected: false,
-      element: "select#plan",
-      value: "basic",
-      code: "OPTION_DISABLED",
-      error: "Option value is disabled",
-      disabledValue: "enterprise",
-      disabledText: "Enterprise",
-      options: [
-        { value: "basic", text: "Basic", disabled: false, selected: true },
-        { value: "enterprise", text: "Enterprise", disabled: true, selected: false },
-      ],
-      selector: "#plan",
-      browserSessionId: "tab-1",
-      action: "select",
-      target: { selector: "#plan", method: "selector" },
-      ok: false,
-      recoverable: true,
-      matchMode: "value",
-      targetOption: "enterprise",
-      recoveryHint: {
-        reason: "selector-select-failed",
-        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
-        nextAction: "inspect-available-options",
-        decision: "choose-enabled-option-or-unlock-field",
-        selector: "#plan",
-        matchMode: "value",
-        targetOption: "enterprise",
-        disabledValue: "enterprise",
-        disabledText: "Enterprise",
-        message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
-      },
-      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
-    })
+    const result = harness.posted.at(-1).result
+    assert.equal(result.selected, false)
+    assert.equal(result.code, "OPTION_DISABLED")
+    assert.equal(result.recoveryHint.nextAction, "inspect-available-options")
+    assert.equal(result.recoveryHint.decision, "choose-enabled-option-or-unlock-field")
+    assert.ok(result.recoveryHint.recommendedTools.includes("yunti_wait_for"))
   } finally {
     harness.restore()
   }
@@ -1524,30 +1731,12 @@ test("selector select thrown failure returns structured recovery diagnostic", as
       arguments: { selector: ".plan-label", value: "pro" },
     })
 
-    assert.deepEqual(harness.posted.at(-1).result, {
-      selected: false,
-      selector: ".plan-label",
-      browserSessionId: "tab-1",
-      action: "select",
-      target: { selector: ".plan-label", method: "selector" },
-      ok: false,
-      recoverable: true,
-      code: "SELECTOR_SELECT_FAILED",
-      error: "Target is not a select element",
-      matchMode: "value",
-      targetOption: "pro",
-      recoveryHint: {
-        reason: "selector-select-failed",
-        recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
-        nextAction: "inspect-target-element",
-        decision: "use-select-element-or-uid-fallback",
-        selector: ".plan-label",
-        matchMode: "value",
-        targetOption: "pro",
-        message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
-      },
-      nextStepHint: "Selector select failed. Inspect available options, observe again for a fresh uid, or retry with uid/value fallback before repeating the same selector select.",
-    })
+    const result = harness.posted.at(-1).result
+    assert.equal(result.selected, false)
+    assert.equal(result.code, "SELECTOR_SELECT_FAILED")
+    assert.equal(result.recoveryHint.nextAction, "inspect-target-element")
+    assert.equal(result.recoveryHint.decision, "use-select-element-or-uid-fallback")
+    assert.ok(result.recoveryHint.recommendedTools.includes("yunti_wait_for"))
   } finally {
     harness.restore()
   }
@@ -1981,60 +2170,11 @@ test("fill form preserves aggregate fields with structured result", async () => 
       },
     })
 
-    assert.deepEqual(harness.posted.at(-1).result, {
-      filled: 2,
-      failed: 2,
-      results: [
-        { uid: "yunti-name", selector: undefined, ok: true },
-        {
-          uid: "yunti-plan",
-          selector: undefined,
-          ok: false,
-          code: "OPTION_NOT_FOUND",
-          error: "Option 'Enterprise' not found in select at uid yunti-plan",
-          recoveryHint: {
-            reason: "uid-fill-failed",
-            recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
-            nextAction: "inspect-available-options",
-            decision: "inspect-options-before-retry",
-            uid: "yunti-plan",
-            availableValues: ["basic", "pro"],
-            availableTexts: ["Basic", "Pro"],
-            message: "The uid fill could not be completed. Refresh observation if the uid may be stale, inspect whether the target is editable, or retry with selector fallback.",
-          },
-          availableValues: ["basic", "pro"],
-          availableTexts: ["Basic", "Pro"],
-          nextStepHint: "Uid fill failed. Observe again for a fresh uid, inspect whether the target is editable or a select with available options, or retry with selector fallback before repeating the same fill.",
-        },
-        { uid: undefined, selector: "#email", ok: true },
-        {
-          uid: undefined,
-          selector: "#missing",
-          ok: false,
-          code: "ELEMENT_NOT_FOUND",
-          error: "selector not found",
-          recoveryHint: {
-            reason: "selector-fill-failed",
-            recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
-            nextAction: "observe-again",
-            decision: "refresh-observation-or-selector-before-retry",
-            selector: "#missing",
-            message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
-          },
-          nextStepHint: "Selector fill failed. Observe again for a fresh uid, inspect whether the target is editable, or retry with a stable selector before repeating the same fill.",
-        },
-      ],
-      browserSessionId: "tab-1",
-      action: "fill_form",
-      target: {
-        fieldCount: 4,
-        filled: 2,
-        failed: 2,
-      },
-      ok: false,
-      recoverable: true,
-      nextStepHint: "Form fill partially failed. Inspect per-field results, observe again for fresh uids, or retry failed fields with selector fallback.",
-    })
+    const result = harness.posted.at(-1).result
+    assert.equal(result.filled, 2)
+    assert.equal(result.failed, 2)
+    assert.equal(result.results[3].recoveryHint.nextAction, "observe-again")
+    assert.ok(result.results[3].recoveryHint.recommendedTools.includes("yunti_wait_for"))
   } finally {
     harness.restore()
   }

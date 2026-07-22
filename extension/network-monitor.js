@@ -1,6 +1,6 @@
 import { DEFAULT_PLATFORM_MATCHES, isPlatformUrl } from "./settings.js"
 
-const HTTPS_NETWORK_FILTER = { urls: ["https://*/*"] }
+const NETWORK_FILTER = { urls: ["http://*/*", "https://*/*"] }
 const SENSITIVE_FIELD_RE =
   /cookie|authorization|token|secret|password|passwd|pwd|sid|session|ticket|tgc|captcha|验证码|密码/i
 
@@ -11,7 +11,7 @@ export function installNetworkMonitor({ sessionsByTab, postBridge, getPlatformMa
     (details) => {
       beginNetworkEvent({ details, sessionsByTab, networkRequests, getPlatformMatches })
     },
-    HTTPS_NETWORK_FILTER,
+    NETWORK_FILTER,
     ["requestBody"]
   )
 
@@ -24,7 +24,7 @@ export function installNetworkMonitor({ sessionsByTab, postBridge, getPlatformMa
       getPlatformMatches,
       postBridge,
     })
-  }, HTTPS_NETWORK_FILTER)
+  }, NETWORK_FILTER)
 
   chrome.webRequest.onErrorOccurred.addListener((details) => {
     finishNetworkEvent({
@@ -35,7 +35,7 @@ export function installNetworkMonitor({ sessionsByTab, postBridge, getPlatformMa
       getPlatformMatches,
       postBridge,
     })
-  }, HTTPS_NETWORK_FILTER)
+  }, NETWORK_FILTER)
 
   return { networkRequests }
 }

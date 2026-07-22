@@ -27,6 +27,11 @@ class FakeElement {
     this.scrollWidth = options.scrollWidth || this.rect.width
     this.clientHeight = options.clientHeight || this.rect.height
     this.clientWidth = options.clientWidth || this.rect.width
+    this.parentElement = options.parentElement || null
+    this.parentNode = options.parentNode || this.parentElement || null
+    this.shadowRoot = options.shadowRoot || null
+    this.contentDocument = options.contentDocument || null
+    this.contentWindow = options.contentWindow || (this.contentDocument ? { document: this.contentDocument } : null)
   }
 
   getAttribute(name) {
@@ -44,8 +49,25 @@ class FakeElement {
   }
 
   closest() {
+    let current = this.parentElement
+    while (current) {
+      if (matchesSelector(current, arguments[0])) return current
+      current = current.parentElement || null
+    }
     return null
   }
+
+  getRootNode() {
+    if (this.parentNode?.host) return this.parentNode
+    return this.parentNode || null
+  }
+}
+
+function matchesSelector(element, selector) {
+  if (!element || !selector) return false
+  if (selector === "label") return element.tagName?.toLowerCase?.() === "label"
+  if (selector.startsWith("#")) return element.id === selector.slice(1)
+  return false
 }
 
 class FakeAnchorElement extends FakeElement {
@@ -87,6 +109,43 @@ function createDocument(elements, options = {}) {
   }
 }
 
+function createShadowRoot(elements, options = {}) {
+  const root = {
+    host: options.host || null,
+    querySelector(selector) {
+      const labelFor = selector.match(/^label\[for="(.+)"\]$/)?.[1]
+      if (!labelFor) return null
+      return elements.find((element) => {
+        if (element.tagName?.toLowerCase?.() !== "label") return false
+        return element.getAttribute("for") === labelFor
+      }) || null
+    },
+    querySelectorAll(selector) {
+      if (selector === "body *") return flattenElements(elements)
+      return flattenElements(elements).filter(isInteractiveFakeElement)
+    },
+  }
+  for (const element of elements) {
+    if (element.parentNode == null) element.parentNode = root
+    if (element.parentElement == null && !root.host) element.parentElement = null
+  }
+  return root
+}
+
+function flattenElements(elements) {
+  const out = []
+  const queue = [...elements]
+  while (queue.length) {
+    const element = queue.shift()
+    if (!element) continue
+    out.push(element)
+    if (element.shadowRoot?.querySelectorAll) {
+      for (const child of element.shadowRoot.querySelectorAll("body *")) queue.push(child)
+    }
+  }
+  return out
+}
+
 function isInteractiveFakeElement(element) {
   const tag = element.tagName.toLowerCase()
   return (
@@ -122,6 +181,10 @@ function loadObserver({ document, location, viewport = {}, sessionId = "tab-1" }
 
 function elementNames(observation) {
   return Array.from(observation.elements, (element) => element.name)
+}
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value))
 }
 
 test("DOM observer returns fresh uids, text tree, and balanced redaction", () => {
@@ -425,4 +488,183 @@ test("DOM observer reports field fillability and select option summaries", () =>
     { value: "basic", text: "Basic", selected: true, disabled: false, valueRedacted: false },
     { value: "enterprise", text: "Enterprise", selected: false, disabled: false, valueRedacted: false },
   ])
+})
+
+test("DOM observer can find bounded interactive matches without full observation", () => {
+  const elements = [
+    new FakeElement("button", {}, {
+      innerText: "Save draft",
+      rect: { x: 20, y: 20, width: 120, height: 32 },
+    }),
+    new FakeElement("button", {}, {
+      innerText: "Submit order",
+      rect: { x: 20, y: 70, width: 120, height: 32 },
+    }),
+    new FakeElement("input", { placeholder: "Search orders" }, {
+      rect: { x: 20, y: 120, width: 180, height: 32 },
+    }),
+  ]
+  const observer = loadObserver({
+    document: createDocument(elements, { pageHeight: 900, viewportHeight: 600 }),
+    location: new URL("https://example.test/find"),
+    viewport: { width: 800, height: 600 },
+  })
+
+  const saveMatches = observer.findElements({ query: "save", role: "button" })
+  assert.equal(saveMatches.matchCount, 1)
+  assert.equal(saveMatches.matches[0].name, "Save draft")
+  assert.equal(saveMatches.matches[0].uid, "yunti-1")
+
+  const placeholderMatches = observer.findElements({ placeholder: "search", tag: "input" })
+  assert.equal(placeholderMatches.matchCount, 1)
+  assert.equal(placeholderMatches.matches[0].placeholder, "Search orders")
+
+  const none = observer.findElements({ query: "archive", maxResults: 2 })
+  assert.equal(none.matchCount, 0)
+  assert.match(none.hints[0], /No matching interactive elements/)
+})
+
+test("DOM observer includes open shadow-root interactive targets in observe and find", () => {
+  const shadowHost = new FakeElement("div", { id: "shadow-host" }, {
+    rect: { x: 10, y: 10, width: 300, height: 120 },
+  })
+  const shadowLabel = new FakeElement("label", { for: "shadow-input" }, {
+    innerText: "Shadow input",
+    textContent: "Shadow input",
+    parentElement: null,
+  })
+  const shadowInput = new FakeElement("input", { id: "shadow-input", placeholder: "Shadow search" }, {
+    rect: { x: 20, y: 20, width: 180, height: 32 },
+    parentElement: shadowLabel,
+  })
+  const shadowButton = new FakeElement("button", { id: "shadow-save" }, {
+    innerText: "Shadow save",
+    rect: { x: 20, y: 70, width: 120, height: 32 },
+  })
+  const shadowScrollable = new FakeElement("div", { id: "shadow-results", "aria-label": "Shadow results" }, {
+    rect: { x: 20, y: 110, width: 220, height: 120 },
+    style: { display: "block", visibility: "visible", opacity: "1", overflowY: "auto", overflowX: "hidden" },
+    scrollTop: 40,
+    scrollHeight: 420,
+    clientHeight: 120,
+  })
+  const shadowRoot = createShadowRoot([shadowLabel, shadowInput, shadowButton, shadowScrollable], { host: shadowHost })
+  shadowHost.shadowRoot = shadowRoot
+
+  const widgetHost = new FakeElement("div", { id: "yunti-browser-runtime-widget" }, {
+    rect: { x: 700, y: 500, width: 44, height: 44 },
+  })
+  const widgetButton = new FakeElement("button", {}, {
+    innerText: "Refresh connection",
+    rect: { x: 700, y: 500, width: 120, height: 32 },
+  })
+  const widgetRoot = createShadowRoot([widgetButton], { host: widgetHost })
+  widgetHost.shadowRoot = widgetRoot
+
+  const observer = loadObserver({
+    document: createDocument([shadowHost, widgetHost], { pageHeight: 1200, viewportHeight: 600 }),
+    location: new URL("https://example.test/shadow"),
+    viewport: { width: 800, height: 600 },
+  })
+
+  const observation = observer.observePage({ mode: "fullPage" })
+  assert.deepEqual(elementNames(observation), ["Shadow input", "Shadow save"])
+  assert.equal(observation.scrollableContainers.length, 1)
+  assert.equal(observation.scrollableContainers[0].name, "Shadow results")
+  assert.match(observation.textTree, /Shadow save/)
+  assert.equal(JSON.stringify(observation).includes("Refresh connection"), false)
+
+  const foundButton = observer.findElements({ query: "shadow save", role: "button" })
+  assert.equal(foundButton.matchCount, 1)
+  assert.equal(foundButton.matches[0].name, "Shadow save")
+
+  const foundInput = observer.findElements({ placeholder: "shadow", tag: "input" })
+  assert.equal(foundInput.matchCount, 1)
+  assert.equal(foundInput.matches[0].name, "Shadow input")
+})
+
+test("DOM observer includes same-origin iframe interactive targets in observe and find", () => {
+  const childButton = new FakeElement("button", { id: "child-action" }, {
+    innerText: "Child action",
+    rect: { x: 12, y: 18, width: 110, height: 32 },
+  })
+  const childInput = new FakeElement("input", { id: "child-input", placeholder: "Child search" }, {
+    rect: { x: 12, y: 60, width: 180, height: 32 },
+  })
+  const childScrollable = new FakeElement("div", { id: "child-results", "aria-label": "Child results" }, {
+    rect: { x: 12, y: 110, width: 220, height: 120 },
+    style: { display: "block", visibility: "visible", opacity: "1", overflowY: "auto", overflowX: "hidden" },
+    scrollTop: 50,
+    scrollHeight: 480,
+    clientHeight: 120,
+  })
+  const childDocument = createDocument([childButton, childInput, childScrollable], {
+    title: "Child frame",
+    pageHeight: 700,
+    viewportHeight: 280,
+  })
+  const frame = new FakeElement("iframe", { id: "child-frame", title: "child frame" }, {
+    rect: { x: 120, y: 200, width: 320, height: 260 },
+    contentDocument: childDocument,
+  })
+
+  const observer = loadObserver({
+    document: createDocument([frame], { pageHeight: 1400, viewportHeight: 600 }),
+    location: new URL("https://example.test/iframe-host"),
+    viewport: { width: 800, height: 600 },
+  })
+
+  const observation = observer.observePage({ mode: "fullPage" })
+  assert.deepEqual(elementNames(observation), ["Child action", "Child search"])
+  const childAction = observation.elements.find((element) => element.name === "Child action")
+  const childInputMatch = observation.elements.find((element) => element.name === "Child search")
+  assert.deepEqual(plain(childAction.rect), { x: 132, y: 218, width: 110, height: 32 })
+  assert.deepEqual(plain(childInputMatch.rect), { x: 132, y: 260, width: 180, height: 32 })
+  assert.equal(observation.scrollableContainers.length, 1)
+  assert.equal(observation.scrollableContainers[0].name, "Child results")
+  assert.deepEqual(plain(observation.scrollableContainers[0].rect), { x: 132, y: 310, width: 220, height: 120 })
+
+  const buttonMatches = observer.findElements({ query: "child action", role: "button" })
+  assert.equal(buttonMatches.matchCount, 1)
+  assert.equal(buttonMatches.matches[0].name, "Child action")
+  assert.deepEqual(plain(buttonMatches.matches[0].rect), { x: 132, y: 218, width: 110, height: 32 })
+
+  const inputMatches = observer.findElements({ placeholder: "child", tag: "input" })
+  assert.equal(inputMatches.matchCount, 1)
+  assert.equal(inputMatches.matches[0].name, "Child search")
+})
+
+test("DOM observer delta response returns a lighter change summary without full elements payload", () => {
+  const saveButton = new FakeElement("button", {}, {
+    innerText: "Save draft",
+    rect: { x: 20, y: 20, width: 120, height: 32 },
+  })
+  const observer = loadObserver({
+    document: createDocument([saveButton], { pageHeight: 900, viewportHeight: 600 }),
+    location: new URL("https://example.test/delta"),
+    viewport: { width: 800, height: 600 },
+  })
+
+  const first = observer.observePage({ responseMode: "full" })
+  assert.equal(first.responseMode, "full")
+  assert.equal(first.elements.length, 1)
+
+  saveButton.innerText = "Save changes"
+  saveButton.textContent = "Save changes"
+
+  const delta = observer.observePage({ responseMode: "delta" })
+  assert.equal(delta.responseMode, "delta")
+  assert.equal(delta.elements, undefined)
+  assert.equal(delta.textTree, undefined)
+  assert.equal(delta.delta.firstObservation, false)
+  assert.equal(delta.delta.textTreeChanged, true)
+  assert.ok(delta.delta.changedElementCount >= 1)
+  assert.ok(
+    delta.delta.changedElements.updated.length +
+      delta.delta.changedElements.added.length +
+      delta.delta.changedElements.removed.length >= 1
+  )
+  assert.equal(delta.baselineObservationId, first.observationId)
+  assert.match(delta.fullObservationHint, /responseMode=full/)
+  assert.match(delta.hints[0], /Run full yunti_observe_page/)
 })

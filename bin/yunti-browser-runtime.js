@@ -32,6 +32,10 @@ const commands = {
     script: join(rootDir, "scripts", "package-extension.js"),
     env: {},
   },
+  "soak-test": {
+    script: join(rootDir, "scripts", "soak-test.js"),
+    env: {},
+  },
 }
 
 if (command === "--help" || command === "-h" || command === "help") {
@@ -81,6 +85,7 @@ Commands:
   doctor             Run install and bridge diagnostics
   print-config       Print MCP configuration for an agent
   package-extension  Build the browser extension zip
+  soak-test          Run the 15-minute full-tool browser endurance test
 
 Examples:
   yunti-browser-runtime

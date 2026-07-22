@@ -18,21 +18,25 @@ Use this loop for normal page work:
 6. After every wait or action, call `yunti_observe_page` again.
 7. Verify the result using observe, snapshot, evaluate, screenshot, network, or
    console tools before assuming the task is done.
-8. If a uid/session/action result is stale or recoverable, follow
-   `code`, `recoveryHint`, and `nextStepHint` before retrying.
+8. If an operation fails, read `retryable`, `retryBudget`, `recoveryAction`,
+   and `resultUncertain`. Retry only when explicitly allowed by the shared budget.
 
 ## Recovery Rules
 
-- Stale route: `0.2.3+` first recovers a live tab through the controller. If the
-  old id cannot identify a live tab, list targets without it and pass the
-  intended `tabId` / `targetId` to the page tool.
+- Stale route: discard the stale id, list targets once, and spend the single
+  allowed retry on the selected live page route.
+- Protocol mismatch: `YUNTI_EXTENSION_PROTOCOL_MISMATCH` has `retryBudget=0`.
+  Reload the current extension and run doctor; do not probe with other tools.
+- Multiple browsers: use `browserInstanceId`, `browserFamily`, and
+  `routeBrowserSessionId` from target inventory. An ambiguous tab id is not
+  retryable until the intended browser instance is selected.
 - Edge sleeping tab: `0.2.4+` bounds content-script recovery and may briefly
   activate the target tab before restoring the user's previous tab. Do not ask
   the user to switch, refresh, or reopen the page unless this automatic recovery
   has failed because browser access is explicitly blocked.
 - Extension-side timeout: the controller poll remains independent from the
-  timed-out page operation. List targets and retry the intended live tab once
-  instead of treating the whole browser as disconnected.
+  timed-out page operation. Treat the result as uncertain and verify page state
+  before deciding whether another call is safe.
 - Stale uid: call `yunti_observe_page` again and use a fresh uid.
 - Async UI: call `yunti_wait_for`, then `yunti_observe_page`, then continue
   with a fresh uid.

@@ -13,6 +13,7 @@ const DEFAULT_CONTENT_SCRIPT_PROBE_TIMEOUT_MS = 1500
 const DEFAULT_CONTENT_SCRIPT_INJECTION_TIMEOUT_MS = 3000
 const DEFAULT_CONTROLLER_TOOL_TIMEOUT_MS = 25_000
 const DEFAULT_CONTROLLER_POLL_STALL_TIMEOUT_MS = 45_000
+export const EXTENSION_PROTOCOL_VERSION = 1
 
 export function createSessionManager(options = {}) {
   const contentScriptProbeTimeoutMs = normalizeTimeout(
@@ -67,6 +68,7 @@ export function createSessionManager(options = {}) {
     const settings = await getSettings()
     cachedPlatformMatches = settings.platformMatches
     const browserSessionId = await getBrowserControllerId()
+    const browserInstanceId = browserSessionId
     const liveTabIds = await currentLiveTabIds()
     const session = {
       browserSessionId,
@@ -77,12 +79,15 @@ export function createSessionManager(options = {}) {
       windowId: null,
       url: "browser://yunti-runtime",
       title: "Yunti Browser Runtime",
+      browserInstanceId,
       liveTabIds,
-      client: normalizeClientInfo(getBackgroundClientInfo()),
+      client: normalizeClientInfo(getBackgroundClientInfo(browserInstanceId)),
+      protocolVersion: EXTENSION_PROTOCOL_VERSION,
       capabilities: {
         singleControllerTransport: true,
         onDemandPageRecovery: true,
         stablePageSessionIds: true,
+        multiBrowserController: true,
       },
       auth: {
         state: "browser_controller",
@@ -443,10 +448,13 @@ export function createSessionManager(options = {}) {
       url: page.url,
       title: page.title || tab.title || platformLabelForUrl(page.url),
       active: Boolean(tab.active),
+      browserInstanceId: browserControllerId,
+      browserControllerSessionId: browserControllerId,
       client: normalizeClientInfo({
-        ...getBackgroundClientInfo(),
+        ...getBackgroundClientInfo(browserControllerId),
         ...(page.client || {}),
       }),
+      protocolVersion: EXTENSION_PROTOCOL_VERSION,
       auth: normalizePageAuth(page.auth, "content_script_register"),
       registeredAt: new Date().toISOString(),
     }
@@ -633,15 +641,19 @@ function normalizeClientInfo(client) {
   return {
     family: normalizeBrowserFamily(value.family || value.userAgent),
     extensionVersion: String(value.extensionVersion || "").slice(0, 80),
+    protocolVersion: Number(value.protocolVersion) || null,
+    browserInstanceId: String(value.browserInstanceId || "").slice(0, 160),
     userAgent: String(value.userAgent || "").slice(0, 500),
     platform: String(value.platform || "").slice(0, 120),
     language: String(value.language || "").slice(0, 80),
   }
 }
 
-function getBackgroundClientInfo() {
+function getBackgroundClientInfo(browserInstanceId = "") {
   return {
     extensionVersion: chrome.runtime?.getManifest?.().version || "",
+    protocolVersion: EXTENSION_PROTOCOL_VERSION,
+    browserInstanceId,
     userAgent: String(globalThis.navigator?.userAgent || ""),
     platform: String(globalThis.navigator?.platform || ""),
     language: String(globalThis.navigator?.language || ""),

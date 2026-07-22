@@ -26,10 +26,21 @@ export function toolOk(value) {
   }
 }
 
-export function toolError(message, detail = null) {
+export function toolError(message, options = {}) {
+  const detail = typeof options === "string" ? options : options.detail || null
   const payload = detail ? `${message}\n${detail}` : message
+  const failure = {
+    ok: false,
+    code: typeof options === "object" ? options.code || "YUNTI_TOOL_ERROR" : "YUNTI_TOOL_ERROR",
+    message,
+    retryable: typeof options === "object" ? Boolean(options.retryable) : false,
+    retryBudget: typeof options === "object" ? Number(options.retryBudget || 0) : 0,
+    recoveryAction: typeof options === "object" ? options.recoveryAction || "inspect_error" : "inspect_error",
+    resultUncertain: typeof options === "object" ? Boolean(options.resultUncertain) : false,
+  }
   return {
     isError: true,
     content: [{ type: "text", text: payload }],
+    structuredContent: failure,
   }
 }

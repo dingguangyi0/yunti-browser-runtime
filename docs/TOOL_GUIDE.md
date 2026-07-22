@@ -8,8 +8,8 @@
    target's `tabId` / `targetId` to the page tool for automatic recovery.
 4. Once `yunti_observe_page` is available in the connected runtime, prefer
    `observe -> act by fresh uid -> observe/verify` for page operations.
-5. If the session becomes stale, retry once so `0.2.3+` can recover its tab;
-   otherwise list targets without the stale id and use `tabId` / `targetId`.
+5. Read `retryable`, `retryBudget`, `recoveryAction`, and `resultUncertain`.
+   The entire recovery chain shares one budget; never retry an expired id.
 6. For multi-step page work, prefer one stable `browserSessionId` throughout the
    task.
 
@@ -19,9 +19,13 @@ previously active tab. Agents must not ask the user to refresh, switch tabs, or
 restart Edge before controller and explicit `tabId` / `targetId` recovery fail.
 One page timeout does not imply that the controller or whole browser is offline.
 
-The browser controller owns the single bridge polling channel. Page sessions are
+Each browser/profile controller owns one bridge polling channel. Page sessions are
 live-tab metadata, not independent polling connections. Stale-session errors
 include a reason and recovery hint; do not repeatedly retry an unknown/closed tab.
+
+In `0.2.5+`, Chrome, Edge, and separate profiles can coexist. Target rows include
+`browserInstanceId`, `browserFamily`, and `routeBrowserSessionId`. Protocol
+mismatch and ambiguous-browser errors have `retryBudget=0` and must not be retried.
 
 For the full P6.3.1 workflow contract and copyable prompt, see
 [Agent Workflow Contract](AGENT_WORKFLOW_CONTRACT.md).
@@ -143,7 +147,8 @@ taking an action whose effect cannot be verified from page state.
   `YUNTI_BROWSER_USER_ID`.
 - `browserSessionId` identifies a registered browser page route; the controller
   is a transport route and is not a page id.
-- In `0.2.3+`, one controller heartbeat keeps live-tab page metadata current.
+- In `0.2.5+`, one controller heartbeat per browser/profile keeps only that
+  instance's live-tab page metadata current.
   Page tools automatically recover a stale session from its tab id, or accept a
   `tabId` / `targetId` from `yunti_list_browser_targets` directly.
 - New tabs can return a new `browserSessionId`; use the returned value for

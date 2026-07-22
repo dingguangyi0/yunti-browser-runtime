@@ -174,6 +174,8 @@ export function createCdpController({
           browserSessionId: pageSession?.browserSessionId || null,
           pageSessionId: pageSession?.browserSessionId || null,
           routeBrowserSessionId: session.browserSessionId,
+          browserInstanceId: session.browserInstanceId || session.client?.browserInstanceId || "",
+          browserFamily: session.client?.family || "unknown",
           registered: Boolean(pageSession),
           targetId: target.targetId || "",
           tabId: target.tabId ?? null,
@@ -186,6 +188,9 @@ export function createCdpController({
       })
     return {
       browserSessionId: session.browserSessionId,
+      routeBrowserSessionId: session.browserSessionId,
+      browserInstanceId: session.browserInstanceId || session.client?.browserInstanceId || "",
+      browserFamily: session.client?.family || "unknown",
       pages,
       targets: targetInfos,
       targetInfos,

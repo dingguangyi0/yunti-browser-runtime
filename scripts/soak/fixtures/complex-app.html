@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Yunti Soak Operations Console</title>
+    <style>
+      :root { color-scheme: light; font-family: Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f5f7fa; color: #1c2430; }
+      header { background: #133c55; color: white; padding: 16px 24px; position: sticky; top: 0; z-index: 3; }
+      header h1 { font-size: 20px; margin: 0; }
+      main { display: grid; gap: 16px; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); padding: 18px; }
+      section { background: white; border: 1px solid #d8dee7; border-radius: 6px; padding: 16px; }
+      h2 { font-size: 16px; margin: 0 0 12px; }
+      .wide { grid-column: 1 / -1; }
+      .grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      label { display: grid; gap: 4px; font-size: 13px; }
+      input, select, textarea, button { font: inherit; min-height: 34px; }
+      button { background: #15616d; border: 0; border-radius: 4px; color: white; cursor: pointer; padding: 7px 12px; }
+      button:disabled { background: #9aa5b1; cursor: wait; }
+      .secondary { background: #4f5d75; }
+      .danger { background: #b23a48; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border-bottom: 1px solid #e5e9ef; padding: 8px; text-align: left; }
+      #scroll-panel { border: 1px solid #bbc4cf; height: 180px; overflow: auto; }
+      .scroll-row { align-items: center; border-bottom: 1px solid #edf0f4; display: flex; height: 70px; padding: 10px; }
+      #drag-board { display: flex; gap: 24px; min-height: 110px; }
+      #drag-card, #drop-zone { align-items: center; display: flex; justify-content: center; min-height: 90px; width: 160px; }
+      #drag-card { background: #ffca3a; border: 2px solid #d49d00; color: #222; cursor: grab; }
+      #drop-zone { border: 2px dashed #15616d; }
+      #tooltip { background: #222; color: white; display: none; padding: 6px; position: absolute; }
+      #hover-target:hover + #tooltip { display: block; }
+      #coordinate-target { height: 48px; width: 190px; }
+      iframe { border: 1px solid #bbc4cf; height: 120px; width: 100%; }
+      output { display: block; min-height: 24px; padding-top: 8px; }
+      #activity { font-family: monospace; white-space: pre-wrap; }
+      @media (max-width: 760px) { main { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
+    </style>
+  </head>
+  <body>
+    <header><h1>Yunti Soak Operations Console</h1></header>
+    <main>
+      <section>
+        <h2>Case Editor</h2>
+        <form id="case-form" class="grid">
+          <label>Owner <input id="owner" name="owner" placeholder="Owner name" /></label>
+          <label>Email <input id="email" name="email" type="email" placeholder="owner@example.test" /></label>
+          <label>Priority
+            <select id="priority" name="priority">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </label>
+          <label>Search <input id="search" name="search" placeholder="Filter cases" /></label>
+          <label style="grid-column: 1 / -1;">Notes <textarea id="notes" name="notes"></textarea></label>
+        </form>
+        <div class="toolbar">
+          <button id="save" type="button">Save case once</button>
+          <button id="async-action" type="button" disabled>Async ready action</button>
+          <button id="prompt-action" class="secondary" type="button">Open prompt</button>
+          <button id="hover-target" class="secondary" type="button">Hover details</button><span id="tooltip">Live tooltip</span>
+        </div>
+        <output id="form-result"></output>
+      </section>
+
+      <section>
+        <h2>Runtime State</h2>
+        <p id="selected-copy">Persistent selection context for the Yunti soak acceptance test.</p>
+        <button id="coordinate-target" type="button">Coordinate action</button>
+        <output id="coordinate-result"></output>
+        <div id="shadow-host"></div>
+      </section>
+
+      <section class="wide">
+        <h2>Live Work Queue</h2>
+        <div class="toolbar">
+          <button id="refresh-data" type="button">Refresh queue</button>
+          <button id="rerender" class="secondary" type="button">Rerender controls</button>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Status</th><th>Owner</th><th>Value</th></tr></thead>
+          <tbody id="queue-body"></tbody>
+        </table>
+        <output id="queue-result"></output>
+      </section>
+
+      <section>
+        <h2>Nested Scrolling</h2>
+        <div id="scroll-panel">
+          <div class="scroll-row">Queue row 1</div><div class="scroll-row">Queue row 2</div>
+          <div class="scroll-row">Queue row 3</div><div class="scroll-row">Queue row 4</div>
+          <div class="scroll-row">Queue row 5</div><div class="scroll-row">Queue row 6</div>
+          <div class="scroll-row">Queue row 7</div><div class="scroll-row"><button id="deep-action" type="button">Deep panel action</button></div>
+        </div>
+        <output id="scroll-result"></output>
+      </section>
+
+      <section>
+        <h2>Drag And Upload</h2>
+        <div id="drag-board">
+          <div id="drag-card" draggable="true">Drag case</div>
+          <div id="drop-zone">Drop here</div>
+        </div>
+        <label>Evidence <input id="upload" type="file" /></label>
+        <output id="asset-result"></output>
+      </section>
+
+      <section class="wide">
+        <h2>Embedded Surfaces</h2>
+        <iframe id="child-frame" src="/soak-child.html" title="Soak child frame"></iframe>
+      </section>
+
+      <section class="wide">
+        <h2>Activity</h2>
+        <div id="preview-target">Preview patch target</div>
+        <output id="activity"></output>
+      </section>
+    </main>
+    <script>
+      const state = window.__soakState = {
+        cycle: Number(new URL(location.href).searchParams.get("cycle") || 0),
+        saveCount: 0,
+        saveKeys: [],
+        asyncCount: 0,
+        coordinateCount: 0,
+        deepCount: 0,
+        dropCount: 0,
+        promptValue: "",
+        rerenderCount: 0,
+        networkLoads: 0,
+      };
+      const log = (message) => {
+        document.querySelector("#activity").textContent += message + "\n";
+        console.log("YUNTI_SOAK", message);
+      };
+      setTimeout(() => { document.querySelector("#async-action").disabled = false; }, 450);
+      document.querySelector("#save").addEventListener("click", async () => {
+        const key = "cycle-" + state.cycle;
+        if (state.saveKeys.includes(key)) return;
+        state.saveKeys.push(key);
+        state.saveCount += 1;
+        document.querySelector("#save").disabled = true;
+        const response = await fetch("/api/save", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ key, owner: document.querySelector("#owner").value }),
+        });
+        const payload = await response.json();
+        document.querySelector("#form-result").textContent = "Saved " + state.saveCount + " / " + payload.accepted;
+        log("saved:" + key);
+      });
+      document.querySelector("#async-action").addEventListener("click", () => {
+        state.asyncCount += 1;
+        setTimeout(() => { document.querySelector("#form-result").textContent = "Async complete " + state.asyncCount; }, 180);
+      });
+      document.querySelector("#prompt-action").addEventListener("click", () => {
+        state.promptValue = prompt("Soak prompt", "pending") || "dismissed";
+        document.querySelector("#form-result").textContent = "Prompt " + state.promptValue;
+      });
+      document.querySelector("#coordinate-target").addEventListener("click", () => {
+        state.coordinateCount += 1;
+        document.querySelector("#coordinate-result").textContent = "Coordinate clicked " + state.coordinateCount;
+      });
+      document.querySelector("#deep-action").addEventListener("click", () => {
+        state.deepCount += 1;
+        document.querySelector("#scroll-result").textContent = "Deep action " + state.deepCount;
+      });
+      document.querySelector("#refresh-data").addEventListener("click", loadQueue);
+      document.querySelector("#rerender").addEventListener("click", () => {
+        state.rerenderCount += 1;
+        const button = document.createElement("button");
+        button.id = "rerendered-action";
+        button.type = "button";
+        button.textContent = "Rerendered action " + state.rerenderCount;
+        button.addEventListener("click", () => { document.querySelector("#queue-result").textContent = "Rerender click " + state.rerenderCount; });
+        document.querySelector("#rerendered-action")?.remove();
+        document.querySelector("#queue-result").before(button);
+      });
+      async function loadQueue() {
+        const response = await fetch("/api/queue?cycle=" + state.cycle + "&load=" + state.networkLoads);
+        const payload = await response.json();
+        state.networkLoads += 1;
+        document.querySelector("#queue-body").innerHTML = payload.items.map((item) =>
+          `<tr><td>${item.id}</td><td>${item.status}</td><td>${item.owner}</td><td>${item.value}</td></tr>`
+        ).join("");
+        document.querySelector("#queue-result").textContent = "Loaded " + payload.items.length + " rows";
+        log("queue:" + state.networkLoads);
+      }
+      const dragCard = document.querySelector("#drag-card");
+      const dropZone = document.querySelector("#drop-zone");
+      dragCard.addEventListener("dragstart", (event) => event.dataTransfer.setData("text/plain", "case"));
+      dropZone.addEventListener("dragover", (event) => event.preventDefault());
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault(); state.dropCount += 1; dropZone.textContent = "Dropped " + state.dropCount;
+      });
+      document.querySelector("#upload").addEventListener("change", (event) => {
+        document.querySelector("#asset-result").textContent = event.target.files[0]?.name || "none";
+      });
+      const shadow = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
+      shadow.innerHTML = '<label>Shadow note <input id="shadow-note" /></label><button id="shadow-action" type="button">Shadow action</button><output id="shadow-result"></output>';
+      shadow.querySelector("#shadow-action").addEventListener("click", () => {
+        shadow.querySelector("#shadow-result").textContent = shadow.querySelector("#shadow-note").value || "shadow-ok";
+      });
+      loadQueue();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Benchmark Async UI</title>
+    <style>
+      #overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Async UI</h1>
+    <button id="render">Render later</button>
+    <button id="delayed-enable" disabled>Delayed enable</button>
+    <div id="spinner">Loading...</div>
+    <div id="overlay">Overlay</div>
+    <input id="search" />
+    <output id="result"></output>
+    <script>
+      setTimeout(() => {
+        document.querySelector("#delayed-enable").disabled = false;
+      }, 500);
+      setTimeout(() => {
+        document.querySelector("#spinner").remove();
+      }, 700);
+      setTimeout(() => {
+        document.querySelector("#overlay").remove();
+      }, 900);
+      document.querySelector("#render").addEventListener("click", () => {
+        setTimeout(() => {
+          document.querySelector("#result").textContent = "Rendered later";
+        }, 400);
+      });
+      document.querySelector("#search").addEventListener("input", (event) => {
+        clearTimeout(window.__searchTimer);
+        window.__searchTimer = setTimeout(() => {
+          document.querySelector("#result").textContent = "Result for " + event.target.value;
+        }, 300);
+      });
+    </script>
+  </body>
+</html>

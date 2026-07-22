@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Benchmark Form Controls</title>
+  </head>
+  <body>
+    <h1>Form Controls</h1>
+    <label>Name <input id="name" /></label>
+    <label>Notes <textarea id="notes"></textarea></label>
+    <label>Editable <div id="editable" contenteditable="true">Edit me</div></label>
+    <label>Plan
+      <select id="plan">
+        <option value="">Choose</option>
+        <option value="basic">Basic</option>
+        <option value="pro">Pro</option>
+      </select>
+    </label>
+    <label><input id="agree" type="checkbox" /> Agree</label>
+    <label><input id="tier-silver" name="tier" type="radio" value="silver" /> Silver</label>
+    <label><input id="tier-gold" name="tier" type="radio" value="gold" /> Gold</label>
+    <button id="save">Save form</button>
+    <output id="result"></output>
+    <script>
+      window.__saveCount = 0;
+      document.querySelector("#save").addEventListener("click", () => {
+        window.__saveCount += 1;
+        document.querySelector("#result").textContent = document.querySelector("#name").value;
+      });
+    </script>
+  </body>
+</html>

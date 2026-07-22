@@ -1,6 +1,8 @@
 const PATCH_ATTR = "data-yunti-browser-runtime-patch"
 const DANGEROUS_RE = /提交|保存|删除|作废|关闭|下架|审核|确认|同意|拒绝|submit|save|delete|remove|approve|reject/i
 const AUTH_CACHE_TTL_MS = 5000
+const DEFAULT_ACTIONABILITY_TIMEOUT_MS = 1200
+const ACTIONABILITY_POLL_INTERVAL_MS = 100
 
 const patchStore = new Map()
 let browserSessionId = null
@@ -368,6 +370,8 @@ async function executeTool(tool, args) {
   switch (tool) {
     case "yunti_observe_page":
       return observePage(args)
+    case "yunti_find_elements":
+      return findElements(args)
     case "yunti_get_page_snapshot":
       return getPageSnapshot(args)
     case "yunti_get_selected_context":
@@ -407,6 +411,14 @@ function observePage(args = {}) {
   }
   window.__YUNTI_BROWSER_SESSION_ID__ = browserSessionId
   return window.YuntiBrowserRuntimeObserver.observePage(args)
+}
+
+function findElements(args = {}) {
+  if (!window.YuntiBrowserRuntimeObserver?.findElements) {
+    throw new Error("yunti_find_elements is unavailable because the DOM observer module was not loaded. Refresh the page and try again.")
+  }
+  window.__YUNTI_BROWSER_SESSION_ID__ = browserSessionId
+  return window.YuntiBrowserRuntimeObserver.findElements(args)
 }
 
 async function getPageSnapshot(args = {}) {
@@ -549,12 +561,23 @@ function rollbackPreviewPatch(patchId) {
   return { restored, remainingPatchIds: [...patchStore.keys()] }
 }
 
-function clickElement(args) {
+async function clickElement(args) {
   if (args.selector) {
-    const element = mustFind(args.selector)
+    const resolved = await resolveActionableSelector(args.selector, {
+      timeoutMs: args.timeoutMs,
+      action: "click",
+      requireEnabled: true,
+      requireReceivesEvents: true,
+    })
+    if (!resolved.ok) return buildActionabilityFailureResult(args.selector, "click", resolved)
+    const element = resolved.element
     element.scrollIntoView({ block: "center", inline: "center" })
     element.click()
-    return { clicked: true, element: describeElement(element) }
+    return {
+      clicked: true,
+      element: describeElement(element),
+      actionability: buildActionabilitySummary(resolved),
+    }
   }
   return clickAt(args)
 }
@@ -562,7 +585,7 @@ function clickElement(args) {
 function clickAt(args) {
   const x = clamp(Number(args.x), 0, Math.max(0, window.innerWidth - 1))
   const y = clamp(Number(args.y), 0, Math.max(0, window.innerHeight - 1))
-  const element = document.elementFromPoint(x, y)
+  const element = resolveElementFromViewportPoint(x, y)
   if (!element) throw new Error(`No element found at viewport coordinate ${x},${y}`)
   focusElement(element)
   dispatchPointerMouseSequence(element, x, y)
@@ -574,8 +597,23 @@ function clickAt(args) {
   }
 }
 
-function hoverElement(args) {
-  const element = resolveTargetElement(args)
+async function hoverElement(args) {
+  const selector = String(args.selector || "").trim()
+  let actionability = undefined
+  let element
+  if (selector) {
+    const resolved = await resolveActionableSelector(selector, {
+      timeoutMs: args.timeoutMs,
+      action: "hover",
+      requireEnabled: false,
+      requireReceivesEvents: true,
+    })
+    if (!resolved.ok) return buildActionabilityFailureResult(selector, "hover", resolved)
+    element = resolved.element
+    actionability = buildActionabilitySummary(resolved)
+  } else {
+    element = resolveTargetElement(args)
+  }
   if (!element) throw new Error("yunti_hover requires selector or x/y coordinates")
   element.scrollIntoView({ block: "center", inline: "center" })
   const rect = element.getBoundingClientRect()
@@ -588,11 +626,28 @@ function hoverElement(args) {
     x: Math.round(x),
     y: Math.round(y),
     element: describeElement(element),
+    ...(actionability ? { actionability } : {}),
   }
 }
 
-function fillElement(args) {
-  const element = resolveTargetElement(args)
+async function fillElement(args) {
+  const selector = String(args.selector || "").trim()
+  let actionability = undefined
+  let element
+  if (selector) {
+    const resolved = await resolveActionableSelector(selector, {
+      timeoutMs: args.timeoutMs,
+      action: "fill",
+      requireEditable: true,
+      requireEnabled: true,
+      requireReceivesEvents: true,
+    })
+    if (!resolved.ok) return buildActionabilityFailureResult(selector, "fill", resolved)
+    element = resolved.element
+    actionability = buildActionabilitySummary(resolved)
+  } else {
+    element = resolveTargetElement(args)
+  }
   if (!element) throw new Error("yunti_fill requires selector or x/y coordinates")
   const value = String(args.value ?? "")
   element.scrollIntoView({ block: "center", inline: "center" })
@@ -603,12 +658,26 @@ function fillElement(args) {
     valueLength: value.length,
     valueApplied: getEditableText(element) === value,
     method: element.isContentEditable ? "contenteditable" : element instanceof HTMLSelectElement ? "select" : "dom",
+    ...(actionability ? { actionability } : {}),
   }
 }
 
-function typeText(args) {
+async function typeText(args) {
   const text = String(args.text ?? "")
-  const element = resolveTargetElement(args) || document.activeElement
+  let element
+  if (args.selector) {
+    const resolved = await resolveActionableSelector(String(args.selector), {
+      timeoutMs: args.timeoutMs,
+      action: "type_text",
+      requireEditable: true,
+      requireEnabled: true,
+      requireReceivesEvents: true,
+    })
+    if (!resolved.ok) return buildActionabilityFailureResult(String(args.selector), "type_text", resolved)
+    element = resolved.element
+  } else {
+    element = resolveTargetElement(args) || document.activeElement
+  }
   if (!element || element === document.body || element === document.documentElement) {
     throw new Error("No editable target is focused; pass selector or x/y")
   }
@@ -622,10 +691,22 @@ function typeText(args) {
   }
 }
 
-function pressKey(args) {
+async function pressKey(args) {
   const key = String(args.key || "")
   if (!key) throw new Error("key is required")
-  const element = resolveTargetElement(args) || document.activeElement || document.body
+  let element
+  if (args.selector) {
+    const resolved = await resolveActionableSelector(String(args.selector), {
+      timeoutMs: args.timeoutMs,
+      action: "press_key",
+      requireEnabled: true,
+      requireReceivesEvents: true,
+    })
+    if (!resolved.ok) return buildActionabilityFailureResult(String(args.selector), "press_key", resolved)
+    element = resolved.element
+  } else {
+    element = resolveTargetElement(args) || document.activeElement || document.body
+  }
   focusElement(element)
   const beforeValue = getEditableText(element)
   dispatchKeyboardEvent(element, "keydown", key)
@@ -640,8 +721,24 @@ function pressKey(args) {
   }
 }
 
-function selectElement(args) {
-  const element = resolveTargetElement(args)
+async function selectElement(args) {
+  const selector = String(args.selector || "").trim()
+  let actionability = undefined
+  let element
+  if (selector) {
+    const resolved = await resolveActionableSelector(selector, {
+      timeoutMs: args.timeoutMs,
+      action: "select",
+      requireEnabled: true,
+      requireReceivesEvents: true,
+      requireTag: "select",
+    })
+    if (!resolved.ok) return buildActionabilityFailureResult(selector, "select", resolved)
+    element = resolved.element
+    actionability = buildActionabilitySummary(resolved)
+  } else {
+    element = resolveTargetElement(args)
+  }
   if (!element) throw new Error("yunti_select requires selector or x/y coordinates")
   if (!(element instanceof HTMLSelectElement)) throw new Error("Target is not a select element")
   const value = String(args.value ?? "")
@@ -662,6 +759,7 @@ function selectElement(args) {
       availableValues: options.map((item) => item.value).slice(0, 50),
       availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
       options: summarizeSelectOptions(options),
+      ...(actionability ? { actionability } : {}),
     }
   }
   if (option?.disabled) {
@@ -678,6 +776,7 @@ function selectElement(args) {
       availableValues: options.map((item) => item.value).slice(0, 50),
       availableTexts: options.map((item) => item.text.trim()).slice(0, 50),
       options: summarizeSelectOptions(options),
+      ...(actionability ? { actionability } : {}),
     }
   }
   element.value = option.value
@@ -689,6 +788,7 @@ function selectElement(args) {
     value: element.value,
     text: option.text.trim(),
     selectedIndex: element.selectedIndex,
+    ...(actionability ? { actionability } : {}),
   }
 }
 
@@ -700,7 +800,7 @@ function scrollPage(args) {
   const coordinateY = hasCoordinateTarget ? clamp(Number(args.y), 0, Math.max(0, window.innerHeight - 1)) : undefined
   const coordinateTarget =
     hasCoordinateTarget
-      ? document.elementFromPoint(coordinateX, coordinateY)
+      ? resolveElementFromViewportPoint(coordinateX, coordinateY)
       : null
   const scrollableAncestor = findScrollableAncestor(coordinateTarget)
   const target = scrollableAncestor || document.scrollingElement || document.documentElement
@@ -734,15 +834,222 @@ function requestUserConfirmation(args) {
   return { approved }
 }
 
+async function resolveActionableSelector(selector, requirements = {}) {
+  const timeoutMs = Number.isFinite(Number(requirements.timeoutMs))
+    ? Math.max(0, Math.min(5000, Number(requirements.timeoutMs)))
+    : DEFAULT_ACTIONABILITY_TIMEOUT_MS
+  const startTime = Date.now()
+  let lastFailure = {
+    ok: false,
+    code: "ELEMENT_NOT_FOUND",
+    error: `Element not found: ${selector}`,
+  }
+
+  while (Date.now() - startTime <= timeoutMs) {
+    const element = document.querySelector(selector)
+    const evaluation = evaluateActionability(element, selector, requirements)
+    if (evaluation.ok) {
+      evaluation.waitedMs = Date.now() - startTime
+      return evaluation
+    }
+    lastFailure = evaluation
+    if (!evaluation.retryable) break
+    await delay(ACTIONABILITY_POLL_INTERVAL_MS)
+  }
+
+  return {
+    ...lastFailure,
+    waitedMs: Math.min(timeoutMs, Date.now() - startTime),
+  }
+}
+
+function evaluateActionability(element, selector, requirements = {}) {
+  if (!element) {
+    return {
+      ok: false,
+      code: "ELEMENT_NOT_FOUND",
+      error: `Element not found: ${selector}`,
+      retryable: true,
+    }
+  }
+
+  const style = getComputedStyle(element)
+  const rect = element.getBoundingClientRect()
+  const hidden = Boolean(
+    element.hidden ||
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      Number(style.opacity) === 0 ||
+      rect.width <= 0 ||
+      rect.height <= 0
+  )
+  if (hidden) {
+    return {
+      ok: false,
+      code: "TARGET_HIDDEN",
+      error: `Target element is hidden or has no size: ${selector}`,
+      retryable: true,
+    }
+  }
+
+  if (requirements.requireTag) {
+    const actualTag = String(element.tagName || "").toLowerCase()
+    if (actualTag !== String(requirements.requireTag).toLowerCase()) {
+      return {
+        ok: false,
+        code: "TARGET_WRONG_TAG",
+        error: `Target element is not a ${requirements.requireTag}: ${selector}`,
+        retryable: false,
+      }
+    }
+  }
+
+  const disabled = Boolean(element.disabled || element.getAttribute("aria-disabled") === "true")
+  if (requirements.requireEnabled && disabled) {
+    return {
+      ok: false,
+      code: "TARGET_DISABLED",
+      error: `Target element is disabled: ${selector}`,
+      retryable: true,
+    }
+  }
+
+  const readOnly = Boolean(element.readOnly || element.getAttribute("aria-readonly") === "true")
+  if (requirements.requireEditable) {
+    const editability = evaluateEditability(element)
+    if (!editability.ok) {
+      return {
+        ok: false,
+        code: editability.code,
+        error: editability.error,
+        retryable: editability.retryable,
+      }
+    }
+    if (readOnly) {
+      return {
+        ok: false,
+        code: "TARGET_READONLY",
+        error: `Target element is readonly: ${selector}`,
+        retryable: true,
+      }
+    }
+  }
+
+  if (requirements.requireReceivesEvents) {
+    const centerX = clamp(rect.left + rect.width / 2, 0, Math.max(0, window.innerWidth - 1))
+    const centerY = clamp(rect.top + rect.height / 2, 0, Math.max(0, window.innerHeight - 1))
+    const hit = resolveElementFromViewportPoint(centerX, centerY)
+    if (hit && hit !== element && !element.contains?.(hit)) {
+      return {
+        ok: false,
+        code: "TARGET_OBSCURED",
+        error: `Target element is not receiving pointer events at its center: ${selector}`,
+        retryable: true,
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    element,
+  }
+}
+
+function evaluateEditability(element) {
+  if (!element) {
+    return {
+      ok: false,
+      code: "TARGET_NOT_EDITABLE",
+      error: "No editable target is focused",
+      retryable: true,
+    }
+  }
+  const tag = element.tagName.toLowerCase()
+  const type = String(element.type || "").toLowerCase()
+  if (element.isContentEditable) return { ok: true }
+  if ("value" in element) {
+    if (tag === "input" && ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"].includes(type)) {
+      return {
+        ok: false,
+        code: "TARGET_NOT_EDITABLE",
+        error: `Target input type ${type} is not editable`,
+        retryable: false,
+      }
+    }
+    return { ok: true }
+  }
+  return {
+    ok: false,
+    code: "TARGET_NOT_EDITABLE",
+    error: "Target element is not editable",
+    retryable: false,
+  }
+}
+
+function buildActionabilitySummary(result = {}) {
+  return {
+    waitedMs: Math.max(0, Number(result.waitedMs || 0)),
+    checks: ["visible", "enabled", "receives-events"],
+  }
+}
+
+function buildActionabilityFailureResult(selector, action, result = {}) {
+  const reason = String(result.code || "ACTIONABILITY_FAILED")
+  const retryable = result.retryable !== false
+  const field = action === "click" ? "clicked"
+    : action === "hover" ? "hovered"
+    : action === "fill" ? "filled"
+    : action === "select" ? "selected"
+    : action === "type_text" ? "typed"
+    : action === "press_key" ? "pressed"
+    : action
+  return {
+    [field]: false,
+    selector,
+    code: reason,
+    error: result.error || `Selector ${action} failed`,
+    actionability: {
+      waitedMs: Math.max(0, Number(result.waitedMs || 0)),
+      retryable,
+    },
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function resolveTargetElement(args = {}) {
   if (args.selector) return mustFind(args.selector)
   if (Number.isFinite(Number(args.x)) && Number.isFinite(Number(args.y))) {
-    return document.elementFromPoint(
+    return resolveElementFromViewportPoint(
       clamp(Number(args.x), 0, Math.max(0, window.innerWidth - 1)),
       clamp(Number(args.y), 0, Math.max(0, window.innerHeight - 1))
     )
   }
   return null
+}
+
+function resolveElementFromViewportPoint(x, y, rootDocument = document) {
+  const root = rootDocument || document
+  const hit = typeof root.elementFromPoint === "function" ? root.elementFromPoint(x, y) : null
+  if (!hit) return null
+  const frameDocument = getSameOriginFrameDocument(hit)
+  if (!frameDocument) return hit
+  const frameRect = hit.getBoundingClientRect()
+  const childX = clamp(x - frameRect.left, 0, Math.max(0, frameRect.width - 1))
+  const childY = clamp(y - frameRect.top, 0, Math.max(0, frameRect.height - 1))
+  return resolveElementFromViewportPoint(childX, childY, frameDocument) || hit
+}
+
+function getSameOriginFrameDocument(element) {
+  if (!element || element.tagName?.toLowerCase?.() !== "iframe") return null
+  try {
+    const frameDocument = element.contentDocument || element.contentWindow?.document || null
+    return typeof frameDocument?.elementFromPoint === "function" ? frameDocument : null
+  } catch {
+    return null
+  }
 }
 
 function summarizeSelectOptions(options) {

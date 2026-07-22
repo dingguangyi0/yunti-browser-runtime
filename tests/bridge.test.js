@@ -1,9 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
+import { createServer } from "node:http"
 import {
   BRIDGE_TOKEN_HEADER,
   BridgeHub,
+  CURRENT_EXTENSION_PROTOCOL_VERSION,
   handleJsonRpc,
   startBridgeServer,
   TOOLS,
@@ -138,7 +140,12 @@ test("local runtime console exposes an optional page and sanitized state", async
         title: "Checkout owner@example.test",
         url: "https://shop.example.test/cart?token=secret-token-1234567890",
         tabId: 7,
-        client: { family: "chrome", extensionVersion: PACKAGE_VERSION },
+        client: {
+          family: "chrome",
+          extensionVersion: PACKAGE_VERSION,
+          protocolVersion: CURRENT_EXTENSION_PROTOCOL_VERSION,
+        },
+        protocolVersion: CURRENT_EXTENSION_PROTOCOL_VERSION,
       }),
     })
 
@@ -513,15 +520,184 @@ test("controller inventory removes closed tabs and fresh page registration repla
   assert.equal(hub.sessions.has("fresh-page"), false)
 })
 
-test("fresh controller registration replaces an older controller for the same user", () => {
+test("fresh controller registration replaces only the same browser instance", () => {
   const hub = new BridgeHub()
-  hub.registerSession({ browserSessionId: "controller-old", userId: "u1", kind: "browser_controller" })
-  hub.registerSession({ browserSessionId: "controller-new", userId: "u1", kind: "browser_controller" })
+  hub.registerSession({
+    browserSessionId: "controller-old",
+    browserInstanceId: "chrome-profile-1",
+    userId: "u1",
+    kind: "browser_controller",
+  })
+  hub.registerSession({
+    browserSessionId: "controller-new",
+    browserInstanceId: "chrome-profile-1",
+    userId: "u1",
+    kind: "browser_controller",
+  })
 
   assert.equal(hub.sessions.has("controller-old"), false)
   assert.equal(hub.sessions.has("controller-new"), true)
   assert.equal(hub.health({ userId: "u1" }).controllerCount, 1)
   assert.equal(hub.health({ userId: "u1" }).browserControllerSessionId, "controller-new")
+})
+
+test("Chrome and Edge controllers coexist and route their own page sessions", async () => {
+  const hub = new BridgeHub()
+  for (const [browserSessionId, browserInstanceId, family] of [
+    ["controller-chrome", "chrome-profile-1", "chrome"],
+    ["controller-edge", "edge-profile-1", "edge"],
+  ]) {
+    hub.registerSession({
+      browserSessionId,
+      browserInstanceId,
+      userId: "u1",
+      kind: "browser_controller",
+      liveTabIds: [7],
+      client: { family },
+      capabilities: { singleControllerTransport: true },
+    })
+    hub.registerSession({
+      browserSessionId: `yunti-page-7-${browserInstanceId}`,
+      browserControllerSessionId: browserSessionId,
+      browserInstanceId,
+      userId: "u1",
+      kind: "page",
+      tabId: 7,
+      client: { family },
+    })
+  }
+
+  const health = hub.health({ userId: "u1" })
+  assert.equal(health.controllerCount, 2)
+  assert.equal(health.pageSessionCount, 2)
+  assert.deepEqual(
+    new Set(health.browserControllerSessionIds),
+    new Set(["controller-chrome", "controller-edge"])
+  )
+
+  const call = hub.callTool("yunti_observe_page", {
+    browserSessionId: "yunti-page-7-chrome-profile-1",
+    userId: "u1",
+  }, 1000)
+  const event = await hub.poll("controller-chrome", 100)
+  assert.equal(event.route.browserSessionId, "yunti-page-7-chrome-profile-1")
+  hub.submitResult({
+    browserSessionId: "controller-chrome",
+    requestId: event.id,
+    ok: true,
+    result: { browserFamily: "chrome" },
+  })
+  assert.equal((await call).browserFamily, "chrome")
+  assert.equal(hub.sessions.get("controller-edge").queue.length, 0)
+
+  const inventoryCall = hub.callTool("yunti_list_browser_targets", { userId: "u1" }, 1000)
+  const [chromeInventoryEvent, edgeInventoryEvent] = await Promise.all([
+    hub.poll("controller-chrome", 100),
+    hub.poll("controller-edge", 100),
+  ])
+  hub.submitResult({
+    browserSessionId: "controller-chrome",
+    requestId: chromeInventoryEvent.id,
+    ok: true,
+    result: {
+      pages: [{ tabId: 7, title: "Chrome page" }],
+      targets: [{ targetId: "tab-7", tabId: 7, type: "page" }],
+    },
+  })
+  hub.submitResult({
+    browserSessionId: "controller-edge",
+    requestId: edgeInventoryEvent.id,
+    ok: true,
+    result: {
+      pages: [{ tabId: 7, title: "Edge page" }],
+      targets: [{ targetId: "tab-7", tabId: 7, type: "page" }],
+    },
+  })
+  const inventory = await inventoryCall
+  assert.equal(inventory.multiBrowser, true)
+  assert.equal(inventory.browserCount, 2)
+  assert.equal(inventory.pages.length, 2)
+  assert.deepEqual(
+    new Set(inventory.pages.map((page) => page.browserFamily)),
+    new Set(["chrome", "edge"])
+  )
+
+  hub.registerSession({
+    browserSessionId: "controller-chrome",
+    browserInstanceId: "chrome-profile-1",
+    userId: "u1",
+    kind: "browser_controller",
+    liveTabIds: [],
+    client: { family: "chrome" },
+    capabilities: { singleControllerTransport: true },
+  })
+  assert.equal(hub.sessions.has("yunti-page-7-chrome-profile-1"), false)
+  assert.equal(hub.sessions.has("yunti-page-7-edge-profile-1"), true)
+})
+
+test("protocol mismatch fails before a browser request is queued", async () => {
+  const hub = new BridgeHub({
+    expectedExtensionVersion: PACKAGE_VERSION,
+    expectedProtocolVersion: CURRENT_EXTENSION_PROTOCOL_VERSION,
+  })
+  hub.registerSession({
+    browserSessionId: "controller-old",
+    browserInstanceId: "chrome-profile-old",
+    userId: "u1",
+    kind: "browser_controller",
+    client: { family: "chrome", extensionVersion: "0.2.2" },
+    capabilities: { singleControllerTransport: true },
+  })
+
+  assert.equal(hub.health({ userId: "u1" }).compatibility.ok, false)
+  await assert.rejects(
+    hub.callTool("yunti_list_browser_targets", { userId: "u1" }, 1000),
+    /YUNTI_EXTENSION_PROTOCOL_MISMATCH.*retryBudget=0/
+  )
+  assert.equal(hub.sessions.get("controller-old").queue.length, 0)
+
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 25,
+    method: "tools/call",
+    params: { name: "yunti_list_browser_targets", arguments: { userId: "u1" } },
+  }, { mode: "owner", hub })
+  assert.equal(response.result.isError, true)
+  assert.equal(
+    response.result.structuredContent.code,
+    "YUNTI_EXTENSION_PROTOCOL_MISMATCH"
+  )
+  assert.equal(response.result.structuredContent.retryable, false)
+  assert.equal(response.result.structuredContent.retryBudget, 0)
+})
+
+test("proxy MCP fails fast when an older bridge still owns the port", async () => {
+  const oldBridge = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" })
+    res.end(JSON.stringify({
+      ok: true,
+      runtime: { version: "0.2.4", expectedExtensionVersion: "0.2.4" },
+    }))
+  })
+  await new Promise((resolve) => oldBridge.listen(0, "127.0.0.1", resolve))
+  const port = oldBridge.address().port
+  try {
+    const response = await handleJsonRpc({
+      jsonrpc: "2.0",
+      id: 26,
+      method: "tools/call",
+      params: { name: "yunti_list_browser_targets", arguments: { userId: "u1" } },
+    }, { mode: "proxy", port, bridgeToken: "" })
+    assert.equal(response.result.isError, true)
+    assert.equal(
+      response.result.structuredContent.code,
+      "YUNTI_BRIDGE_RUNTIME_MISMATCH"
+    )
+    assert.equal(response.result.structuredContent.retryable, false)
+    assert.equal(response.result.structuredContent.retryBudget, 0)
+  } finally {
+    await new Promise((resolve) => oldBridge.close(resolve))
+  }
 })
 
 test("browser controller heartbeat does not replace the active page route", async () => {
@@ -656,6 +832,7 @@ test("yunti-browser-runtime keeps the complete core tool surface", async () => {
   const requiredTools = [
     "yunti_get_tool_usage_hints",
     "yunti_observe_page",
+    "yunti_find_elements",
     "yunti_get_page_snapshot",
     "yunti_get_selected_context",
     "yunti_fetch_with_cookie",
@@ -911,7 +1088,7 @@ test("mcp usage hints include P3.2 parameter guidance for fill and CDP", async (
 
   assert.equal(fillResponse.result.isError, undefined)
   const fillPayload = JSON.parse(fillResponse.result.content[0].text)
-  assert.equal(fillPayload.version, "2026-07-17")
+  assert.equal(fillPayload.version, "2026-07-22")
   assert.equal(fillPayload.tools.yunti_fill.schema.required.includes("value"), true)
   assert.match(fillPayload.tools.yunti_fill.notes.join("\n"), /Coordinate-only fill is not supported/)
 
@@ -992,11 +1169,34 @@ test("mcp usage hints include observe-first page operation guidance", async () =
   const schema = payload.tools.yunti_observe_page.schema
 
   assert.ok(schema.properties.mode.enum.includes("viewport"))
+  assert.ok(schema.properties.responseMode.enum.includes("full"))
+  assert.ok(schema.properties.responseMode.enum.includes("delta"))
   assert.ok(schema.properties.redaction.enum.includes("balanced"))
   assert.ok(schema.properties.redaction.enum.includes("strict"))
   assert.ok(schema.properties.redaction.enum.includes("off"))
   assert.match(payload.tools.yunti_observe_page.notes.join("\n"), /fresh for the latest observation/)
+  assert.match(payload.tools.yunti_observe_page.notes.join("\n"), /responseMode=delta/)
   assert.match(payload.tools.yunti_observe_page.commonMistakes.join("\n"), /permanent selectors/)
+  assert.match(payload.tools.yunti_observe_page.commonMistakes.join("\n"), /responseMode=delta as a full replacement/)
+})
+
+test("mcp usage hints expose targeted find guidance", async () => {
+  const response = await handleJsonRpc({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: {
+      name: "yunti_get_tool_usage_hints",
+      arguments: { tool: "yunti_find_elements" },
+    },
+  }, { mode: "owner", hub: new BridgeHub() })
+
+  assert.equal(response.result.isError, undefined)
+  const payload = JSON.parse(response.result.content[0].text)
+  const schema = payload.tools.yunti_find_elements.schema
+  assert.equal(schema.properties.maxResults.maximum, 50)
+  assert.match(payload.tools.yunti_find_elements.notes.join("\n"), /full-page observation would be too large/)
+  assert.match(payload.tools.yunti_find_elements.commonMistakes.join("\n"), /full-page verification/)
 })
 
 test("mcp usage hints treat CDP as an unrestricted first-class backend", async () => {
@@ -1174,10 +1374,12 @@ test("mcp usage hints expose default agent workflow contract", async () => {
     "yunti_get_tool_usage_hints",
     "yunti_list_browser_targets",
     "yunti_observe_page",
+    "yunti_find_elements",
     "yunti_wait_for",
   ])
   assert.match(defaultWorkflow, /yunti_list_browser_targets/)
   assert.match(defaultWorkflow, /yunti_observe_page/)
+  assert.match(defaultWorkflow, /yunti_find_elements/)
   assert.match(defaultWorkflow, /fresh uid/)
   assert.match(defaultWorkflow, /yunti_wait_for/)
   assert.match(defaultWorkflow, /recoveryHint/)
@@ -1209,7 +1411,10 @@ test("mcp usage hints expose minimal browser workflow use cases", async () => {
     "scrollToFind",
     "switchTab",
     "waitForAsyncResult",
+    "findTargetedElement",
   ])
+  assert.match(useCases.findTargetedElement.join("\n"), /yunti_find_elements/)
+  assert.match(useCases.findTargetedElement.join("\n"), /fall back to yunti_observe_page/)
   assert.match(useCases.clickByUid.join("\n"), /fresh observation/)
   assert.match(useCases.clickByUid.join("\n"), /yunti_click/)
   assert.match(useCases.fillForm.join("\n"), /fillable/)
@@ -1665,6 +1870,69 @@ test("yunti_observe_page dispatches to extension", async () => {
   }
   hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: observation })
   assert.deepEqual(await call, observation)
+})
+
+test("yunti_observe_page passes through delta mode results", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_observe_page", {
+    browserSessionId: "tab-1",
+    userId: "u1",
+    mode: "viewport",
+    responseMode: "delta",
+    redaction: "balanced",
+  }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_observe_page")
+  assert.equal(event.arguments.responseMode, "delta")
+
+  const observation = {
+    observationId: "obs-delta-1",
+    browserSessionId: "tab-1",
+    responseMode: "delta",
+    delta: {
+      firstObservation: false,
+      changedElementCount: 1,
+      changedScrollableContainerCount: 0,
+      changedElements: { added: [], removed: [], updated: ["button|button|Save||||20|20|120|32"] },
+      changedScrollableContainers: { added: [], removed: [], updated: [] },
+    },
+    hints: ["Delta observation detected page changes. Run full yunti_observe_page before choosing a fresh uid for the next action."],
+  }
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result: observation })
+  assert.deepEqual(await call, observation)
+})
+
+test("yunti_find_elements dispatches to extension", async () => {
+  const hub = new BridgeHub()
+  hub.registerSession({ browserSessionId: "tab-1", userId: "u1", url: "https://app.example.test/" })
+
+  const call = hub.callTool("yunti_find_elements", {
+    browserSessionId: "tab-1",
+    userId: "u1",
+    query: "save",
+    role: "button",
+    maxResults: 5,
+  }, 1000)
+  const event = await hub.poll("tab-1", 100)
+  assert.equal(event.tool, "yunti_find_elements")
+  assert.equal(event.arguments.browserSessionId, undefined)
+  assert.equal(event.arguments.userId, undefined)
+  assert.equal(event.arguments.query, "save")
+  assert.equal(event.arguments.role, "button")
+  assert.equal(event.arguments.maxResults, 5)
+
+  const result = {
+    observationId: "find-1",
+    browserSessionId: "tab-1",
+    uidMapVersion: "observe-v1",
+    matchCount: 1,
+    matches: [{ uid: "yunti-5", role: "button", name: "Save form" }],
+    hints: ["Use the returned fresh uid for click/fill/select, then verify with yunti_observe_page or evaluate."],
+  }
+  hub.submitResult({ browserSessionId: "tab-1", requestId: event.id, ok: true, result })
+  assert.deepEqual(await call, result)
 })
 
 test("yunti_click dispatches uid-based click to extension", async () => {

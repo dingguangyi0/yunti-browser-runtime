@@ -7,3 +7,4 @@ extension.zip
 .env
 .env.*
 .npmrc
+.artifacts/

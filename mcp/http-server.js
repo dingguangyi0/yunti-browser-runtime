@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
   BridgeHub,
+  CURRENT_EXTENSION_PROTOCOL_VERSION,
   DEFAULT_SESSION_TTL_MS,
   DEFAULT_TOOL_TIMEOUT_MS,
   normalizeRouteUserId,
@@ -222,7 +223,12 @@ export async function startBridgeServer({
     )
   }
   const activeBridgeToken = configuredBridgeToken
-  const hub = new BridgeHub({ sessionTtlMs })
+  const hub = new BridgeHub({
+    sessionTtlMs,
+    runtimeVersion: PACKAGE_VERSION,
+    expectedExtensionVersion: EXTENSION_VERSION || PACKAGE_VERSION,
+    expectedProtocolVersion: CURRENT_EXTENSION_PROTOCOL_VERSION,
+  })
   const cleanupTimer = setInterval(() => {
     hub.cleanupExpiredSessions()
   }, Math.max(5_000, SESSION_CLEANUP_INTERVAL_MS))
@@ -308,10 +314,12 @@ export async function startBridgeServer({
             sessions: health.sessions,
             activeSessionId: health.activeSessionId,
             browserControllerSessionId: health.browserControllerSessionId,
+            browserControllerSessionIds: health.browserControllerSessionIds,
             sessionCount: health.sessionCount,
             visibleSessionCount: health.visibleSessionCount,
             pageSessionCount: health.pageSessionCount,
             controllerCount: health.controllerCount,
+            compatibility: health.compatibility,
           },
           { allowOrigins }
         )

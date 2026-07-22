@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Yunti Soak Child</title></head>
+  <body>
+    <h1>Embedded Case Detail</h1>
+    <label>Child note <input id="child-note" /></label>
+    <button id="child-action" type="button">Child action</button>
+    <output id="child-result"></output>
+    <script>
+      document.querySelector("#child-action").addEventListener("click", () => {
+        document.querySelector("#child-result").textContent = document.querySelector("#child-note").value || "child-ok";
+      });
+    </script>
+  </body>
+</html>

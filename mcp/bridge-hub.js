@@ -11,6 +11,7 @@ import {
 import { toolUsageHints } from "./tools.js"
 
 export const DEFAULT_TOOL_TIMEOUT_MS = 30_000
+export const CURRENT_EXTENSION_PROTOCOL_VERSION = 1
 const MAX_NETWORK_EVENTS = 1000
 const MAX_CDP_EVENTS = 2000
 const MAX_CONSOLE_MESSAGES = 1000
@@ -55,6 +56,20 @@ function supportsControllerPageRouting(session) {
   return Boolean(session?.meta?.capabilities?.singleControllerTransport)
 }
 
+function normalizeBrowserInstanceId(meta = {}) {
+  return String(
+    meta?.browserInstanceId ||
+    meta?.client?.browserInstanceId ||
+    meta?.browserControllerSessionId ||
+    ""
+  ).trim()
+}
+
+function normalizeProtocolVersion(meta = {}) {
+  const value = Number(meta?.protocolVersion ?? meta?.client?.protocolVersion)
+  return Number.isInteger(value) && value > 0 ? value : null
+}
+
 function normalizeTabId(value) {
   const tabId = Number(value)
   return Number.isFinite(tabId) && tabId > 0 ? tabId : null
@@ -71,6 +86,12 @@ function tabIdFromBrowserSessionId(value) {
   const browserSessionId = String(value || "").trim()
   const match = browserSessionId.match(/^yunti(?:-page)?-(\d+)(?:-|$)/)
   return match ? normalizeTabId(match[1]) : null
+}
+
+function controllerIdFromPageSessionId(value) {
+  const browserSessionId = String(value || "").trim()
+  const match = browserSessionId.match(/^yunti-page-\d+-(.+)$/)
+  return match?.[1] ? `yunti-browser-${match[1]}` : ""
 }
 
 const BROWSER_CONTROLLER_TOOLS = new Set([
@@ -114,6 +135,9 @@ function summarizeSession(session, activeSessionId) {
     windowId: meta.windowId ?? null,
     clientFamily: redactLikelySensitiveText(client.family || "", 80),
     extensionVersion: redactLikelySensitiveText(client.extensionVersion || meta.extensionVersion || "", 80),
+    protocolVersion: normalizeProtocolVersion(meta),
+    browserInstanceId: redactLikelySensitiveText(normalizeBrowserInstanceId(meta), 160),
+    browserControllerSessionId: redactLikelySensitiveText(meta.browserControllerSessionId || "", 160),
     queuedRequests: session.queue.length,
     pollers: session.pollers.length,
     updatedAt: meta.updatedAt || "",
@@ -136,7 +160,12 @@ export function requireRouteUserId(args = {}, operation = "Yunti browser tool") 
   return userId
 }
 export class BridgeHub {
-  constructor({ sessionTtlMs = DEFAULT_SESSION_TTL_MS } = {}) {
+  constructor({
+    sessionTtlMs = DEFAULT_SESSION_TTL_MS,
+    runtimeVersion = "",
+    expectedExtensionVersion = "",
+    expectedProtocolVersion = null,
+  } = {}) {
     this.sessions = new Map()
     this.pendingRequests = new Map()
     this.networkEvents = []
@@ -150,7 +179,121 @@ export class BridgeHub {
     this.activeSessionId = null
     this.activeSessionByUser = new Map()
     this.browserControllerByUser = new Map()
+    this.browserControllersByUser = new Map()
     this.sessionTtlMs = Math.max(5_000, Number(sessionTtlMs) || DEFAULT_SESSION_TTL_MS)
+    this.runtimeVersion = String(runtimeVersion || "").trim()
+    this.expectedExtensionVersion = String(expectedExtensionVersion || "").trim()
+    this.expectedProtocolVersion = Number.isInteger(Number(expectedProtocolVersion))
+      ? Number(expectedProtocolVersion)
+      : null
+  }
+
+  controllerSessionIdsForUser(userId) {
+    const routeUserId = normalizeRouteUserId(userId)
+    if (!routeUserId) return []
+    const ids = this.browserControllersByUser.get(routeUserId) || new Set()
+    const live = []
+    for (const browserSessionId of ids) {
+      const session = this.getLiveSession(browserSessionId)
+      if (session && isBrowserControllerSession(session)) live.push(browserSessionId)
+    }
+    return live
+  }
+
+  controllerSessionsForUser(userId, { compatibleOnly = false } = {}) {
+    const sessions = this.controllerSessionIdsForUser(userId)
+      .map((browserSessionId) => this.sessions.get(browserSessionId))
+      .filter(Boolean)
+    return compatibleOnly
+      ? sessions.filter((session) => this.sessionCompatibility(session).ok)
+      : sessions
+  }
+
+  trackBrowserController(userId, browserSessionId) {
+    if (!userId || !browserSessionId) return
+    const ids = this.browserControllersByUser.get(userId) || new Set()
+    ids.add(browserSessionId)
+    this.browserControllersByUser.set(userId, ids)
+    this.browserControllerByUser.set(userId, browserSessionId)
+  }
+
+  untrackBrowserController(browserSessionId) {
+    for (const [userId, ids] of this.browserControllersByUser.entries()) {
+      ids.delete(browserSessionId)
+      if (ids.size === 0) {
+        this.browserControllersByUser.delete(userId)
+        this.browserControllerByUser.delete(userId)
+        continue
+      }
+      if (this.browserControllerByUser.get(userId) === browserSessionId) {
+        this.browserControllerByUser.set(userId, [...ids].at(-1))
+      }
+    }
+  }
+
+  sessionCompatibility(session) {
+    const meta = session?.meta || {}
+    const extensionVersion = String(meta?.client?.extensionVersion || meta?.extensionVersion || "").trim()
+    const protocolVersion = normalizeProtocolVersion(meta)
+    const issues = []
+    if (this.expectedExtensionVersion && extensionVersion !== this.expectedExtensionVersion) {
+      issues.push({
+        code: extensionVersion ? "EXTENSION_VERSION_MISMATCH" : "EXTENSION_VERSION_UNKNOWN",
+        expected: this.expectedExtensionVersion,
+        actual: extensionVersion || null,
+      })
+    }
+    if (this.expectedProtocolVersion && protocolVersion !== this.expectedProtocolVersion) {
+      issues.push({
+        code: protocolVersion ? "EXTENSION_PROTOCOL_MISMATCH" : "EXTENSION_PROTOCOL_UNKNOWN",
+        expected: this.expectedProtocolVersion,
+        actual: protocolVersion,
+      })
+    }
+    return {
+      ok: issues.length === 0,
+      extensionVersion: extensionVersion || null,
+      protocolVersion,
+      issues,
+    }
+  }
+
+  compatibilitySummary(sessions = []) {
+    const connected = sessions.filter(Boolean)
+    const details = connected.map((session) => ({
+      browserSessionId: session.browserSessionId,
+      kind: isBrowserControllerSession(session) ? "browser_controller" : "page",
+      browserInstanceId: normalizeBrowserInstanceId(session.meta),
+      ...this.sessionCompatibility(session),
+    }))
+    return {
+      ok: details.every((detail) => detail.ok),
+      expectedExtensionVersion: this.expectedExtensionVersion || null,
+      expectedProtocolVersion: this.expectedProtocolVersion,
+      incompatibleSessionCount: details.filter((detail) => !detail.ok).length,
+      sessions: details,
+    }
+  }
+
+  incompatibleExtensionError(compatibility) {
+    const actualVersions = [...new Set(
+      compatibility.sessions.map((session) => session.extensionVersion || "unknown")
+    )].join(", ")
+    return new Error(
+      `YUNTI_EXTENSION_PROTOCOL_MISMATCH: connected extension (${actualVersions}) is not compatible with runtime ${this.expectedExtensionVersion || "current"}. Reload the unpacked extension from the current package directory. retryable=false retryBudget=0`
+    )
+  }
+
+  assertUserExtensionCompatibility(userId) {
+    const controllers = this.controllerSessionsForUser(userId)
+    const sessions = controllers.length
+      ? controllers
+      : [...this.sessions.values()].filter(
+          (session) => normalizeRouteUserId(session.meta?.userId) === userId
+        )
+    const compatibility = this.compatibilitySummary(sessions)
+    if (!compatibility.ok) throw this.incompatibleExtensionError(compatibility)
+    return compatibility
   }
 
   recordActivity(input = {}) {
@@ -216,6 +359,41 @@ export class BridgeHub {
     return refreshed
   }
 
+  refreshPageSessionsForController(controllerSession, now = Date.now()) {
+    const userId = normalizeRouteUserId(controllerSession?.meta?.userId)
+    if (!userId) return 0
+    const browserInstanceId = normalizeBrowserInstanceId(controllerSession?.meta)
+    const controllers = this.controllerSessionsForUser(userId)
+    const liveTabs = Array.isArray(controllerSession?.meta?.liveTabIds)
+      ? new Set(controllerSession.meta.liveTabIds.map(normalizeTabId).filter(Boolean))
+      : null
+    const staleSessionIds = []
+    let refreshed = 0
+    for (const session of this.sessions.values()) {
+      if (isBrowserControllerSession(session)) continue
+      if (normalizeRouteUserId(session.meta?.userId) !== userId) continue
+      const pageInstanceId = normalizeBrowserInstanceId(session.meta)
+      const belongsToController = browserInstanceId
+        ? pageInstanceId === browserInstanceId
+        : controllers.length === 1 && !pageInstanceId
+      if (!belongsToController) continue
+      const tabId = normalizeTabId(session.meta?.tabId)
+      if (liveTabs && tabId && !liveTabs.has(tabId)) {
+        staleSessionIds.push(session.browserSessionId)
+        continue
+      }
+      this.refreshSession(session, now, {
+        heartbeatSource: "browser_controller",
+        browserControllerSessionId: controllerSession.browserSessionId,
+      })
+      refreshed += 1
+    }
+    for (const browserSessionId of staleSessionIds) {
+      this.markSessionStale(browserSessionId, "browser tab no longer exists")
+    }
+    return refreshed
+  }
+
   markSessionStale(browserSessionId, reason = "disconnected") {
     const session = this.sessions.get(browserSessionId)
     if (!session) return null
@@ -230,9 +408,7 @@ export class BridgeHub {
     for (const [userId, activeSessionId] of this.activeSessionByUser.entries()) {
       if (activeSessionId === browserSessionId) this.activeSessionByUser.delete(userId)
     }
-    for (const [userId, controllerSessionId] of this.browserControllerByUser.entries()) {
-      if (controllerSessionId === browserSessionId) this.browserControllerByUser.delete(userId)
-    }
+    this.untrackBrowserController(browserSessionId)
     for (const poller of session.pollers.splice(0)) {
       poller({ type: "noop", id: randomUUID(), stale: true, reason })
     }
@@ -275,17 +451,31 @@ export class BridgeHub {
     if (!browserSessionId) throw new Error("browserSessionId is required")
     const routeUserId = requireRouteUserId(meta, "browser session registration")
     const incomingTabId = normalizeTabId(meta.tabId)
+    const incomingBrowserInstanceId = normalizeBrowserInstanceId(meta)
     if (isBrowserControllerMeta(meta)) {
       for (const [existingSessionId, candidate] of this.sessions.entries()) {
         if (existingSessionId === browserSessionId || !isBrowserControllerSession(candidate)) continue
         if (normalizeRouteUserId(candidate.meta?.userId) !== routeUserId) continue
-        this.markSessionStale(existingSessionId, "replaced by a fresh browser controller")
+        const existingBrowserInstanceId = normalizeBrowserInstanceId(candidate.meta)
+        if (
+          incomingBrowserInstanceId &&
+          existingBrowserInstanceId &&
+          incomingBrowserInstanceId === existingBrowserInstanceId
+        ) {
+          this.markSessionStale(existingSessionId, "replaced by a fresh controller for the same browser instance")
+        }
       }
     } else if (incomingTabId) {
       for (const [existingSessionId, candidate] of this.sessions.entries()) {
         if (existingSessionId === browserSessionId || isBrowserControllerSession(candidate)) continue
         if (normalizeRouteUserId(candidate.meta?.userId) !== routeUserId) continue
         if (normalizeTabId(candidate.meta?.tabId) !== incomingTabId) continue
+        const existingBrowserInstanceId = normalizeBrowserInstanceId(candidate.meta)
+        if (
+          incomingBrowserInstanceId &&
+          existingBrowserInstanceId &&
+          incomingBrowserInstanceId !== existingBrowserInstanceId
+        ) continue
         this.markSessionStale(existingSessionId, "replaced by a fresh page session for the same tab")
       }
     }
@@ -308,8 +498,8 @@ export class BridgeHub {
     this.sessions.set(browserSessionId, existing)
     const userId = normalizeRouteUserId(existing.meta.userId)
     if (isBrowserControllerSession(existing)) {
-      if (userId) this.browserControllerByUser.set(userId, browserSessionId)
-      this.refreshPageSessionsForUser(userId, now, existing.meta.liveTabIds)
+      this.trackBrowserController(userId, browserSessionId)
+      this.refreshPageSessionsForController(existing, now)
     } else {
       const currentActiveId = userId ? this.activeSessionByUser.get(userId) : this.activeSessionId
       const currentActive = currentActiveId ? this.getLiveSession(currentActiveId) : null
@@ -385,17 +575,30 @@ export class BridgeHub {
       : null
     const controllerCount = sessions.filter((session) => isBrowserControllerMeta(session)).length
     const pageSessionCount = sessions.length - controllerCount
+    const rawSessions = [...this.sessions.values()].filter(
+      (session) => !userId || normalizeRouteUserId(session.meta?.userId) === userId
+    )
+    const compatibilitySessions = rawSessions.filter(isBrowserControllerSession)
     return {
       ok: true,
       name: "yunti-browser-runtime-bridge",
+      runtime: {
+        version: this.runtimeVersion || null,
+        expectedExtensionVersion: this.expectedExtensionVersion || null,
+        expectedProtocolVersion: this.expectedProtocolVersion,
+      },
       activeSessionId,
       browserControllerSessionId,
+      browserControllerSessionIds: userId ? this.controllerSessionIdsForUser(userId) : [],
       extensionConnected: controllerCount > 0 || pageSessionCount > 0,
       pageSessionCount,
       controllerCount,
       sessions,
       sessionCount: this.sessions.size,
       visibleSessionCount: sessions.length,
+      compatibility: this.compatibilitySummary(
+        compatibilitySessions.length ? compatibilitySessions : rawSessions
+      ),
     }
   }
 
@@ -428,6 +631,9 @@ export class BridgeHub {
         active: session.browserSessionId === activeSessionId,
         userId: meta.userId || "",
         displayName: meta.displayName || "",
+        browserInstanceId: normalizeBrowserInstanceId(meta),
+        browserControllerSessionId: meta.browserControllerSessionId || "",
+        clientFamily: meta.client?.family || "",
         registeredAt: meta.registeredAt || meta.updatedAt || "",
       }
     })
@@ -482,6 +688,62 @@ export class BridgeHub {
     return browserSessionId
   }
 
+  selectControllerSession(userId, {
+    pageSession = null,
+    explicitControllerId = "",
+    requestedTabId = null,
+    requestedBrowserInstanceId = "",
+  } = {}) {
+    const allControllers = this.controllerSessionsForUser(userId)
+    if (!allControllers.length) return null
+    const compatibleControllers = allControllers.filter(
+      (session) => this.sessionCompatibility(session).ok
+    )
+    if (!compatibleControllers.length) {
+      throw this.incompatibleExtensionError(this.compatibilitySummary(allControllers))
+    }
+    if (explicitControllerId) {
+      const explicit = allControllers.find(
+        (session) => session.browserSessionId === explicitControllerId
+      )
+      if (explicit && !this.sessionCompatibility(explicit).ok) {
+        throw this.incompatibleExtensionError(this.compatibilitySummary([explicit]))
+      }
+      if (explicit) return explicit
+    }
+    const pageControllerId = String(pageSession?.meta?.browserControllerSessionId || "").trim()
+    if (pageControllerId) {
+      const exact = compatibleControllers.find(
+        (session) => session.browserSessionId === pageControllerId
+      )
+      if (exact) return exact
+    }
+    const browserInstanceId = String(
+      requestedBrowserInstanceId || normalizeBrowserInstanceId(pageSession?.meta)
+    ).trim()
+    if (browserInstanceId) {
+      const instanceMatches = compatibleControllers.filter(
+        (session) => normalizeBrowserInstanceId(session.meta) === browserInstanceId
+      )
+      if (instanceMatches.length === 1) return instanceMatches[0]
+    }
+    if (requestedTabId) {
+      const tabMatches = compatibleControllers.filter((session) =>
+        Array.isArray(session.meta?.liveTabIds) &&
+        session.meta.liveTabIds.map(normalizeTabId).includes(requestedTabId)
+      )
+      if (tabMatches.length === 1) return tabMatches[0]
+      if (tabMatches.length > 1) {
+        throw new Error(
+          `YUNTI_BROWSER_INSTANCE_AMBIGUOUS: tabId ${requestedTabId} exists in more than one connected browser. Pass a page browserSessionId or browserInstanceId from yunti_list_browser_targets. retryable=false retryBudget=0`
+        )
+      }
+    }
+    const preferredId = this.browserControllerByUser.get(userId) || ""
+    return compatibleControllers.find((session) => session.browserSessionId === preferredId) ||
+      compatibleControllers.at(-1)
+  }
+
   resolveToolRoute(args, tool = "") {
     this.cleanupExpiredSessions()
     const userId =
@@ -496,14 +758,27 @@ export class BridgeHub {
       normalizeTabId(args?.tabId) ||
       tabIdFromTargetId(args?.targetId) ||
       tabIdFromTargetId(args?.params?.targetId)
-    const controllerSessionId = this.browserControllerByUser.get(userId) || ""
-    const controllerSession = controllerSessionId
-      ? this.getLiveSession(controllerSessionId)
-      : null
+    const requestedBrowserInstanceId = String(args?.browserInstanceId || "").trim()
+    const explicitSession = explicit ? this.getLiveSession(explicit) : null
+    if (explicitSession && normalizeRouteUserId(explicitSession.meta?.userId) !== userId) {
+      throw new Error(`browser session is not owned by userId: ${userId}`)
+    }
+    const inferredControllerId = explicitSession && isBrowserControllerSession(explicitSession)
+      ? explicit
+      : controllerIdFromPageSessionId(explicit)
+    const controllerSession = this.selectControllerSession(userId, {
+      pageSession: explicitSession && !isBrowserControllerSession(explicitSession)
+        ? explicitSession
+        : null,
+      explicitControllerId: inferredControllerId,
+      requestedTabId,
+      requestedBrowserInstanceId,
+    })
+    const controllerSessionId = controllerSession?.browserSessionId || ""
     const controllerCanRoutePages = supportsControllerPageRouting(controllerSession)
 
     if (explicit) {
-      const session = this.getLiveSession(explicit)
+      const session = explicitSession
       if (!session) {
         if (controllerSession && BROWSER_CONTROLLER_TOOLS.has(tool)) {
           return {
@@ -530,9 +805,6 @@ export class BridgeHub {
         }
         throw staleSessionError(explicit, "not registered or heartbeat expired")
       }
-      if (normalizeRouteUserId(session.meta?.userId) !== userId) {
-        throw new Error(`browser session is not owned by userId: ${userId}`)
-      }
       if (isBrowserControllerSession(session)) {
         if (!BROWSER_CONTROLLER_TOOLS.has(tool) && !supportsControllerPageRouting(session)) {
           throw new Error(`${tool || "This tool"} requires a concrete page session. Reload the Yunti 0.2.3+ extension to enable automatic page recovery through the browser controller.`)
@@ -555,6 +827,9 @@ export class BridgeHub {
           requestedSessionId: explicit,
           viaController: true,
         }
+      }
+      if (!this.sessionCompatibility(session).ok) {
+        throw this.incompatibleExtensionError(this.compatibilitySummary([session]))
       }
       return {
         userId,
@@ -614,15 +889,23 @@ export class BridgeHub {
     if (normalizeRouteUserId(session.meta?.userId) !== userId) {
       throw new Error(`browser session is not owned by userId: ${userId}`)
     }
-    if (controllerCanRoutePages) {
+    const activeController = this.selectControllerSession(userId, {
+      pageSession: session,
+      requestedTabId: requestedTabId || normalizeTabId(session.meta?.tabId),
+      requestedBrowserInstanceId,
+    })
+    if (supportsControllerPageRouting(activeController)) {
       return {
         userId,
         logicalSessionId: userSessionId,
-        transportSessionId: controllerSessionId,
+        transportSessionId: activeController.browserSessionId,
         targetTabId: requestedTabId || normalizeTabId(session.meta?.tabId),
         requestedSessionId: userSessionId,
         viaController: true,
       }
+    }
+    if (!this.sessionCompatibility(session).ok) {
+      throw this.incompatibleExtensionError(this.compatibilitySummary([session]))
     }
     return {
       userId,
@@ -635,6 +918,78 @@ export class BridgeHub {
   }
 
   async callTool(tool, args = {}, timeoutMs = DEFAULT_TOOL_TIMEOUT_MS) {
+    const routeUserId = requireRouteUserId(args, tool || "Yunti browser tool")
+    this.assertUserExtensionCompatibility(routeUserId)
+    const hasExplicitRoute = Boolean(String(args?.browserSessionId || "").trim())
+    if (
+      !hasExplicitRoute &&
+      (tool === "yunti_list_browser_targets" || tool === "yunti_list_pages")
+    ) {
+      const userId = routeUserId
+      const controllers = this.controllerSessionsForUser(userId, { compatibleOnly: true })
+      if (controllers.length > 1) {
+        const outcomes = await Promise.allSettled(
+          controllers.map((controller) => this.callTool(tool, {
+            ...args,
+            browserSessionId: controller.browserSessionId,
+          }, timeoutMs))
+        )
+        const successful = outcomes
+          .map((outcome, index) => ({ outcome, controller: controllers[index] }))
+          .filter(({ outcome }) => outcome.status === "fulfilled")
+        if (!successful.length) {
+          throw new Error(
+            `Yunti could not list targets from any connected browser controller: ${outcomes
+              .map((outcome) => outcome.reason?.message || "unknown failure")
+              .join("; ")}`
+          )
+        }
+        const browsers = successful.map(({ outcome, controller }) => ({
+          browserInstanceId: normalizeBrowserInstanceId(controller.meta),
+          browserFamily: controller.meta?.client?.family || "unknown",
+          routeBrowserSessionId: controller.browserSessionId,
+          result: outcome.value,
+        }))
+        const pages = browsers.flatMap((browser) =>
+          (Array.isArray(browser.result?.pages) ? browser.result.pages : []).map((page) => ({
+            ...page,
+            browserInstanceId: page.browserInstanceId || browser.browserInstanceId,
+            browserFamily: page.browserFamily || browser.browserFamily,
+            routeBrowserSessionId: page.routeBrowserSessionId || browser.routeBrowserSessionId,
+          }))
+        )
+        const targets = browsers.flatMap((browser) =>
+          (Array.isArray(browser.result?.targets) ? browser.result.targets : []).map((target) => ({
+            ...target,
+            browserInstanceId: target.browserInstanceId || browser.browserInstanceId,
+            browserFamily: target.browserFamily || browser.browserFamily,
+            routeBrowserSessionId: target.routeBrowserSessionId || browser.routeBrowserSessionId,
+          }))
+        )
+        return {
+          browserSessionId: null,
+          routeBrowserSessionIds: browsers.map((browser) => browser.routeBrowserSessionId),
+          multiBrowser: true,
+          browserCount: browsers.length,
+          browsers,
+          pages,
+          targets,
+          targetInfos: targets,
+          pageCount: pages.length,
+          total: targets.length,
+          partial: successful.length !== outcomes.length,
+          browserErrors: outcomes.flatMap((outcome, index) => outcome.status === "rejected"
+            ? [{
+                routeBrowserSessionId: controllers[index].browserSessionId,
+                error: outcome.reason?.message || String(outcome.reason || "unknown failure"),
+              }]
+            : []),
+          method: "Target.getTargets",
+          source: "bridge.multi-browser",
+          listedAt: new Date().toISOString(),
+        }
+      }
+    }
     const route = this.resolveToolRoute(args, tool)
     const browserSessionId = route.logicalSessionId
     const transportSessionId = route.transportSessionId
@@ -1059,6 +1414,13 @@ export class BridgeHub {
       .map((session) => summarizeSession(session, this.activeSessionId))
     const controllerCount = sessions.filter((session) => isBrowserControllerMeta(session)).length
     const pageSessionCount = sessions.length - controllerCount
+    const rawSessions = [...this.sessions.values()].filter(
+      (session) => !userId || normalizeRouteUserId(session.meta?.userId) === userId
+    )
+    const rawControllerSessions = rawSessions.filter(isBrowserControllerSession)
+    const compatibility = this.compatibilitySummary(
+      rawControllerSessions.length ? rawControllerSessions : rawSessions
+    )
     const browserSessionIds = new Set(sessions.map((session) => session.browserSessionId))
     const pendingRequests = [...this.pendingRequests.entries()]
       .filter(([, pending]) => browserSessionIds.has(pending.browserSessionId))
@@ -1078,22 +1440,25 @@ export class BridgeHub {
         }))
       )
     return {
-      ok: true,
+      ok: compatibility.ok,
       name: "yunti-browser-runtime-console",
       generatedAt: new Date().toISOString(),
       runtime: {
         version: redactLikelySensitiveText(args.runtimeVersion || "", 80),
         expectedExtensionVersion: redactLikelySensitiveText(args.expectedExtensionVersion || "", 80),
+        expectedProtocolVersion: this.expectedProtocolVersion,
       },
       sessionCount: sessions.length,
       pageSessionCount,
       controllerCount,
       extensionConnected: controllerCount > 0 || pageSessionCount > 0,
       browserControllerSessionId: userId ? this.browserControllerByUser.get(userId) || null : null,
+      browserControllerSessionIds: userId ? this.controllerSessionIdsForUser(userId) : [],
       activeSessionId: userId ? this.activeSessionByUser.get(userId) || null : this.activeSessionId,
       sessions,
       pendingRequests,
       queuedRequests,
+      compatibility,
       diagnostics: {
         networkEvents: this.networkEvents.filter((event) => browserSessionIds.has(event.browserSessionId)).length,
         consoleMessages: this.consoleMessages.filter((event) => browserSessionIds.has(event.browserSessionId)).length,
@@ -1106,6 +1471,7 @@ export class BridgeHub {
         .reverse(),
       warnings: consoleWarnings(sessions, {
         expectedExtensionVersion: args.expectedExtensionVersion,
+        expectedProtocolVersion: this.expectedProtocolVersion,
       }),
       guidance: {
         noSessions:
@@ -1121,7 +1487,10 @@ export class BridgeHub {
   }
 }
 
-function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
+function consoleWarnings(sessions, {
+  expectedExtensionVersion = "",
+  expectedProtocolVersion = null,
+} = {}) {
   const warnings = []
   const controllerCount = sessions.filter((session) => isBrowserControllerMeta(session)).length
   const pageSessionCount = sessions.length - controllerCount
@@ -1144,7 +1513,12 @@ function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
   }
   const expected = String(expectedExtensionVersion || "").trim()
   if (!expected) return warnings
-  const versions = new Set(sessions.map((session) => session.extensionVersion).filter(Boolean))
+  const compatibilitySessions = controllerCount > 0
+    ? sessions.filter((session) => isBrowserControllerMeta(session))
+    : sessions
+  const versions = new Set(
+    compatibilitySessions.map((session) => session.extensionVersion).filter(Boolean)
+  )
   if (versions.size === 0) {
     warnings.push({
       code: "EXTENSION_VERSION_UNKNOWN",
@@ -1161,6 +1535,29 @@ function consoleWarnings(sessions, { expectedExtensionVersion = "" } = {}) {
         severity: "warning",
         message: `Connected extension version ${version} does not match runtime package version ${expected}. Reload the unpacked extension from the current package directory.`,
       })
+    }
+  }
+  const expectedProtocol = Number(expectedProtocolVersion)
+  if (Number.isInteger(expectedProtocol) && expectedProtocol > 0) {
+    const protocols = new Set(
+      compatibilitySessions.map((session) => Number(session.protocolVersion)).filter(Boolean)
+    )
+    if (protocols.size === 0) {
+      warnings.push({
+        code: "EXTENSION_PROTOCOL_UNKNOWN",
+        severity: "error",
+        message: `Connected extension does not report protocol ${expectedProtocol}. Reload the unpacked extension from the current package directory.`,
+      })
+    } else {
+      for (const protocol of protocols) {
+        if (protocol !== expectedProtocol) {
+          warnings.push({
+            code: "EXTENSION_PROTOCOL_MISMATCH",
+            severity: "error",
+            message: `Connected extension protocol ${protocol} does not match runtime protocol ${expectedProtocol}. Reload the unpacked extension from the current package directory.`,
+          })
+        }
+      }
     }
   }
   return warnings

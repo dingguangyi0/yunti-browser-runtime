@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Benchmark Shadow Root</title>
+  </head>
+  <body>
+    <h1>Shadow Root</h1>
+    <div id="shadow-host"></div>
+    <script>
+      const root = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
+      root.innerHTML = '<label>Shadow input <input id="shadow-input" /></label><button id="shadow-save">Shadow save</button><output id="shadow-result"></output>';
+      root.querySelector("#shadow-save").addEventListener("click", () => {
+        root.querySelector("#shadow-result").textContent = root.querySelector("#shadow-input").value;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Benchmark Guarded Submit</title>
+  </head>
+  <body>
+    <h1>Guarded Submit</h1>
+    <button id="submit">Submit once</button>
+    <output id="result"></output>
+    <script>
+      window.__submitCount = 0;
+      window.__submittedValues = [];
+      document.querySelector("#submit").addEventListener("click", () => {
+        if (window.__submitCount > 0) return;
+        window.__submitCount += 1;
+        window.__submittedValues.push(window.__submitCount);
+        document.querySelector("#submit").disabled = true;
+        setTimeout(() => {
+          document.querySelector("#result").textContent = "Submitted " + window.__submitCount;
+        }, 400);
+      });
+    </script>
+  </body>
+</html>

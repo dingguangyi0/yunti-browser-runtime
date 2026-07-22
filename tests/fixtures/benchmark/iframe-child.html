@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Iframe Child</title>
+  </head>
+  <body>
+    <button id="child-action">Child action</button>
+    <output id="child-result"></output>
+    <script>
+      document.querySelector("#child-action").addEventListener("click", () => {
+        document.querySelector("#child-result").textContent = "Child clicked";
+      });
+    </script>
+  </body>
+</html>

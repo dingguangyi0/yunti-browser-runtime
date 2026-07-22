@@ -178,6 +178,11 @@ machine-only output, run:
 npm run doctor:json
 ```
 
+In `0.2.5+`, doctor also compares the runtime with the extension version and
+protocol actually running in the browser. `YUNTI_EXTENSION_PROTOCOL_MISMATCH`
+must be resolved before browser tools are called; retries cannot repair an old
+service worker.
+
 ## Release Check
 
 Before publishing or sharing a release candidate, run:
@@ -198,9 +203,9 @@ runs the unit test suite, and verifies the npm package contents with
   directly to the page tool. The controller will establish the page route.
 - If doctor reports `authorized: false` with `authRequired: true`, set
   `YUNTI_BROWSER_BRIDGE_TOKEN` and save the same token in the extension popup.
-- In `0.2.3+`, old page session IDs that contain a live tab id are recovered
-  automatically. If recovery still fails, call `yunti_list_browser_targets`
-  without the stale id and use the target's `tabId` / `targetId`.
+- Read `retryable`, `retryBudget`, `recoveryAction`, and `resultUncertain` before
+  recovery. For a stale route, discard the stale id, list targets once, and use
+  the single retry on the selected live page route.
 - In `0.2.4+`, Edge sleeping tabs are recovered with bounded probe/injection
   timeouts. Yunti may briefly activate the target tab and then restore the
   user's previous tab. Do not ask the user to switch, refresh, or reopen the

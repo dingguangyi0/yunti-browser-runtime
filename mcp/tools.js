@@ -69,6 +69,12 @@ export const TOOLS = [
           description:
             "Observation scope. Defaults to viewport; fullPage is bounded by maxElements and maxTextLength.",
         },
+        responseMode: {
+          type: "string",
+          enum: ["full", "delta"],
+          description:
+            "Use full for the normal complete observation with fresh uid candidates. Use delta for a lighter change summary relative to the previous observe call in the same page context; delta is for verification, not for picking a new uid blindly.",
+        },
         maxElements: {
           type: "integer",
           minimum: 1,
@@ -98,6 +104,58 @@ export const TOOLS = [
           enum: ["balanced", "strict", "off"],
           description:
             "DOM observation redaction mode. Defaults to balanced. Use off only for explicit local debugging; it is not recommended for agent workflows.",
+        },
+      },
+    },
+  },
+  {
+    name: "yunti_find_elements",
+    description:
+      "Find a bounded set of interactive page elements matching text, name, role, tag, or placeholder cues without returning a full-page observation. Use this when the agent needs a smaller, targeted candidate set before clicking, filling, selecting, or observing again.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        browserSessionId: {
+          type: "string",
+          description:
+            "Optional target Yunti browser session. Use the returned browserSessionId for follow-up actions on the same tab.",
+        },
+        query: {
+          type: "string",
+          description:
+            "Case-insensitive text query matched against name, label, text, placeholder, selectedText, and href preview.",
+        },
+        role: {
+          type: "string",
+          description: "Optional role filter, for example button, textbox, combobox, or link.",
+        },
+        tag: {
+          type: "string",
+          description: "Optional tag filter, for example button, input, select, textarea, or a.",
+        },
+        placeholder: {
+          type: "string",
+          description: "Optional case-insensitive placeholder substring filter.",
+        },
+        maxResults: {
+          type: "integer",
+          minimum: 1,
+          maximum: 50,
+          description: "Maximum matches to return. Defaults to 10.",
+        },
+        includeHidden: {
+          type: "boolean",
+          description: "Include hidden or invisible elements. Defaults to false.",
+        },
+        includeRects: {
+          type: "boolean",
+          description: "Include viewport-relative element rectangles. Defaults to true.",
+        },
+        redaction: {
+          type: "string",
+          enum: ["balanced", "strict", "off"],
+          description:
+            "DOM search redaction mode. Defaults to balanced. Use off only for explicit local debugging.",
         },
       },
     },
@@ -962,6 +1020,11 @@ function installBrowserIsolationSchemas() {
       description:
         "Optional local route user id. Defaults to YUNTI_BROWSER_USER_ID or local in the standalone runtime.",
     }
+    schema.properties.browserInstanceId ||= {
+      type: "string",
+      description:
+        "Optional browser/profile instance id returned by yunti_list_browser_targets. Use it only when Chrome, Edge, or multiple profiles expose overlapping tab ids.",
+    }
     if (!NON_PAGE_TARGET_TOOLS.has(tool.name)) {
       schema.properties.tabId ||= {
         type: "integer",
@@ -1007,13 +1070,22 @@ export function toolUsageHints(args = {}) {
         {
           browserSessionId: "yunti-...",
           mode: "viewport",
+          responseMode: "full",
           includeTextTree: true,
+          redaction: "balanced",
+        },
+        {
+          browserSessionId: "yunti-...",
+          mode: "viewport",
+          responseMode: "delta",
           redaction: "balanced",
         },
       ],
       notes: [
         "Use this as the default page-operation refresh step once available.",
         "Returned uids are fresh for the latest observation in the current browserSessionId; observe again after navigation, DOM changes, or stale uid errors.",
+        "responseMode=delta returns a lighter change summary relative to the previous observation in the same page context. It is useful for post-action verification and repeated checks when a full textTree/elements payload would be too large.",
+        "responseMode=delta does not replace the normal full observe path for choosing the next uid. When a delta indicates change and another action is needed, call responseMode=full before picking a fresh uid.",
         "Input-like elements may include editable, fillable, readOnly, fillBlockReason, selectedIndex/selectedValue/selectedText, and select options[] summaries so agents can inspect field state before filling or selecting.",
         "Default balanced redaction hides credential-like values. Strict redaction additionally hides likely email, phone, Luhn-valid payment-card-like values, address-like text, page titles, labels, names, visible text, placeholders, value previews, and select option text.",
         "Screenshots are separate and may still contain visible sensitive content.",
@@ -1021,9 +1093,27 @@ export function toolUsageHints(args = {}) {
       ],
       commonMistakes: [
         "Do not treat observation uids as permanent selectors across refreshes or tabs.",
+        "Do not treat responseMode=delta as a full replacement for choosing the next action target; use full observe before acting on a new uid.",
         "Do not use redaction=off unless the user explicitly wants local debugging.",
         "Do not blindly retry an action after no page change; observe, wait, scroll, or switch tabs based on hints.",
         "A page-operation timeout does not imply that the browser controller is disconnected. List targets and retry the intended live tab once before asking the user to intervene.",
+      ],
+    },
+    yunti_find_elements: {
+      purpose: "Find a bounded candidate set of interactive elements by text/name/role cues before acting or doing a full observation.",
+      required: [],
+      recommended: ["browserSessionId", "query", "role", "maxResults"],
+      notes: [
+        "Use this when a full-page observation would be too large or when the page already has many controls.",
+        "Matches are case-insensitive and search across name, label, text, placeholder, selectedText, and href preview.",
+        "Returned uids are fresh for the current browserSessionId and can be used like other observe-page uids.",
+        "Prefer this for targeted lookups such as 'Save', 'Submit', 'Search', a field label, or a specific button role.",
+        "If no match is found, broaden the query, drop the role/tag filter, scroll, or fall back to yunti_observe_page.",
+      ],
+      commonMistakes: [
+        "Do not assume it searches the whole DOM regardless of visibility; includeHidden=false is the default.",
+        "Do not treat returned uids as permanent selectors across rerenders or navigation.",
+        "Do not use it as a replacement for full-page verification after an action; observe or verify separately.",
       ],
     },
     yunti_list_browser_targets: {
@@ -1032,7 +1122,8 @@ export function toolUsageHints(args = {}) {
       recommended: ["browserSessionId"],
       notes: [
         "Use for page counts, all tabs, finding a tab, or choosing a CDP target.",
-        "In 0.2.3+, this routes through the single extension browser controller even when no concrete page session is registered yet.",
+        "In 0.2.5+, each browser/profile has its own controller. With no explicit route, target inventory aggregates all compatible connected browser instances.",
+        "Each page includes browserInstanceId, browserFamily, and routeBrowserSessionId so overlapping Chrome/Edge tab ids remain unambiguous.",
         "A page row's browserSessionId/pageSessionId is null until registered; routeBrowserSessionId is the controller transport, not a page id.",
         "Pass a returned tabId or targetId directly to observe/click/fill when needed; the controller establishes the content-script page session automatically.",
         "If a stale browserSessionId was supplied accidentally, target inventory falls back to the live controller route.",
@@ -1356,13 +1447,13 @@ export function toolUsageHints(args = {}) {
     },
   }
   const topicMap = {
-    browser: ["yunti_observe_page", "yunti_wait_for", "yunti_get_page_snapshot", "yunti_list_browser_targets", "yunti_list_pages"],
+    browser: ["yunti_observe_page", "yunti_find_elements", "yunti_wait_for", "yunti_get_page_snapshot", "yunti_list_browser_targets", "yunti_list_pages"],
     cdp: ["yunti_cdp_send_command", "yunti_evaluate_script"],
     tabs: ["yunti_new_page", "yunti_close_page", "yunti_select_page", "yunti_list_browser_targets"],
     memory: ["yunti_get_learning_memory", "yunti_remember_learning", "yunti_forget_learning_memory"],
     network: ["yunti_get_network_log", "yunti_list_network_requests", "yunti_get_network_request", "yunti_clear_network_requests"],
     console: ["yunti_list_console_messages", "yunti_get_console_message", "yunti_clear_console_messages"],
-    workflow: ["yunti_get_tool_usage_hints", "yunti_list_browser_targets", "yunti_observe_page", "yunti_wait_for"],
+    workflow: ["yunti_get_tool_usage_hints", "yunti_list_browser_targets", "yunti_observe_page", "yunti_find_elements", "yunti_wait_for"],
   }
   const selectedNames = requestedTool
     ? [requestedTool]
@@ -1379,15 +1470,17 @@ export function toolUsageHints(args = {}) {
     }
   }
   return {
-    version: "2026-07-17",
+    version: "2026-07-22",
     coreRules: [
       "Every browser-facing yunti_* tool call requires userId.",
       "browserSessionId is the current user's browser route; tabId and targetId are selectors, not permissions.",
       "yunti_list_browser_targets is the canonical live browser inventory.",
       "yunti_list_pages is a compatibility alias for the same live target inventory.",
       "For page operations, prefer observe -> act by fresh uid -> observe/verify once yunti_observe_page is available.",
-      "In 0.2.3+, one browser controller transports all browser and page tools; page sessions do not open independent long polls.",
-      "If an old page browserSessionId is stale, Yunti recovers its live tab automatically; otherwise list targets without the stale id and pass tabId or targetId to the page tool.",
+      "In 0.2.5+, one controller per browser/profile transports that instance's browser and page tools; page sessions do not open independent long polls.",
+      "Treat retryable, retryBudget, recoveryAction, and resultUncertain as authoritative. One failure chain shares one retry budget across all recovery layers.",
+      "YUNTI_BRIDGE_RUNTIME_MISMATCH, YUNTI_EXTENSION_PROTOCOL_MISMATCH, and YUNTI_BROWSER_INSTANCE_AMBIGUOUS have retryBudget=0; stop and follow recoveryAction instead of retrying.",
+      "If a page browserSessionId is stale, follow the structured recoveryAction and spend at most its shared retryBudget; never retry the expired id itself.",
       "After yunti_new_page, use the returned browserSessionId for follow-up calls on the new tab.",
       "The controller heartbeat keeps metadata for tabs that still exist and removes routes for closed tabs.",
       "If a tool call fails due to parameters, inspect this hint output and the tool schema before retrying.",
@@ -1408,8 +1501,10 @@ export function toolUsageHints(args = {}) {
         "If you only have tabId or targetId, use yunti_cdp_send_command routed through the current browserSessionId.",
       ],
       recoverRoute: [
-        "Retry a stale legacy page browserSessionId once; 0.2.3+ extracts its tab id and recovers through the controller.",
-        "If that cannot identify a live tab, call yunti_list_browser_targets without the stale id.",
+        "Read the structured failure first. Retry only when retryable=true and never exceed retryBudget for the entire recovery chain.",
+        "For YUNTI_SESSION_STALE, discard the stale id, call yunti_list_browser_targets once, and spend the single retry on the selected live page route.",
+        "For YUNTI_EXTENSION_PROTOCOL_MISMATCH, do not call another browser tool until doctor reports matching runtime, extension, and protocol versions.",
+        "For YUNTI_BRIDGE_RUNTIME_MISMATCH, restart the MCP/bridge process and run doctor; an old process owning the port cannot be repaired by retrying a page tool.",
         "Use the page browserSessionId when registered, or pass the returned tabId/targetId directly to the page tool for automatic registration.",
       ],
       evaluate: [
@@ -1435,6 +1530,7 @@ export function toolUsageHints(args = {}) {
         "Call yunti_get_tool_usage_hints when tool usage is uncertain.",
         "Call yunti_list_browser_targets and choose the intended page browserSessionId or tabId/targetId.",
         "Call yunti_observe_page before page actions and use fresh uids whenever possible.",
+        "Use yunti_find_elements when a smaller targeted candidate set is enough and you want to avoid a full-page observation.",
         "Select content-script actions or CDP based on expected reliability; switch to CDP freely when it offers better targeting, input, observation, or verification.",
         "After every action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.",
         "For async rendering, validation, navigation, option loading, or infinite scroll, call yunti_wait_for, then yunti_observe_page, then continue with a fresh uid.",
@@ -1498,6 +1594,12 @@ export function toolUsageHints(args = {}) {
           "If code=WAIT_TIMEOUT, observe or inspect current page state before adjusting the condition or retrying.",
           "Do not reuse pre-wait uids for newly rendered content.",
           "Verify the final result with observe, snapshot, evaluate, screenshot, network, or console tools.",
+        ],
+        findTargetedElement: [
+          "Call yunti_find_elements with a query such as Save, Search, Submit, or a field label.",
+          "Optionally narrow by role, tag, or placeholder when the page has many matches.",
+          "Use the returned fresh uid for click/fill/select, then verify with yunti_observe_page or evaluate.",
+          "If no result is returned, broaden the query, scroll, or fall back to yunti_observe_page.",
         ],
       },
       actionResultContract: [

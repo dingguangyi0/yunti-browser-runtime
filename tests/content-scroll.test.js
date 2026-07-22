@@ -19,6 +19,8 @@ class FakeElement {
     this.textContent = options.textContent || this.innerText || ""
     this.parentElement = options.parentElement || null
     this.children = options.children || []
+    this.contentDocument = options.contentDocument || null
+    this.contentWindow = options.contentWindow || (this.contentDocument ? { document: this.contentDocument } : null)
     this.style = options.style || { display: "block", visibility: "visible", opacity: "1" }
     this.scrollLeft = options.scrollLeft || 0
     this.scrollTop = options.scrollTop || 0
@@ -48,6 +50,18 @@ class FakeElement {
     this.scrollLeft += Number(left || 0)
     this.scrollTop += Number(top || 0)
   }
+
+  scrollIntoView() {}
+
+  click() {
+    this.clicked = true
+  }
+
+  dispatchEvent() {
+    return true
+  }
+
+  focus() {}
 }
 
 function createContentHarness({ elementFromPoint, documentScrollTop = 0 } = {}) {
@@ -78,6 +92,14 @@ function createContentHarness({ elementFromPoint, documentScrollTop = 0 } = {}) 
     navigator: { userAgent: "Chrome/123", platform: "macOS", language: "en-US" },
     window: { innerWidth: 800, innerHeight: 600, confirm: () => true },
     Node: { ELEMENT_NODE: 1 },
+    Event: class FakeEvent {
+      constructor(type, options = {}) {
+        this.type = type
+        this.bubbles = Boolean(options.bubbles)
+      }
+    },
+    HTMLSelectElement: FakeElement,
+    HTMLTextAreaElement: FakeElement,
     CSS: { escape: (value) => String(value) },
     Map,
     URL,
@@ -105,6 +127,27 @@ function createContentHarness({ elementFromPoint, documentScrollTop = 0 } = {}) 
   const source = readFileSync(resolve("extension/content.js"), "utf8")
   vm.runInContext(source, context, { filename: "extension/content.js" })
   return context
+}
+
+function createDocumentStub({ elementFromPoint } = {}) {
+  return {
+    title: "Nested Document",
+    body: new FakeElement("body"),
+    documentElement: new FakeElement("html", {}, {
+      scrollTop: 0,
+      scrollHeight: 800,
+      clientHeight: 300,
+    }),
+    scrollingElement: new FakeElement("html", {}, {
+      scrollTop: 0,
+      scrollHeight: 800,
+      clientHeight: 300,
+    }),
+    forms: [],
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    elementFromPoint: elementFromPoint || (() => null),
+  }
 }
 
 test("content scroll reports coordinate container hit metadata", () => {
@@ -156,4 +199,89 @@ test("content scroll reports coordinate document fallback metadata", () => {
   })
   assert.equal(result.scrollContainerFound, false)
   assert.equal(result.coordinateScrollFallback, "document")
+})
+
+test("content scroll resolves same-origin iframe coordinate targets", () => {
+  const childButton = new FakeElement("button", { id: "child-action" }, {
+    innerText: "Child action",
+    rect: { x: 10, y: 15, width: 100, height: 30 },
+  })
+  const childDocument = createDocumentStub({
+    elementFromPoint: (x, y) => (x === 30 && y === 45 ? childButton : null),
+  })
+  const frame = new FakeElement("iframe", { id: "child-frame" }, {
+    rect: { x: 100, y: 200, width: 300, height: 200 },
+    contentDocument: childDocument,
+  })
+  const context = createContentHarness({
+    elementFromPoint: (x, y) => (x === 130 && y === 245 ? frame : null),
+  })
+
+  const result = context.scrollPage({ x: 130, y: 245, deltaY: 160 })
+
+  assert.equal(result.scrolled, true)
+  assert.deepEqual(plain(result.coordinateTarget), {
+    x: 130,
+    y: 245,
+    found: true,
+    element: {
+      selector: "#child-action",
+      tag: "button",
+      id: "child-action",
+      className: null,
+      text: "Child action",
+    },
+  })
+  assert.equal(result.scrollContainerFound, false)
+  assert.equal(result.coordinateScrollFallback, "document")
+})
+
+test("content click selector auto-waits for element appearance", async () => {
+  const button = new FakeElement("button", { id: "menu" }, { innerText: "Open menu" })
+  let ready = false
+  const context = createContentHarness()
+  context.document.querySelector = (selector) => selector === "#menu" && ready ? button : null
+  setTimeout(() => { ready = true }, 50)
+
+  const result = await context.clickElement({ selector: "#menu", timeoutMs: 250 })
+
+  assert.equal(result.clicked, true)
+  assert.equal(result.element.selector, "#menu")
+  assert.ok(result.actionability.waitedMs >= 0)
+})
+
+test("content fill selector auto-waits for disabled target to become enabled", async () => {
+  const input = new FakeElement("input", { id: "name" }, {
+    rect: { x: 20, y: 20, width: 180, height: 32 },
+  })
+  input.value = ""
+  input.disabled = true
+  const context = createContentHarness()
+  context.document.querySelector = (selector) => selector === "#name" ? input : null
+  setTimeout(() => { input.disabled = false }, 50)
+
+  const result = await context.fillElement({ selector: "#name", value: "Yunti", timeoutMs: 250 })
+
+  assert.equal(result.filled, true)
+  assert.equal(result.valueApplied, true)
+  assert.equal(input.value, "Yunti")
+  assert.ok(result.actionability.waitedMs >= 0)
+})
+
+test("content click selector returns structured actionability timeout", async () => {
+  const context = createContentHarness()
+  context.document.querySelector = () => null
+
+  const result = await context.clickElement({ selector: "#missing", timeoutMs: 0 })
+
+  assert.deepEqual(plain(result), {
+    clicked: false,
+    selector: "#missing",
+    code: "ELEMENT_NOT_FOUND",
+    error: "Element not found: #missing",
+    actionability: {
+      waitedMs: 0,
+      retryable: true,
+    },
+  })
 })

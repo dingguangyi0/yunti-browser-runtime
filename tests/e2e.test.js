@@ -9,6 +9,10 @@ import { handleJsonRpc, startBridgeServer } from "../mcp/server.js"
 import packageJson from "../package.json" with { type: "json" }
 
 const runE2e = process.env.YUNTI_E2E === "1"
+const e2eExecutablePath = String(process.env.YUNTI_E2E_EXECUTABLE_PATH || "").trim()
+const secondE2eExecutablePath = String(
+  process.env.YUNTI_E2E_SECOND_EXECUTABLE_PATH || ""
+).trim()
 const rootDir = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const extensionDir = join(rootDir, "extension")
 
@@ -26,12 +30,18 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
   const bridgeUrl = `http://127.0.0.1:${bridgePort}`
   const pageServer = await startTestPageServer()
   const userDataDir = await mkdtemp(join(tmpdir(), "yunti-browser-profile-"))
+  const secondUserDataDir = secondE2eExecutablePath
+    ? await mkdtemp(join(tmpdir(), "yunti-browser-profile-second-"))
+    : ""
   let context = null
   let page = null
+  let secondContext = null
+  let secondPage = null
 
   try {
     context = await playwright.chromium.launchPersistentContext(userDataDir, {
       headless: false,
+      ...(e2eExecutablePath ? { executablePath: e2eExecutablePath } : {}),
       args: [
         `--disable-extensions-except=${extensionDir}`,
         `--load-extension=${extensionDir}`,
@@ -71,6 +81,44 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_EXTENSION_CONTROLLER"), false)
     assert.equal(consoleState.warnings.some((warning) => warning.code === "NO_PAGE_SESSIONS"), false)
     assert.equal(consoleState.warnings.some((warning) => warning.code === "EXTENSION_VERSION_MISMATCH"), false)
+
+    if (secondE2eExecutablePath) {
+      secondContext = await playwright.chromium.launchPersistentContext(secondUserDataDir, {
+        headless: false,
+        executablePath: secondE2eExecutablePath,
+        args: [
+          `--disable-extensions-except=${extensionDir}`,
+          `--load-extension=${extensionDir}`,
+        ],
+      })
+      const secondWorker = await getExtensionWorker(secondContext)
+      await secondWorker.evaluate(
+        ({ bridgeUrl: runtimeBridgeUrl }) =>
+          chrome.storage.local.set({
+            bridgeUrl: runtimeBridgeUrl,
+            bridgeToken: "",
+            platformMatches: ["*"],
+            localUserId: "local",
+            localUserName: "local",
+          }),
+        { bridgeUrl }
+      )
+      secondPage = await secondContext.newPage()
+      await secondPage.goto(`${pageServer.url}?browser=second`)
+      await waitForControllerCount(bridgeUrl, 2)
+
+      const multiBrowserTargets = await callTool(
+        bridge,
+        "yunti_list_browser_targets",
+        {}
+      )
+      assert.equal(multiBrowserTargets.multiBrowser, true)
+      assert.equal(multiBrowserTargets.browserCount, 2)
+      assert.deepEqual(
+        new Set(multiBrowserTargets.browsers.map((browser) => browser.browserFamily)),
+        new Set(["chrome", "edge"])
+      )
+    }
 
     const targets = await callTool(bridge, "yunti_list_browser_targets", { browserSessionId })
     assert.ok(targets.total >= 1)
@@ -152,10 +200,14 @@ test("real browser extension bridge smoke", { skip: runE2e ? false : "set YUNTI_
     t.diagnostic(`E2E artifacts: ${artifactDir}`)
     throw error
   } finally {
+    await secondContext?.close().catch(() => {})
     await context?.close().catch(() => {})
     await pageServer.close()
     await new Promise((resolvePromise) => bridge.server.close(resolvePromise))
     await rm(userDataDir, { recursive: true, force: true }).catch(() => {})
+    if (secondUserDataDir) {
+      await rm(secondUserDataDir, { recursive: true, force: true }).catch(() => {})
+    }
   }
 })
 
@@ -216,6 +268,17 @@ async function waitForBrowserSession(bridgeUrl) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
   }
   throw new Error("Timed out waiting for extension page registration")
+}
+
+async function waitForControllerCount(bridgeUrl, expectedCount) {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    const response = await fetch(`${bridgeUrl}/health?userId=local`)
+    const health = await response.json()
+    if (Number(health.controllerCount || 0) >= expectedCount) return health
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
+  }
+  throw new Error(`Timed out waiting for ${expectedCount} browser controllers`)
 }
 
 async function getConsoleState(bridgeUrl) {

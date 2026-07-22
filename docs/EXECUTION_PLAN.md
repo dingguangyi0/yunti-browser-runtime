@@ -2,6 +2,111 @@
 
 本文档记录 Yunti Browser Runtime 从本地 MVP 走向可开源、可长期稳定使用版本的执行计划。
 
+## 0.2.5 当前执行锚点
+
+`0.2.5` 暂停继续扩张 P8 新能力，先完成可靠性收敛。详细范围与验收见
+[RELEASE_0_2_5.md](RELEASE_0_2_5.md)。
+
+执行顺序：
+
+1. runtime/extension 实际版本与协议 fail-fast：已完成。
+2. Chrome、Edge、不同 profile controller 并存与页面归属隔离：已完成。
+3. 多浏览器 target 聚合、结构化重试预算、Skills/hints 同步：已完成。
+4. 完整 unit/release check：已完成。
+5. 生成体验包并完成真实 Chrome/Edge 及同时在线回归：已完成。
+6. 只有体验验证通过后才发布 npm；当前 npm 稳定版仍为 `0.2.4`。
+
+本版本不新增 MCP 工具，不推进 remote mode，不把 P8.2.2 之后的新能力混入
+稳定性修复。
+
+## Post-0.2.3 / P8 当前执行锚点
+
+详细竞品证据、Yunti 代码缺口和 P8 验收指标已沉淀到
+[COMPETITOR_RESEARCH_2026.md](COMPETITOR_RESEARCH_2026.md)。恢复上下文时，应先
+读取该文档，再阅读本文的历史执行记录。
+
+当前原则：
+
+- 重点吸收 Alibaba Page Agent 和 browser-use；停更项目不进入优先级。
+- 其他活跃项目只用于校准 actionability、诊断、安全和评测契约。
+- 不改变 Yunti local-first、existing-browser、MCP-native、无强制 LLM、细粒度
+  `yunti_*` 工具、单 controller 会话恢复和 CDP 完整能力。
+- P8 每次只推进一个可验收切片，先记录目标、非目标和指标，再改代码。
+- 不确定的写操作绝不跨后端盲目重放。
+
+当前 P8 阶段总览：
+
+| 阶段 | 状态 | 交付目标 |
+| --- | --- | --- |
+| P8 调研与差距审计 | 已完成 | 主参考、代码证据、护栏、P0-P2 路线 |
+| Edge session recovery hotfix | 本地已完成 | Edge sleeping tab 探测/注入超时、controller 非阻塞 poll、watchdog、旧 session 自动恢复 |
+| P8.0 | 已完成基线 | 30+ 场景 benchmark，记录 `0.2.3` 成功率、恢复率、错误动作、延迟和观察体积 |
+| P8.1 | 第一轮已完成 | Observation v2：find、delta、iframe/shadow 深层目标 |
+| P8.2 | 已启动，P8.2.1 完成 | 统一 actionability、typed events、bounded auto-wait、取消和后置验证 |
+| P8.3 | 未开始 | 可验证语义目标 recipe 和安全自愈 |
+| P8.4 | 未开始 | 脱敏 trajectory、failure bundle 和 replay |
+| P8.5 | 未开始 | origin policy、不可信页面内容标记、注入攻击 fixtures |
+| P8.6 | 未开始 | core/devtools/full profile、扩展商店更新路径 |
+| P8.7 | 后置 | 可选远程浏览器 provider，不改变本地默认 |
+| P8.8 | 后置 | Lighthouse、性能洞察、screencast、heap diagnostics |
+
+下一步自然推进提示词：
+
+```text
+继续推进 Yunti Browser Runtime。先读取 docs/COMPETITOR_RESEARCH_2026.md、
+docs/PROJECT_STATUS.md、docs/EXECUTION_PLAN.md 和 docs/NEXT_MAJOR_PLAN.md。
+Page Agent 和 browser-use 是主参考，停更项目不进入优先级；不要把 Yunti 改成任何
+竞品的克隆。Edge sleeping-tab/session recovery hotfix 已完成本地真实验证，先保持该
+稳定性修复，不回退到要求用户刷新页面。下一步继续 P8.2.2：把 uid/coordinate 路径
+并入统一 actionability，并补 typed lifecycle/cancellation 的最小切片；每次只推进一个
+可验收改动，并用 benchmark 记录成功率、错误动作率、恢复率、重复写入和 p50/p95。
+保留 local-first、existing-browser、MCP-native、单 controller、细粒度工具、
+redaction 和 unrestricted CDP。
+```
+
+P8 当前已完成切片：
+
+- P8.0 benchmark baseline 已完成：首轮可用基线 artifact 位于
+  `.artifacts/benchmark/2026-07-19T05-33-41-631Z/`，15/15 已实现场景通过，
+  duplicate writes 为 0，p50 duration 112 ms，p95 duration 10227 ms。
+- P8.1.1 已完成：新增 `yunti_find_elements`，提供 bounded targeted find，
+  降低必须整页 observe 才能定位单一目标的成本。
+- P8.1.2 已完成：`yunti_observe_page`、`yunti_find_elements` 和
+  `scrollableContainers[]` 现在会递归覆盖 open shadow roots，并显式排除
+  Yunti 自身注入 widget，避免 agent 把扩展 UI 当成业务目标。
+- P8.1.3 已完成：`yunti_observe_page` 和 `yunti_find_elements` 现在会递归覆盖
+  same-origin iframe 内的交互目标与 scrollable container；返回 rect 会折算到
+  顶层 viewport 坐标。内容脚本的坐标命中路径也已同步支持 same-origin iframe，
+  因此 observe 得到的新 uid 在 click/fill/type/select/press 的既有坐标链路上仍可
+  用。当前仍未引入多 frame 独立 session，也不覆盖跨域 iframe。
+- P8.1.4 已完成：`yunti_observe_page` 新增 additive 的
+  `responseMode: "delta"`。delta 模式会相对上一次 observe 返回更轻的页面/滚动
+  变化摘要、文本树变化标记、变化计数和 bounded changed-entry metadata，而不会替换
+  正常 full observe 的 actionable uid map。适合重复验证，不适合直接选择下一步 uid。
+- P8.2.1 已完成：先把 selector 路径收成第一版统一 actionability / bounded
+  auto-wait。content script 里的 selector click、hover、fill、type、press 和
+  select 现在共享短等待和 readiness 检查，覆盖 presence、visibility、
+  enabled/editable、tag expectation 和 receives-events。目标存在但暂时不可操作时，
+  结构化失败会明确提示先 wait/observe 再重试，而不是把失败都折叠成同一种 selector miss。
+- Edge session recovery hotfix 已完成本地实现和真实 Edge 150 验证：controller poll
+  不再 await 整个工具执行；content-script probe/injection 和工具执行均有有界超时；
+  recovery alarm 会通过 poll-progress watchdog 替换卡死 poller；Edge sleeping tab
+  后台注入卡住时会临时激活目标 tab、完成注入后恢复原 tab。真实验证覆盖安装后零页面
+  session 发现 21 个旧 tab、同一 sleeping tab 自动恢复，以及扩展 reload 后继续使用旧
+  page session id，均不要求刷新页面。
+
+P8.0 详细计划：
+
+- 基线文档已写入
+  [RELIABILITY_BENCHMARK_PLAN.md](RELIABILITY_BENCHMARK_PLAN.md)。
+- 当前完成的是 benchmark 契约、场景矩阵、指标口径、artifact 规则、fixture 页面、
+  scenario manifest、runner 入口、npm 脚本和基础校验测试。
+- 尚未完成的是 30+ 场景的完整 runner 覆盖；首轮 `0.2.3` baseline 报告已完成。
+- 当前自然推进顺序不是回退重跑基线，而是继续 P8.2：
+  先把 uid/coordinate 路径也并入统一 actionability，再补 typed lifecycle /
+  cancellation / richer wait diagnostics，最后把这些改动纳入 benchmark runner 的更多
+  场景闭环。
+
 维护规则：
 
 - 每完成一个阶段，都要更新本文档的状态。
@@ -31,6 +136,7 @@
 | P0.3 | 已完成 | browser controller 心跳 / 页面按需注册 |
 | P0.4 | 已完成 | 单 controller 传输 / 页面 session 稳定恢复 |
 | P0.5 | 已完成 | CDP 一等能力 / 成功率优先的后端选择策略 |
+| P0.6 | 本地已完成 | Edge sleeping tab / 卡死 controller poller 自动恢复 |
 | P1.1 | 已完成 | doctor 增强 |
 | P1.2 | 已完成 | MCP config printer |
 | P1.3 | 已完成 | extension 打包脚本 |

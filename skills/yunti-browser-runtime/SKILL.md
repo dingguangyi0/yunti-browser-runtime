@@ -20,7 +20,8 @@ Then call `yunti_list_browser_targets` to understand the live browser state befo
 4. Prefer fresh uids for click, hover, fill, select, scroll, type, press, upload, and drag operations.
 5. After each action, verify by observing again or using snapshot, evaluate, screenshot, network, or console tools.
 6. For async rendering, validation, navigation, option loading, or infinite scroll, call `yunti_wait_for`, then `yunti_observe_page`, then continue with a fresh uid.
-7. If a result has `ok: false`, `code`, `recoveryHint`, or `nextStepHint`, follow that guidance before retrying.
+7. If a result has `ok: false`, read `retryable`, `retryBudget`,
+   `recoveryAction`, and `resultUncertain`; retry only when explicitly allowed.
 8. Use selector or coordinate fallback only when fresh uids are unavailable or as an explicit recovery/debugging path.
 
 Ask the user before submitting, deleting, approving, purchasing, publishing, uploading sensitive files, changing production data, exposing secrets, or taking an action whose effect cannot be verified from page state.
@@ -33,7 +34,8 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
    target `tabId` / `targetId`.
 2. Call `yunti_observe_page` and choose the target element uid from the fresh observation.
 3. Call `yunti_click` with `browserSessionId` and `uid`.
-4. Read `ok`, `code`, `recoverable`, `recoveryHint`, and `nextStepHint`; if recoverable, follow the hint before retrying.
+4. Read `ok`, `code`, `retryable`, `retryBudget`, `recoveryHint`, and
+   `nextStepHint`; retry only when the shared budget allows it.
 5. Call `yunti_observe_page` again or use screenshot/evaluate to verify the expected page change.
 
 ### Fill Form
@@ -72,21 +74,31 @@ Ask the user before submitting, deleting, approving, purchasing, publishing, upl
 ## Routing Rules
 
 - Treat `yunti_list_browser_targets` as the canonical live browser inventory.
-- In `0.2.3+`, the extension uses one browser-controller transport for browser
-  and page tools. Page actions remain content-script based; the controller
-  resolves the target tab and establishes the page session on demand.
+- In `0.2.5+`, each browser/profile uses one browser-controller transport for
+  its browser and page tools. Chrome, Edge, and separate profiles may coexist;
+  page actions route through the controller identified by `browserInstanceId`
+  and `routeBrowserSessionId`.
 - A target inventory row has a page `browserSessionId` only when registered.
   `routeBrowserSessionId` is the controller transport and must not be mistaken
   for the page id.
 - Keep the returned `browserSessionId` for follow-up page and CDP calls.
-- If a stored page `browserSessionId` is stale, retry once normally: `0.2.3+`
-  recovers legacy ids containing a live tab id. Otherwise list targets without
-  the stale id and pass the intended `tabId` / `targetId` to the page tool.
+- Treat `retryable`, `retryBudget`, `recoveryAction`, and `resultUncertain` as
+  authoritative. One failure chain has one shared retry budget; do not let the
+  MCP client, this skill, and a fallback backend each spend a separate retry.
+- For `YUNTI_SESSION_STALE`, discard the stale id, list targets once, and spend
+  the single retry on the selected live page route.
+- For `YUNTI_BRIDGE_RUNTIME_MISMATCH`,
+  `YUNTI_EXTENSION_PROTOCOL_MISMATCH`, or
+  `YUNTI_BROWSER_INSTANCE_AMBIGUOUS`, retry zero times. Follow
+  `recoveryAction`; do not probe with other page tools.
+- If `resultUncertain: true`, verify current page state before deciding whether
+  another call is safe. Never replay a possibly completed write through DOM or
+  CDP without verification.
 - In `0.2.4+`, Edge sleeping tabs are recovered automatically. The runtime may
   briefly activate the target tab to restore the content-script route and then
   return to the user's previously active tab. Do not ask the user to switch,
   refresh, or reopen the page before this automatic recovery has failed.
-- Stale-session errors include a reason and recovery hint; do not keep retrying the expired id.
+- Stale-session errors include a reason and recovery hint; never retry the expired id itself.
 - New tabs may return a new `browserSessionId`; use that returned value for follow-up actions on the new tab.
 - `tabId` / `targetId` may be passed to page tools specifically for automatic
   route recovery; they do not become page session ids.

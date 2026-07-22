@@ -34,9 +34,11 @@
   const PAYMENT_CARD_RE = /(?:^|[^\d])(?:\d[ -]?){13,19}(?:$|[^\d])/
   const ADDRESS_RE =
     /\b\d{1,6}\s+[\p{L}0-9 .'-]{2,}\s+(street|st|road|rd|avenue|ave|lane|ln|boulevard|blvd|drive|dr|way|court|ct)\b|[\p{Script=Han}]{1,20}(省|市|区|县|路|街|号楼|单元|室)/iu
+  let lastObservationState = null
 
   function observePage(args = {}) {
     const mode = args.mode === "fullPage" ? "fullPage" : "viewport"
+    const responseMode = args.responseMode === "delta" ? "delta" : "full"
     const maxElements = clampInteger(args.maxElements, 1, MAX_ELEMENTS, DEFAULT_MAX_ELEMENTS)
     const maxTextLength = clampInteger(args.maxTextLength, 0, MAX_TEXT_LENGTH, DEFAULT_MAX_TEXT_LENGTH)
     const includeHidden = Boolean(args.includeHidden)
@@ -51,7 +53,7 @@
     }
 
     const scope = mode === "fullPage" ? "fullPage" : "viewport"
-    const candidates = Array.from(document.querySelectorAll(INTERACTIVE_SELECTOR))
+    const candidates = collectInteractiveCandidates()
     const elements = []
     const textLines = []
     let uidCounter = 0
@@ -87,12 +89,14 @@
     const warnings = []
     if (redaction === "off") warnings.push("DOM observation redaction is off; use only for explicit local debugging.")
     if (document.readyState === "loading") hints.push("Page is still loading; wait and observe again before acting.")
-
-    return {
-      observationId: `obs-${Date.now()}`,
+    const observationId = `obs-${Date.now()}`
+    const capturedAt = new Date().toISOString()
+    const baseObservation = {
+      observationId,
       browserSessionId: globalScope.__YUNTI_BROWSER_SESSION_ID__ || null,
-      capturedAt: new Date().toISOString(),
+      capturedAt,
       uidMapVersion: "observe-v1",
+      responseMode,
       page: {
         url: redactUrl(location.href, redaction, redactions),
         title: redactTextPreview("page title", document.title || "", 300, { redaction, redactions }),
@@ -121,6 +125,321 @@
       hints,
       warnings,
     }
+
+    if (responseMode !== "delta") {
+      lastObservationState = captureObservationState(baseObservation)
+      return baseObservation
+    }
+
+    const deltaObservation = buildDeltaObservation(baseObservation, lastObservationState)
+    lastObservationState = captureObservationState(baseObservation)
+    return deltaObservation
+  }
+
+  function findElements(args = {}) {
+    const query = String(args.query || "").trim().toLowerCase()
+    const roleFilter = String(args.role || "").trim().toLowerCase()
+    const tagFilter = String(args.tag || "").trim().toLowerCase()
+    const placeholderFilter = String(args.placeholder || "").trim().toLowerCase()
+    const includeHidden = Boolean(args.includeHidden)
+    const includeRects = args.includeRects !== false
+    const redaction = normalizeRedaction(args.redaction)
+    const maxResults = clampInteger(args.maxResults, 1, 50, 10)
+    const redactions = {
+      mode: redaction,
+      count: 0,
+      categories: [],
+      screenshotRedacted: false,
+    }
+
+    const candidates = collectInteractiveCandidates()
+    const matches = []
+    let uidCounter = 0
+
+    for (const element of candidates) {
+      if (matches.length >= maxResults) break
+      if (isYuntiWidgetElement(element)) continue
+      const visible = isVisible(element)
+      if (!includeHidden && !visible) continue
+
+      uidCounter += 1
+      const item = describeElement(element, `yunti-${uidCounter}`, {
+        includeRects,
+        redaction,
+        redactions,
+        visible,
+      })
+      if (!matchesElement(item, {
+        query,
+        roleFilter,
+        tagFilter,
+        placeholderFilter,
+      })) continue
+      matches.push(item)
+    }
+
+    return {
+      observationId: `find-${Date.now()}`,
+      browserSessionId: globalScope.__YUNTI_BROWSER_SESSION_ID__ || null,
+      capturedAt: new Date().toISOString(),
+      uidMapVersion: "observe-v1",
+      query: cleanObject({
+        query: query || undefined,
+        role: roleFilter || undefined,
+        tag: tagFilter || undefined,
+        placeholder: placeholderFilter || undefined,
+        maxResults,
+        includeHidden,
+      }),
+      matchCount: matches.length,
+      matches,
+      redactions: finalizeRedactions(redactions),
+      hints: matches.length
+        ? ["Use the returned fresh uid for click/fill/select, then verify with yunti_observe_page or evaluate."]
+        : ["No matching interactive elements found. Broaden the query, scroll, or fall back to yunti_observe_page."],
+    }
+  }
+
+  function collectInteractiveCandidates() {
+    return collectFromRoots((root) => queryAll(root, INTERACTIVE_SELECTOR))
+  }
+
+  function collectScrollableCandidates() {
+    return collectFromRoots((root) => queryAll(root, "body *"))
+  }
+
+  function collectFromRoots(selectElements) {
+    const visitedRoots = new Set()
+    const visitedElements = new Set()
+    const results = []
+    const roots = [{ root: document, offsetX: 0, offsetY: 0 }]
+
+    while (roots.length) {
+      const entry = roots.shift()
+      const root = entry?.root
+      const offsetX = Number(entry?.offsetX || 0)
+      const offsetY = Number(entry?.offsetY || 0)
+      if (!root || visitedRoots.has(root)) continue
+      visitedRoots.add(root)
+
+      for (const element of selectElements(root)) {
+        if (!element || visitedElements.has(element)) continue
+        visitedElements.add(element)
+        if (isInsideYuntiWidget(element)) continue
+        setObservationOffset(element, offsetX, offsetY)
+        results.push(element)
+      }
+
+      for (const element of queryAll(root, "body *")) {
+        const shadowRoot = element?.shadowRoot
+        if (shadowRoot && !isYuntiWidgetHost(element)) {
+          roots.push({ root: shadowRoot, offsetX, offsetY })
+        }
+        const iframeDocument = getSameOriginIframeDocument(element)
+        if (iframeDocument) {
+          const iframeRect = rectInfo(element, { offsetX, offsetY })
+          roots.push({
+            root: iframeDocument,
+            offsetX: iframeRect.x,
+            offsetY: iframeRect.y,
+          })
+        }
+      }
+    }
+
+    return results
+  }
+
+  function queryAll(root, selector) {
+    if (!root || typeof root.querySelectorAll !== "function") return []
+    try {
+      return Array.from(root.querySelectorAll(selector))
+    } catch {
+      return []
+    }
+  }
+
+  function getSameOriginIframeDocument(element) {
+    if (!element || element.tagName?.toLowerCase?.() !== "iframe") return null
+    try {
+      const frameDocument = element.contentDocument || element.contentWindow?.document || null
+      return frameDocument?.documentElement ? frameDocument : null
+    } catch {
+      return null
+    }
+  }
+
+  function captureObservationState(observation) {
+    const elements = Array.isArray(observation?.elements) ? observation.elements : []
+    const scrollableContainers = Array.isArray(observation?.scrollableContainers) ? observation.scrollableContainers : []
+    return {
+      observationId: observation.observationId,
+      capturedAt: observation.capturedAt,
+      pageSignature: JSON.stringify({
+        url: observation?.page?.url || "",
+        title: observation?.page?.title || "",
+        readyState: observation?.page?.readyState || "",
+      }),
+      scrollSignature: JSON.stringify(observation?.scroll || {}),
+      textTree: observation?.textTree || "",
+      elementCount: Number(observation?.elementCount || elements.length || 0),
+      scrollableContainerCount: scrollableContainers.length,
+      elementsByIdentity: buildElementIdentityMap(elements),
+      scrollablesByIdentity: buildElementIdentityMap(scrollableContainers),
+    }
+  }
+
+  function buildDeltaObservation(observation, previousState) {
+    const currentElements = Array.isArray(observation?.elements) ? observation.elements : []
+    const currentScrollables = Array.isArray(observation?.scrollableContainers) ? observation.scrollableContainers : []
+    const currentElementMap = buildElementIdentityMap(currentElements)
+    const currentScrollableMap = buildElementIdentityMap(currentScrollables)
+    const changedElements = summarizeChangedEntries(currentElementMap, previousState?.elementsByIdentity)
+    const changedScrollables = summarizeChangedEntries(currentScrollableMap, previousState?.scrollablesByIdentity)
+    const samePage = previousState?.pageSignature === JSON.stringify({
+      url: observation?.page?.url || "",
+      title: observation?.page?.title || "",
+      readyState: observation?.page?.readyState || "",
+    })
+    const sameScroll = previousState?.scrollSignature === JSON.stringify(observation?.scroll || {})
+    const sameTextTree = previousState?.textTree === (observation?.textTree || "")
+    const firstDelta = !previousState
+    const changedElementCount = changedElements.added.length + changedElements.removed.length + changedElements.updated.length
+    const changedScrollableCount = changedScrollables.added.length + changedScrollables.removed.length + changedScrollables.updated.length
+    const deltaHints = [
+      changedElementCount || changedScrollableCount || !samePage || !sameScroll || !sameTextTree
+        ? "Delta observation detected page changes. Run full yunti_observe_page before choosing a fresh uid for the next action."
+        : "Delta observation found no meaningful page changes. Use yunti_wait_for, scroll, or switch tabs before repeating the same action.",
+    ]
+
+    return cleanObject({
+      observationId: observation.observationId,
+      browserSessionId: observation.browserSessionId,
+      capturedAt: observation.capturedAt,
+      uidMapVersion: observation.uidMapVersion,
+      responseMode: "delta",
+      baselineObservationId: previousState?.observationId,
+      page: observation.page,
+      viewport: observation.viewport,
+      scroll: observation.scroll,
+      elementCount: observation.elementCount,
+      scrollableContainerCount: currentScrollables.length,
+      redactions: observation.redactions,
+      warnings: observation.warnings,
+      limits: observation.limits,
+      delta: {
+        firstObservation: firstDelta,
+        pageChanged: !samePage,
+        scrollChanged: !sameScroll,
+        textTreeChanged: !sameTextTree,
+        textTreeLength: observation?.textTree ? observation.textTree.length : 0,
+        previousTextTreeLength: previousState?.textTree ? previousState.textTree.length : 0,
+        changedElementCount,
+        changedScrollableContainerCount: changedScrollableCount,
+        previousElementCount: previousState?.elementCount,
+        previousScrollableContainerCount: previousState?.scrollableContainerCount,
+        changedElements: trimChangedEntries(changedElements),
+        changedScrollableContainers: trimChangedEntries(changedScrollables),
+      },
+      hints: deltaHints,
+      fullObservationHint: "Use responseMode=full when you need a fresh full uid map, textTree, or complete scrollableContainers for the next action.",
+    })
+  }
+
+  function buildElementIdentityMap(elements) {
+    const map = new Map()
+    for (const element of elements || []) {
+      const key = elementIdentityKey(element)
+      if (!key) continue
+      map.set(key, JSON.stringify(summarizeComparableElement(element)))
+    }
+    return map
+  }
+
+  function summarizeChangedEntries(currentMap, previousMap) {
+    const added = []
+    const removed = []
+    const updated = []
+    const previous = previousMap instanceof Map ? previousMap : new Map()
+
+    for (const [key, value] of currentMap.entries()) {
+      if (!previous.has(key)) {
+        added.push(key)
+      } else if (previous.get(key) !== value) {
+        updated.push(key)
+      }
+    }
+
+    for (const key of previous.keys()) {
+      if (!currentMap.has(key)) removed.push(key)
+    }
+
+    return { added, removed, updated }
+  }
+
+  function trimChangedEntries(changes) {
+    return {
+      added: (changes?.added || []).slice(0, 10),
+      removed: (changes?.removed || []).slice(0, 10),
+      updated: (changes?.updated || []).slice(0, 10),
+    }
+  }
+
+  function summarizeComparableElement(element) {
+    return cleanObject({
+      role: element?.role,
+      tag: element?.tag,
+      name: element?.name,
+      text: element?.text,
+      label: element?.label,
+      placeholder: element?.placeholder,
+      valuePreview: element?.valuePreview,
+      selectedText: element?.selectedText,
+      hrefPreview: element?.hrefPreview,
+      rect: element?.rect,
+      visible: element?.visible,
+      disabled: element?.disabled,
+      editable: element?.editable,
+      fillable: element?.fillable,
+      checked: element?.checked,
+      selected: element?.selected,
+      scrollTop: element?.scrollTop,
+      scrollLeft: element?.scrollLeft,
+      pixelsBelow: element?.pixelsBelow,
+      pixelsRight: element?.pixelsRight,
+    })
+  }
+
+  function elementIdentityKey(element) {
+    if (!element) return ""
+    return [
+      element.tag || "",
+      element.role || "",
+      element.name || "",
+      element.label || "",
+      element.placeholder || "",
+      element.hrefPreview || "",
+      element.rect?.x ?? "",
+      element.rect?.y ?? "",
+      element.rect?.width ?? "",
+      element.rect?.height ?? "",
+    ].join("|")
+  }
+
+  function matchesElement(item, filters) {
+    if (filters.roleFilter && String(item.role || "").toLowerCase() !== filters.roleFilter) return false
+    if (filters.tagFilter && String(item.tag || "").toLowerCase() !== filters.tagFilter) return false
+    if (filters.placeholderFilter && !String(item.placeholder || "").toLowerCase().includes(filters.placeholderFilter)) return false
+    if (!filters.query) return true
+    const haystacks = [
+      item.name,
+      item.label,
+      item.text,
+      item.placeholder,
+      item.selectedText,
+      item.hrefPreview,
+    ].filter(Boolean).map((value) => String(value).toLowerCase())
+    return haystacks.some((value) => value.includes(filters.query))
   }
 
   function describeElement(element, uid, options) {
@@ -180,7 +499,7 @@
   function collectScrollableContainers(options) {
     const containers = []
     let uidCounter = 0
-    for (const element of Array.from(document.querySelectorAll("body *"))) {
+    for (const element of collectScrollableCandidates()) {
       if (containers.length >= options.maxElements) break
       if (isYuntiWidgetElement(element) || !isVisible(element) || !isScrollable(element)) continue
       uidCounter += 1
@@ -484,7 +803,9 @@
 
   function findLabel(element) {
     if (element.id && globalScope.CSS?.escape) {
-      const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`)
+      const rootNode = element.getRootNode?.() || document
+      const lookupRoot = typeof rootNode?.querySelector === "function" ? rootNode : document
+      const label = lookupRoot.querySelector(`label[for="${CSS.escape(element.id)}"]`)
       if (label) return compactText(label.innerText || label.textContent || "", 160)
     }
     return compactText(element.closest?.("label")?.innerText || element.closest?.("label")?.textContent || "", 160)
@@ -511,7 +832,23 @@
   }
 
   function isYuntiWidgetElement(element) {
-    return Boolean(element.closest?.("#yunti-browser-runtime-widget"))
+    return Boolean(element.closest?.("#yunti-browser-runtime-widget")) || isInsideYuntiWidget(element)
+  }
+
+  function isInsideYuntiWidget(element) {
+    let current = element
+    while (current) {
+      if (isYuntiWidgetHost(current)) return true
+      const rootNode = current.getRootNode?.()
+      const host = rootNode?.host
+      if (!host || host === current) break
+      current = host
+    }
+    return false
+  }
+
+  function isYuntiWidgetHost(element) {
+    return Boolean(element?.id === "yunti-browser-runtime-widget")
   }
 
   function isVisible(element) {
@@ -540,14 +877,28 @@
     )
   }
 
-  function rectInfo(element) {
+  function rectInfo(element, offset = getObservationOffset(element)) {
     const rect = element.getBoundingClientRect()
     return {
-      x: Math.round(rect.x),
-      y: Math.round(rect.y),
+      x: Math.round(rect.x + Number(offset?.x || 0)),
+      y: Math.round(rect.y + Number(offset?.y || 0)),
       width: Math.round(rect.width),
       height: Math.round(rect.height),
     }
+  }
+
+  function setObservationOffset(element, offsetX, offsetY) {
+    if (!element || typeof element !== "object") return
+    try {
+      element.__yuntiObservationOffset = {
+        x: Number(offsetX || 0),
+        y: Number(offsetY || 0),
+      }
+    } catch {}
+  }
+
+  function getObservationOffset(element) {
+    return element?.__yuntiObservationOffset || { x: 0, y: 0 }
   }
 
   function compactText(text, maxLength) {
@@ -580,7 +931,9 @@
 
   globalScope.YuntiBrowserRuntimeObserver = {
     observePage,
+    findElements,
     _private: {
+      matchesElement,
       shouldRedact,
       redactUrl,
     },

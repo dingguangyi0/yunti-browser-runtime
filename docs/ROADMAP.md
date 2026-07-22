@@ -84,3 +84,23 @@ plan.
 Remote multi-user operation is intentionally out of the first release. It should
 be designed as a separate server layer on top of the local runtime, not mixed
 into the local core.
+
+## Phase 8: Measured Browser-Agent Reliability
+
+See [COMPETITOR_RESEARCH_2026.md](COMPETITOR_RESEARCH_2026.md) for the durable,
+evidence-backed post-`0.2.3` plan.
+
+- Use Alibaba Page Agent and browser-use as the primary references.
+- Exclude stale projects from prioritization; use other active projects only as
+  narrow evidence for actionability, diagnostics, evaluation, or security.
+- Start with P8.0 benchmark and the `0.2.3` baseline before changing runtime
+  behavior.
+- The benchmark contract and 30+ scenario matrix now live in
+  [RELIABILITY_BENCHMARK_PLAN.md](RELIABILITY_BENCHMARK_PLAN.md).
+- Follow with Observation v2, unified actionability/auto-wait, validated target
+  recipes, sanitized trajectories, trust boundaries, capability profiles, and
+  extension distribution.
+- Keep remote browsers and advanced DevTools insight packs optional and later
+  than measurable local reliability improvements.
+- Preserve local existing-browser operation, fine-grained MCP tools, the single
+  controller transport, redaction, and unrestricted CDP.

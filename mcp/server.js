@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import readline from "node:readline"
 import { pathToFileURL } from "node:url"
+import packageJson from "../package.json" with { type: "json" }
 import { DEFAULT_TOOL_TIMEOUT_MS, normalizeRouteUserId, requireRouteUserId } from "./bridge-hub.js"
 import {
   BRIDGE_TOKEN_HEADER,
@@ -19,7 +20,11 @@ import {
 } from "./tools.js"
 
 export { TOOLS } from "./tools.js"
-export { BridgeHub, DEFAULT_SESSION_TTL_MS } from "./bridge-hub.js"
+export {
+  BridgeHub,
+  CURRENT_EXTENSION_PROTOCOL_VERSION,
+  DEFAULT_SESSION_TTL_MS,
+} from "./bridge-hub.js"
 export {
   BRIDGE_TOKEN_HEADER,
   DEFAULT_HOST,
@@ -32,6 +37,8 @@ const RELAY_TOKEN = process.env.YUNTI_BROWSER_RELAY_TOKEN || ""
 const SERVER_NAME = process.env.YUNTI_BROWSER_SERVER_NAME || "Yunti Browser Runtime"
 const _ROUTE_USER_ID = process.env.YUNTI_BROWSER_USER_ID || "local"
 const _ROUTE_USER_NAME = process.env.YUNTI_BROWSER_USER_NAME || "local"
+const PACKAGE_VERSION = packageJson.version || ""
+const proxyCompatibilityCache = new Map()
 
 function normalizeBaseUrl(value) {
   return String(value || "")
@@ -58,6 +65,74 @@ function preflightBrowserToolScope(tool, args = {}) {
   requireRouteUserId(args, tool)
 }
 
+function classifyToolFailure(error, tool = "") {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/YUNTI_EXTENSION_PROTOCOL_MISMATCH/.test(message)) {
+    return {
+      message,
+      code: "YUNTI_EXTENSION_PROTOCOL_MISMATCH",
+      retryable: false,
+      retryBudget: 0,
+      recoveryAction: "reload_extension_then_run_doctor",
+      resultUncertain: false,
+      detail: "Do not retry browser tools until yunti-browser-runtime doctor reports matching runtime, extension, and protocol versions.",
+    }
+  }
+  if (/YUNTI_BRIDGE_RUNTIME_MISMATCH/.test(message)) {
+    return {
+      message,
+      code: "YUNTI_BRIDGE_RUNTIME_MISMATCH",
+      retryable: false,
+      retryBudget: 0,
+      recoveryAction: "restart_mcp_bridge_then_run_doctor",
+      resultUncertain: false,
+      detail: "Do not retry browser tools until the running bridge version matches this MCP package.",
+    }
+  }
+  if (/YUNTI_BROWSER_INSTANCE_AMBIGUOUS/.test(message)) {
+    return {
+      message,
+      code: "YUNTI_BROWSER_INSTANCE_AMBIGUOUS",
+      retryable: false,
+      retryBudget: 0,
+      recoveryAction: "select_browser_instance",
+      resultUncertain: false,
+      detail: "List targets through the intended routeBrowserSessionId, then pass that page browserSessionId or browserInstanceId.",
+    }
+  }
+  if (/stale or disconnected|heartbeat expired/i.test(message)) {
+    return {
+      message,
+      code: "YUNTI_SESSION_STALE",
+      retryable: true,
+      retryBudget: 1,
+      recoveryAction: "list_targets_then_retry_once",
+      resultUncertain: false,
+      detail: "Discard the stale browserSessionId, list live targets once, and retry only with the selected live page route.",
+    }
+  }
+  if (/timed out/i.test(message)) {
+    return {
+      message,
+      code: "YUNTI_TOOL_TIMEOUT",
+      retryable: false,
+      retryBudget: 0,
+      recoveryAction: "verify_state_before_retry",
+      resultUncertain: true,
+      detail: `The ${tool || "browser"} result is uncertain. Inspect current page state before deciding whether another call is safe.`,
+    }
+  }
+  return {
+    message,
+    code: "YUNTI_TOOL_ERROR",
+    retryable: false,
+    retryBudget: 0,
+    recoveryAction: "inspect_error",
+    resultUncertain: false,
+    detail: "Inspect the error and current browser targets before making another call.",
+  }
+}
+
 function bridgeRequestHeaders(bridgeToken = "") {
   const headers = { "content-type": "application/json" }
   const token = normalizeBridgeToken(bridgeToken)
@@ -67,6 +142,7 @@ function bridgeRequestHeaders(bridgeToken = "") {
 
 async function proxyToolRequest(port, tool, args, timeoutMs, bridgeToken = "") {
   const routedArgs = withRouteUser(args)
+  await assertProxyBridgeCompatibility(port, routedArgs.userId, bridgeToken)
   const response = await fetch(`http://${DEFAULT_HOST}:${port}/mcp/request`, {
     method: "POST",
     headers: bridgeRequestHeaders(bridgeToken),
@@ -77,6 +153,35 @@ async function proxyToolRequest(port, tool, args, timeoutMs, bridgeToken = "") {
     throw new Error(data?.error || `bridge HTTP ${response.status}`)
   }
   return data?.result ?? null
+}
+
+async function assertProxyBridgeCompatibility(port, userId, bridgeToken = "") {
+  const cacheKey = `${port}|${userId}|${bridgeToken ? "auth" : "no-auth"}`
+  const cached = proxyCompatibilityCache.get(cacheKey)
+  if (cached && Date.now() - cached.checkedAt < 1000) return cached.value
+  const response = await fetch(
+    `http://${DEFAULT_HOST}:${port}/console/state?userId=${encodeURIComponent(userId || "local")}`,
+    { headers: bridgeRequestHeaders(bridgeToken) }
+  )
+  const state = await response.json().catch(() => null)
+  if (!response.ok || !state?.runtime?.version) {
+    throw new Error(
+      `YUNTI_BRIDGE_RUNTIME_MISMATCH: running bridge version is unknown, but MCP package is ${PACKAGE_VERSION}. Restart the Yunti MCP/bridge process. retryable=false retryBudget=0`
+    )
+  }
+  if (state.runtime.version !== PACKAGE_VERSION) {
+    throw new Error(
+      `YUNTI_BRIDGE_RUNTIME_MISMATCH: running bridge is ${state.runtime.version}, but MCP package is ${PACKAGE_VERSION}. Restart the Yunti MCP/bridge process. retryable=false retryBudget=0`
+    )
+  }
+  if (state.compatibility?.ok === false) {
+    throw new Error(
+      `YUNTI_EXTENSION_PROTOCOL_MISMATCH: connected extension is not compatible with runtime ${PACKAGE_VERSION}. Reload the unpacked extension from the current package directory. retryable=false retryBudget=0`
+    )
+  }
+  const value = { ok: true, runtimeVersion: state.runtime.version }
+  proxyCompatibilityCache.set(cacheKey, { checkedAt: Date.now(), value })
+  return value
 }
 
 async function proxyBridgeLocalToolRequest(port, tool, args, bridgeToken = "") {
@@ -174,7 +279,7 @@ export async function handleJsonRpc(req, bridge) {
   if (req.method === "initialize") {
     return jsonRpcOk(req.id, {
       protocolVersion: "2024-11-05",
-      serverInfo: { name: SERVER_NAME, version: "1.0.0" },
+      serverInfo: { name: SERVER_NAME, version: PACKAGE_VERSION },
       capabilities: { tools: {} },
     })
   }
@@ -193,12 +298,10 @@ export async function handleJsonRpc(req, bridge) {
       const result = await callTool(bridge, name, args)
       return jsonRpcOk(req.id, toolOk(result))
     } catch (error) {
+      const failure = classifyToolFailure(error, name)
       return jsonRpcOk(
         req.id,
-        toolError(
-          error instanceof Error ? error.message : String(error),
-          "Open an internal platform page with the Yunti Browser Runtime extension loaded, then try again."
-        )
+        toolError(failure.message, failure)
       )
     }
   }

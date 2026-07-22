@@ -87,6 +87,8 @@ export function createToolDispatcher({
         result = await takeSnapshot(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_observe_page") {
         result = await observePage(tabId, session, event.arguments || {})
+      } else if (event.tool === "yunti_find_elements") {
+        result = await findElements(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_click") {
         result = await clickByUid(tabId, session, event.arguments || {})
       } else if (event.tool === "yunti_hover") {
@@ -185,6 +187,15 @@ export function createToolDispatcher({
       (await activeTabId())
     if (!targetTabId) {
       throw new Error(`${event.tool} could not resolve an active http/https browser tab.`)
+    }
+    const knownPageSession = sessionsByTab.get(targetTabId) || null
+    if (knownPageSession) {
+      const currentTab = knownPageSession.url
+        ? await chrome.tabs.get(targetTabId).catch(() => null)
+        : null
+      if (!knownPageSession.url || !currentTab?.url || currentTab.url === knownPageSession.url) {
+        return { tabId: targetTabId, session: knownPageSession }
+      }
     }
     const recovery = await ensureTabRegistered(targetTabId, {
       reason: `tool_request_${event.tool}`,
@@ -473,7 +484,7 @@ export function createToolDispatcher({
       tool: "yunti_observe_page",
       arguments: args,
     })
-    if (Array.isArray(observation?.elements)) {
+    if (observation?.responseMode !== "delta" && Array.isArray(observation?.elements)) {
       storePageUidMap(session, "observe", [
         ...observation.elements,
         ...(Array.isArray(observation.scrollableContainers) ? observation.scrollableContainers : []),
@@ -488,6 +499,21 @@ export function createToolDispatcher({
       url: observation?.url || session.url || "",
       title: observation?.title || session.title || "",
     }
+  }
+
+  async function findElements(tabId, session, args = {}) {
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "yunti_execute_tool",
+      tool: "yunti_find_elements",
+      arguments: args,
+    })
+    if (Array.isArray(result?.matches)) {
+      storePageUidMap(session, "find", result.matches, {
+        observationId: result.observationId,
+        uidMapVersion: result.uidMapVersion,
+      })
+    }
+    return result
   }
 
   function storePageUidMap(session, source, elements, meta = {}) {
@@ -677,7 +703,6 @@ export function createToolDispatcher({
     if (!selector) {
       throw new Error("yunti_click requires uid, selector, or both x and y. Call yunti_take_snapshot to get uid, pass a CSS selector, or use yunti_click_at for coordinate-only clicks.")
     }
-    // Fall back to content script for selector-based click
     const contentResult = await chrome.tabs.sendMessage(tabId, {
       type: "yunti_execute_tool",
       tool: "yunti_click",
@@ -696,7 +721,12 @@ export function createToolDispatcher({
         nextStepHint: "Selector click dispatched. Observe again, read page state, or use a fresh uid when possible to verify the intended change.",
       }
     }
-    return contentResult
+    return buildSelectorActionFailureResult(session, "click", selector, contentResult, {
+      recommendedTools: ["yunti_observe_page", "yunti_wait_for", "yunti_click"],
+      nextAction: "observe-or-wait-before-retrying-click",
+      decision: "inspect-readiness-before-selector-click-retry",
+      message: "The selector click could not be completed yet. Wait for the target to appear, become enabled, or stop being covered before retrying the same click.",
+    })
   }
   
   async function hoverByUid(tabId, session, args = {}) {
@@ -764,7 +794,14 @@ export function createToolDispatcher({
       tool: "yunti_hover",
       arguments: args,
     })
-    if (!result || typeof result !== "object" || result.hovered !== true) return result
+    if (!result || typeof result !== "object" || result.hovered !== true) {
+      return buildSelectorActionFailureResult(session, "hover", selector, result, {
+        recommendedTools: ["yunti_observe_page", "yunti_wait_for", "yunti_hover"],
+        nextAction: "observe-or-wait-before-retrying-hover",
+        decision: "inspect-readiness-before-selector-hover-retry",
+        message: "The selector hover could not be completed yet. Wait for the target to appear, become visible, or stop being covered before retrying.",
+      })
+    }
     return {
       ...result,
       hovered: true,
@@ -868,11 +905,17 @@ export function createToolDispatcher({
     const code = fillResult?.code || inferFillFailureCode(error, "SELECTOR_FILL_FAILED")
     const recoveryHint = {
       reason: "selector-fill-failed",
-      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_fill"],
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_wait_for", "yunti_fill"],
       nextAction: code === "ELEMENT_NOT_FOUND" ? "observe-again" : "inspect-target-element",
       decision: code === "ELEMENT_NOT_FOUND" ? "refresh-observation-or-selector-before-retry" : "inspect-editability-before-retry",
       selector,
       message: "The selector fill could not be completed. Inspect whether the selector still matches an editable element, observe again for a fresh uid, or evaluate the field before retrying.",
+    }
+
+    if (["TARGET_HIDDEN", "TARGET_DISABLED", "TARGET_READONLY", "TARGET_OBSCURED"].includes(code)) {
+      recoveryHint.nextAction = "wait-for-actionability"
+      recoveryHint.decision = "wait-before-selector-fill-retry"
+      recoveryHint.message = "The selector fill target exists but is not ready yet. Wait for it to appear, enable, unlock, or stop being covered before retrying the same fill."
     }
 
     return {
@@ -1321,7 +1364,7 @@ export function createToolDispatcher({
     const error = selectResult?.error || "Selector select failed"
     const recoveryHint = {
       reason: "selector-select-failed",
-      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_select"],
+      recommendedTools: ["yunti_observe_page", "yunti_take_snapshot", "yunti_evaluate_script", "yunti_wait_for", "yunti_select"],
       nextAction: code === "OPTION_NOT_FOUND" || code === "OPTION_DISABLED" ? "inspect-available-options" : "inspect-target-element",
       decision: code === "OPTION_DISABLED" ? "choose-enabled-option-or-unlock-field" : code === "OPTION_NOT_FOUND" ? "inspect-options-before-retry" : "use-select-element-or-uid-fallback",
       selector,
@@ -1332,6 +1375,12 @@ export function createToolDispatcher({
       ...(disabledValue ? { disabledValue } : {}),
       ...(disabledText ? { disabledText } : {}),
       message: "The selector select could not be completed. Inspect the target select element and available options before retrying, or use a fresh uid/value fallback.",
+    }
+
+    if (["TARGET_HIDDEN", "TARGET_DISABLED", "TARGET_OBSCURED"].includes(code)) {
+      recoveryHint.nextAction = "wait-for-actionability"
+      recoveryHint.decision = "wait-before-selector-select-retry"
+      recoveryHint.message = "The selector select target exists but is not ready yet. Wait for it to appear, enable, or stop being covered before retrying."
     }
 
     return {
@@ -1400,6 +1449,43 @@ export function createToolDispatcher({
       ...(disabledText ? { disabledText } : {}),
       recoveryHint,
       nextStepHint: "Uid select failed. Inspect available options, observe again for a fresh uid, or retry with selector/value fallback before repeating the same select.",
+    }
+  }
+
+  function buildSelectorActionFailureResult(session, action, selector, contentResult = {}, recovery = {}) {
+    const resultFieldByAction = {
+      click: "clicked",
+      hover: "hovered",
+      fill: "filled",
+      select: "selected",
+      type_text: "typed",
+      press_key: "pressed",
+    }
+    const resultField = resultFieldByAction[action] || action
+    const code = String(contentResult?.code || `SELECTOR_${String(action).toUpperCase()}_FAILED`)
+    const error = String(contentResult?.error || `Selector ${action} failed`)
+    return {
+      ...(contentResult && typeof contentResult === "object" ? contentResult : {}),
+      [resultField]: false,
+      selector,
+      browserSessionId: session.browserSessionId,
+      action,
+      target: { selector, method: "selector" },
+      ok: false,
+      recoverable: true,
+      code,
+      error,
+      recoveryHint: {
+        reason: `selector-${action}-failed`,
+        recommendedTools: recovery.recommendedTools || ["yunti_observe_page", "yunti_wait_for"],
+        nextAction: recovery.nextAction || "observe-before-retry",
+        decision: recovery.decision || "refresh-readiness-before-retry",
+        selector,
+        message: recovery.message || `The selector ${action} could not be completed.`,
+      },
+      nextStepHint: action === "hover"
+        ? "Selector hover failed. Wait for the target to become visible and unobstructed, or observe again before retrying."
+        : `Selector ${action} failed. Wait for the target to become ready, or observe again before retrying.`,
     }
   }
 
@@ -1894,7 +1980,43 @@ export function createToolDispatcher({
     }
     sessionsByTab.set(tab.id, session)
     await postBridge("/sessions/register", session).catch(() => null)
-    return { created: true, browserSessionId, tabId: tab.id, windowId: tab.windowId, url: tab.url || url, title: tab.title || "" }
+    const registration = await waitForNewPageRegistration(tab.id, url)
+    const readySession = registration?.session || sessionsByTab.get(tab.id) || null
+    return {
+      created: true,
+      ready: Boolean(registration?.ok && readySession),
+      browserSessionId: readySession?.browserSessionId || browserSessionId,
+      tabId: tab.id,
+      windowId: tab.windowId,
+      url: readySession?.url || tab.url || url,
+      title: readySession?.title || tab.title || "",
+      ...(registration?.ok
+        ? {}
+        : {
+            recoveryHint: registration?.error || registration?.reason || "page registration is still pending",
+            nextStepHint: "The tab was created, but its page runtime is not ready yet. Verify this tab through yunti_list_browser_targets before acting; do not create another tab blindly.",
+          }),
+    }
+  }
+
+  async function waitForNewPageRegistration(tabId, requestedUrl) {
+    if (!/^https?:\/\//iu.test(String(requestedUrl || ""))) {
+      return { ok: true, session: sessionsByTab.get(tabId) || null, reason: "non_http_page" }
+    }
+    const deadline = Date.now() + 10_000
+    let tab = null
+    while (Date.now() < deadline) {
+      tab = await chrome.tabs.get(tabId).catch(() => null)
+      if (tab?.status === "complete") break
+      await delayCdp(50)
+    }
+    if (!tab || tab.status !== "complete") {
+      return { ok: false, reason: "tab_load_timeout", error: "The new tab did not finish loading within 10 seconds." }
+    }
+    return ensureTabRegistered(tabId, {
+      tab,
+      reason: "new_page_ready",
+    })
   }
 
   function stableChildPageSessionId(tabId, parentSession) {

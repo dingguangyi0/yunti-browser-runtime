@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Benchmark Nested Scroll</title>
+    <style>
+      #panel {
+        border: 1px solid #ccc;
+        height: 180px;
+        overflow: auto;
+        width: 320px;
+      }
+      .row {
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        height: 80px;
+        padding: 0 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Nested Scroll</h1>
+    <div style="height: 1200px;">
+      <p>Scroll down to reach the document target.</p>
+      <div style="margin-top: 1000px;"><button id="document-target">Document target</button></div>
+    </div>
+    <div id="panel">
+      <div class="row">Row 1</div>
+      <div class="row">Row 2</div>
+      <div class="row">Row 3</div>
+      <div class="row">Row 4</div>
+      <div class="row">Row 5</div>
+      <div class="row">Row 6</div>
+      <div class="row">Row 7</div>
+      <div class="row">Row 8</div>
+      <div class="row"><button id="deep-target">Deep target</button></div>
+    </div>
+    <output id="result"></output>
+    <script>
+      document.querySelector("#document-target").addEventListener("click", () => {
+        document.querySelector("#result").textContent = "Document target clicked";
+      });
+      document.querySelector("#deep-target").addEventListener("click", () => {
+        document.querySelector("#result").textContent = "Deep target clicked";
+      });
+    </script>
+  </body>
+</html>

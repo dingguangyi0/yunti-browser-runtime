@@ -1,6 +1,121 @@
 # Project Status
 
+## 0.2.5 Reliability Convergence
+
+`0.2.5` is now the active reliability release. Its implementation contract is
+recorded in [RELEASE_0_2_5.md](RELEASE_0_2_5.md).
+
+Current status:
+
+- runtime/extension protocol and live-version fail-fast: implemented
+- `doctor` mismatch failure and zero-retry guidance: implemented and validated
+  against the currently running `0.2.2` browser extension
+- Chrome/Edge/profile controller coexistence: implemented
+- page ownership and same-tab-id cross-browser isolation: implemented
+- multi-browser target inventory aggregation: implemented
+- running Bridge proxy-version fail-fast: implemented and validated against a
+  simulated older Bridge plus the live local `0.2.4` Bridge
+- structured MCP retry budget and uncertainty contract: implemented
+- packaged skill and user-facing recovery guidance: updated
+- automated regression: 179 total tests, 178 passed, 1 opt-in browser smoke
+  skipped by default, 0 failed
+- full `npm run release:check`: passing; package contains 64 files and extension
+  zip contains 13 files
+- real Chromium extension E2E: passing
+- real Microsoft Edge extension E2E: passing
+- simultaneous Chromium + Edge controller/target aggregation E2E: passing
+- P8 benchmark: 15/15 scenarios pass, duplicate writes 0, p50 122 ms, p95
+  11488 ms in `.artifacts/benchmark/2026-07-22T03-57-17-852Z/`
+- qualifying browser soak: 900.655 seconds, 710 continuous cycles,
+  19,233/19,233 successful calls, 52/52 MCP tools, 710 stale-route recoveries,
+  237 child tabs, 178 CDP detach/reattach recoveries, and duplicate writes 0 in
+  `.artifacts/soak/2026-07-22T04-42-52-595Z/`
+- reusable post-installation endurance procedure: complete in
+  [SOAK_TEST.md](SOAK_TEST.md)
+
+The user accepted the `0.2.5` experience build and requested publication on
+2026-07-22. Source, package, extension, and registry checks must still complete
+before the release is marked published.
+
 ## Current Phase
+
+Post-`0.2.3` planning is now organized as Phase 8 in
+[COMPETITOR_RESEARCH_2026.md](COMPETITOR_RESEARCH_2026.md). Alibaba Page Agent
+and browser-use are the primary references. Projects without current
+maintenance are excluded from prioritization; other active tools are retained
+only as narrow supporting evidence.
+
+P8 status:
+
+- P8 research and code-gap audit: complete
+- P8.0 reliability benchmark contract: complete in
+  [RELIABILITY_BENCHMARK_PLAN.md](RELIABILITY_BENCHMARK_PLAN.md)
+- P8.0 benchmark foundation: complete with fixture pages, scenario manifest,
+  runner entry, npm scripts, and validation tests
+- P8.0 full-tool browser endurance fixture and 15-minute soak runner: complete
+- P8.0 first full `0.2.3` benchmark capture: complete with 15/15 implemented
+  benchmark scenarios passing, duplicate writes at 0, p50 duration 112 ms, and
+  p95 duration 10227 ms in
+  `.artifacts/benchmark/2026-07-19T05-33-41-631Z/`
+- P8.1.1 targeted `yunti_find_elements` observation path: complete
+- P8.1.2 open shadow-root observation/find coverage: complete
+- P8.1.3 same-origin iframe observation/find coverage: complete
+- P8.1.4 lighter observation delta verification path: complete
+- P8.2.1 selector-path bounded actionability and auto-wait: complete
+- Post-0.2.3 Edge sleeping-tab/session recovery hotfix: complete locally and
+  validated against Microsoft Edge 150
+- P8.2 remaining typed lifecycle, uid/coordinate readiness, and cancellation:
+  planned
+- P8.3 validated semantic target recipes and self-healing: planned
+- P8.4 persistent history, sanitized trajectories, and failure replay: planned
+- P8.5 trust boundary and hostile-page fixtures: planned
+- P8.6 capability profiles and extension update path: planned
+- P8.7 optional remote provider adapter: deferred until local reliability gains
+  are measured
+- P8.8 DevTools insight packs: deferred behind normal page-operation quality
+
+P8 runtime behavior has now started moving in small, benchmarked slices. The
+first reproducible `0.2.3` baseline is captured, and Observation v2 now
+includes targeted `yunti_find_elements`, open shadow-root coverage,
+same-origin iframe coverage, and an additive `responseMode: "delta"` path for
+lighter repeated verification. Delta mode returns page/scroll change summaries
+and bounded changed-entry metadata without replacing the normal full observe
+path or its actionable uid map.
+
+The first P8.2 slice is now in place for selector-driven actions: content-script
+selector paths for click, hover, fill, type, press, and select now share a
+bounded readiness wait plus unified actionability checks for presence,
+visibility, enabled/editable state, tag expectations, and receives-events
+behavior. Structured selector failures now tell agents to wait before retrying
+when the target exists but is not yet ready.
+
+The 2026-07-20 Edge stability investigation confirmed a browser-specific
+failure that did not reproduce in Chrome 150. On Edge 150, probing an existing
+sleeping tab with `chrome.tabs.sendMessage` or injecting into it can remain
+pending instead of rejecting promptly. The controller poll loop previously
+awaited that tool execution, so one sleeping tab could block the only poller;
+recovery alarms refreshed controller metadata but refused to replace the
+apparently existing poller, and Bridge eventually reported the session stale.
+
+The local hotfix now bounds content-script probe and injection time, keeps
+controller polling independent from the serialized tool execution queue,
+returns a bounded extension-side timeout instead of hanging forever, and uses a
+poll-progress watchdog to replace stalled pollers. When Edge blocks background
+injection into a sleeping tab, Yunti temporarily activates that tab, injects
+the packaged scripts, and restores the previously active tab without reloading
+the page. Observe responses are normalized with the authoritative recovered
+page session id even when the newly injected content script still reports its
+pre-registration null id.
+
+Real Edge evidence: with 21 pre-existing tabs and zero registered page
+sessions, `yunti_list_browser_targets` discovered all 21 without a page refresh.
+Before the hotfix, observing sleeping tab `1542219058` timed out twice at 25-30
+seconds and left the controller poll blocked. After the hotfix, the same tab
+recovered and returned 12 elements in 3288 ms. A page session recorded before
+an extension reload was then reused after the reload while the page was in the
+background; the old session id recovered in 3284 ms and returned 28 elements,
+again without a page refresh. Chrome remained unaffected throughout the user
+comparison.
 
 Release `yunti-browser-runtime@0.2.3` is complete and verified on the official
 npm registry. It fixes page-session expiry under many open tabs, completes
@@ -56,13 +171,15 @@ Acceptance for this slice:
 - Verify with unit tests, release checks, and real-browser E2E if browser
   behavior changes.
 
-Latest `0.2.3` validation: targeted bridge/session-manager/tool dispatcher tests
+Latest post-`0.2.3` validation: targeted bridge/session-manager/tool dispatcher tests
 pass, including 30-page zero-page-poller coverage, stale legacy id recovery,
 controller-only active-tab recovery, closed-tab reconciliation, controller
 startup race prevention, aborted-poller cleanup, and controller transport
-dispatch, plus the CDP first-class backend usage contract. `npm run
-release:check` passes with 146 node:test cases total, 145 passing and 1 default
-real-browser smoke skipped, plus package contents validation
+dispatch, Edge hanging-message probe timeout, sleeping-tab temporary activation,
+stalled-poller replacement, and controller polling during a hung tool. The
+latest local `npm test` run covers 169 node:test cases: 168 passed, 1 default
+real-browser smoke was skipped, and 0 failed. `npm run check` and `git diff
+--check` pass. The last published `0.2.3` release gate passed package contents validation
 with 49 files and extension zip validation with 13 files. A separate
 `YUNTI_E2E=1 npm run test:e2e` run passes the real-browser smoke, including the
 single-controller poller invariants and repeated page operations. `git diff

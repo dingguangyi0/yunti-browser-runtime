@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Benchmark Rerender</title>
+  </head>
+  <body>
+    <h1>Rerender</h1>
+    <div id="toolbar">
+      <button id="rerender">Replace buttons</button>
+    </div>
+    <div id="action-root">
+      <button id="action">Action A</button>
+    </div>
+    <output id="result"></output>
+    <script>
+      window.__currentVersion = "A";
+      window.__actionCount = 0;
+      function wireAction(label) {
+        const action = document.querySelector("#action");
+        action.addEventListener("click", () => {
+          window.__actionCount += 1;
+          document.querySelector("#result").textContent = label + " clicked";
+        });
+      }
+      wireAction("Action A");
+      document.querySelector("#rerender").addEventListener("click", () => {
+        window.__currentVersion = "B";
+        document.querySelector("#action-root").innerHTML = '<button id="action">Action B</button>';
+        wireAction("Action B");
+      });
+    </script>
+  </body>
+</html>

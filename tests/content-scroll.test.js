@@ -159,6 +159,14 @@ function createDocumentStub({ elementFromPoint } = {}) {
   }
 }
 
+test("content script does not inject a visible Yunti page widget", () => {
+  const source = readFileSync(resolve("extension/content.js"), "utf8")
+
+  assert.doesNotMatch(source, /yunti-browser-runtime-widget/)
+  assert.doesNotMatch(source, /installWidget|updateWidgetStatus|data-toggle|data-refresh/)
+  assert.doesNotMatch(source, /当前页面临时增强|刷新连接/)
+})
+
 test("content scroll reports coordinate container hit metadata", () => {
   const item = new FakeElement("button", {}, { innerText: "Load more" })
   const panel = new FakeElement("div", { id: "results" }, {

@@ -6,7 +6,6 @@ const ACTIONABILITY_POLL_INTERVAL_MS = 100
 
 const patchStore = new Map()
 let browserSessionId = null
-let widgetRoot = null
 let registerTimer = null
 let authStateCache = null
 let extensionContextInvalidated = false
@@ -31,10 +30,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 void bootstrapContent()
 
 async function bootstrapContent() {
-  await register().catch((error) => {
-    updateWidgetStatus(error?.message || String(error))
-    return null
-  })
+  await register().catch(() => null)
 }
 
 async function register(options = {}) {
@@ -55,19 +51,7 @@ async function register(options = {}) {
   if (response?.ok) {
     browserSessionId = response.session.browserSessionId
     installPageWatchers()
-    installWidget()
   }
-  const auth = response?.session?.auth || page.auth
-  updateWidgetStatus(
-    response?.ok
-      ? auth.loggedIn
-        ? auth.userName
-          ? `Connected: ${auth.userName}`
-          : "Connected to current page"
-        : "Connected to current page"
-      : response?.error || "未连接",
-    auth
-  )
   return response
 }
 
@@ -254,73 +238,8 @@ function scheduleRegister() {
   if (extensionContextInvalidated) return
   clearTimeout(registerTimer)
   registerTimer = setTimeout(() => {
-    void register().catch((error) => updateWidgetStatus(error?.message || String(error)))
+    void register().catch(() => null)
   }, 500)
-}
-
-function installWidget() {
-  if (widgetRoot || document.getElementById("yunti-browser-runtime-widget")) return
-  const host = document.createElement("div")
-  host.id = "yunti-browser-runtime-widget"
-  host.style.position = "fixed"
-  host.style.right = "18px"
-  host.style.bottom = "18px"
-  host.style.zIndex = "2147483647"
-  document.documentElement.appendChild(host)
-
-  const shadow = host.attachShadow({ mode: "open" })
-  shadow.innerHTML = `
-    <style>
-      :host { all: initial; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      .fab {
-        width: 44px; height: 44px; border-radius: 999px; border: 0; cursor: pointer;
-        background: #0f766e; color: white; box-shadow: 0 10px 24px rgba(15, 23, 42, .24);
-        font: 700 15px/1 system-ui; display: grid; place-items: center;
-      }
-      .panel {
-        width: 292px; margin-bottom: 10px; border: 1px solid rgba(15, 23, 42, .14);
-        border-radius: 10px; background: white; color: #111827;
-        box-shadow: 0 18px 42px rgba(15, 23, 42, .24); overflow: hidden;
-      }
-      .hidden { display: none; }
-      header { padding: 12px 13px; background: #0f766e; color: white; }
-      h2 { margin: 0; font-size: 14px; letter-spacing: 0; }
-      p { margin: 5px 0 0; font-size: 12px; color: rgba(255,255,255,.86); }
-      .body { display: grid; gap: 9px; padding: 12px; }
-      .status { font-size: 12px; line-height: 1.4; color: #475569; word-break: break-word; }
-      button.action {
-        min-height: 32px; border-radius: 7px; border: 1px solid #cbd5e1; background: #fff;
-        color: #0f172a; cursor: pointer; font: 500 13px/1 system-ui;
-      }
-      button.action:disabled { opacity: .48; cursor: not-allowed; }
-      button.primary { border-color: #0f766e; background: #0f766e; color: white; }
-      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    </style>
-    <div class="panel hidden" data-panel>
-      <header>
-        <h2>Yunti Browser Runtime</h2>
-        <p>当前页面临时增强，刷新后恢复。</p>
-      </header>
-      <div class="body">
-        <div class="status" data-status>正在连接...</div>
-        <button class="action" data-refresh>刷新连接</button>
-      </div>
-    </div>
-    <button class="fab" data-toggle title="Yunti Browser Runtime">AI</button>
-  `
-
-  widgetRoot = shadow
-  const panel = shadow.querySelector("[data-panel]")
-  shadow.querySelector("[data-toggle]").addEventListener("click", () => {
-    panel.classList.toggle("hidden")
-  })
-  shadow.querySelector("[data-refresh]").addEventListener("click", () => {
-    void register({ forceAuth: true }).catch((error) => updateWidgetStatus(error?.message || String(error)))
-  })
-}
-
-async function sendWidgetMessage(message) {
-  return sendRuntimeMessage(message)
 }
 
 async function sendRuntimeMessage(message) {
@@ -346,24 +265,7 @@ function contextInvalidatedResponse() {
 function markExtensionContextInvalidated() {
   extensionContextInvalidated = true
   clearTimeout(registerTimer)
-  updateWidgetStatus(contextInvalidatedResponse().error)
   return contextInvalidatedResponse()
-}
-
-function updateWidgetStatus(text, auth = null) {
-  if (!widgetRoot && browserSessionId) installWidget()
-  const status = widgetRoot?.querySelector("[data-status]")
-  if (status) {
-    status.textContent = `${text}${browserSessionId ? `\n${browserSessionId}` : ""}`
-  }
-  if (auth) {
-    for (const button of widgetRoot?.querySelectorAll("[data-refresh]") || []) {
-      button.disabled = false
-      button.title = auth.loggedIn
-        ? ""
-        : "Yunti页面已连接，登录态由 agent 结合页面和接口结果判断"
-    }
-  }
 }
 
 async function executeTool(tool, args) {

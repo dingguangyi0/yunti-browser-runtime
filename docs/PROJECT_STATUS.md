@@ -1,5 +1,12 @@
 # Project Status
 
+## 0.2.7 Page UI Hotfix
+
+`0.2.7` is an urgent hotfix based directly on published `0.2.6`. It removes
+the injected `AI` floating button and connection panel from normal pages while
+preserving controller registration, MCP operations, the extension popup,
+Content Script actions, and CDP. See [RELEASE_0_2_7.md](RELEASE_0_2_7.md).
+
 ## 0.2.6 Dynamic Page Reliability
 
 `0.2.6` is the active reliability release. Its implementation and acceptance

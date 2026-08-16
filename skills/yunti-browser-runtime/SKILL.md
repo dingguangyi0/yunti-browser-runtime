@@ -5,6 +5,31 @@ description: Use when an agent needs to operate or inspect a user's browser thro
 
 # Yunti Browser Runtime
 
+## Installation And Health
+
+When the user asks to install or connect Yunti, prefer the local CLI setup
+flow:
+
+```bash
+yunti-browser-runtime setup --agent <current-agent>
+```
+
+For Codex this installs the packaged skill idempotently. For other agents use
+`--no-skill` if the Agent has no standard skill directory, then add the printed
+MCP block without overwriting existing configuration. The command never
+silently installs a browser extension or changes browser pages.
+
+Run the read-only health summary before full diagnosis:
+
+```bash
+yunti-browser-runtime status
+```
+
+Use `status --json` for machine-readable state and `status --strict` as a gate
+that requires a live page route. Only use `doctor` when a detailed report or
+recovery steps are needed. Do not ask the user to fill a token for the default
+loopback bridge, and do not ask for a page refresh as an installation step.
+
 ## First Step
 
 For any browser task, first call `yunti_get_tool_usage_hints` unless the user is only asking a conceptual question.

@@ -24,6 +24,14 @@ const commands = {
     script: join(rootDir, "scripts", "doctor.js"),
     env: {},
   },
+  status: {
+    script: join(rootDir, "scripts", "status.js"),
+    env: {},
+  },
+  setup: {
+    script: join(rootDir, "scripts", "setup.js"),
+    env: {},
+  },
   "print-config": {
     script: join(rootDir, "scripts", "print-config.js"),
     env: {},
@@ -83,6 +91,8 @@ Commands:
   bridge             Start only the local HTTP bridge
   console            Start the bridge and print the optional local console URL
   doctor             Run install and bridge diagnostics
+  status             Show compact runtime, bridge, controller, and page state
+  setup              Install the packaged skill and print Agent setup steps
   print-config       Print MCP configuration for an agent
   package-extension  Build the browser extension zip
   soak-test          Run the 15-minute full-tool browser endurance test

@@ -6,6 +6,7 @@
 - Product baseline: `yunti-browser-runtime@0.2.3`
 - Scope: planning and evidence only; no runtime implementation is included
 - Primary references: Alibaba Page Agent and browser-use
+- Kimi WebBridge follow-up: see [Kimi comparison and install research](KIMI_WEBBRIDGE_COMPARISON_2026.md)
 - Freshness rule: projects without current maintenance can appear in historical
   notes, but they cannot define P8 priorities or architecture
 

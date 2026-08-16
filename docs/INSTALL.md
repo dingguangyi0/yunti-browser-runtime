@@ -85,8 +85,26 @@ and contains only the extension runtime files.
 
 ## Register MCP
 
-Print the MCP server configuration for your agent, then add it to your agent
-configuration:
+For Codex, the recommended setup command installs the packaged skill when it is
+missing or outdated, without overwriting a differing custom skill:
+
+```bash
+yunti-browser-runtime setup --agent codex
+```
+
+For other agents, setup prints the MCP block and keeps skill placement explicit:
+
+```bash
+yunti-browser-runtime setup --agent claude-code --no-skill
+yunti-browser-runtime setup --agent cursor --no-skill
+yunti-browser-runtime setup --agent cline --no-skill
+```
+
+Use `--check-only` when you want a read-only preview. Existing Agent private
+configuration is never rewritten by `setup`; add the printed MCP block to the
+matching Agent configuration or UI.
+
+The compatibility command remains available:
 
 ```bash
 npm run print-config
@@ -102,21 +120,14 @@ agents that launch the MCP server themselves.
 
 ### Agent Examples
 
-These examples intentionally use `npm run print-config` instead of hard-coded
-local paths. Copy the JSON printed by the command into the matching agent's MCP
+These examples use `setup` to keep the local package path and skill source
+current. Copy the JSON printed by the command into the matching agent's MCP
 configuration file or UI.
 
 #### Codex
 
 ```bash
-npm run print-config -- --agent codex --human
-```
-
-Then install the browser skill if your Codex setup supports skills:
-
-```bash
-mkdir -p ~/.codex/skills
-cp -R skills/yunti-browser-runtime ~/.codex/skills/
+yunti-browser-runtime setup --agent codex
 ```
 
 Start a new Codex session after adding the MCP server and skill. For browser
@@ -126,7 +137,7 @@ tasks, the session should call `yunti_get_tool_usage_hints` first, then
 #### Claude Code
 
 ```bash
-npm run print-config -- --agent claude-code --human
+yunti-browser-runtime setup --agent claude-code --no-skill
 ```
 
 Add the printed `mcpServers.yunti-browser-runtime` block to Claude Code's MCP
@@ -138,7 +149,7 @@ extension popup.
 #### Cursor
 
 ```bash
-npm run print-config -- --agent cursor --human
+yunti-browser-runtime setup --agent cursor --no-skill
 ```
 
 Add the printed `mcpServers` JSON to Cursor's MCP configuration. Restart or
@@ -148,7 +159,7 @@ project to confirm the bridge and extension are healthy.
 #### Cline
 
 ```bash
-npm run print-config -- --agent cline --human
+yunti-browser-runtime setup --agent cline --no-skill
 ```
 
 Add the printed server entry to Cline's MCP settings. Keep the extension loaded
@@ -159,6 +170,20 @@ page route automatically; refresh only when browser injection is explicitly
 blocked.
 
 ## Check Health
+
+Use the compact state command first:
+
+```bash
+yunti-browser-runtime status
+yunti-browser-runtime status --json
+```
+
+The state is one of `page_ready`, `controller_online`, `runtime_ready`,
+`bridge_offline`, `bridge_unauthorized`, `version_mismatch`, or `needs_setup`.
+Add `--strict` when a script should fail unless a live page route is ready.
+`status` is read-only and reuses the complete doctor checks.
+
+For the full diagnostic report:
 
 ```bash
 npm run doctor

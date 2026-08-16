@@ -1,5 +1,26 @@
 # Project Status
 
+# P0 Productized Onboarding Slice
+
+The Kimi WebBridge comparison led to the first local productization slice.
+This is implemented on the current development branch and is not a published
+version yet:
+
+- `yunti-browser-runtime setup --agent codex` idempotently installs the packaged
+  Codex skill when it is missing, while refusing to overwrite a differing skill
+  unless `--force` is explicit.
+- `setup --check-only` is read-only; all agents receive a printed MCP block, and
+  Agent-private MCP configuration is never rewritten automatically.
+- `yunti-browser-runtime status` reuses doctor checks and emits a compact,
+  raw-payload-free state: `page_ready`, `controller_online`, `runtime_ready`,
+  `bridge_offline`, `bridge_unauthorized`, `version_mismatch`, or `needs_setup`.
+- `status --json` is machine-readable and `status --strict` is a readiness gate
+  for scripts and installers.
+- README, install guide, packaged skill, CLI smoke, release checks, and CLI
+  tests are synchronized.
+- Chrome Web Store / Edge Add-ons distribution remains the next separate track;
+  npm cannot silently install a browser extension.
+
 ## 0.2.7 Page UI Hotfix
 
 `0.2.7` is an urgent hotfix based directly on published `0.2.6`. It removes

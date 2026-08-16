@@ -231,6 +231,92 @@ function checkCliSmoke() {
   return true
 }
 
+function checkSetupStatusSmoke() {
+  const status = spawnSync(
+    process.execPath,
+    ["scripts/status.js", "--json"],
+    {
+      cwd: rootDir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    }
+  )
+  if (status.status !== 0) {
+    console.error("status smoke check failed:")
+    console.error("- exit code: " + status.status)
+    console.error("- stderr: " + (status.stderr.trim() || "(empty)"))
+    return false
+  }
+
+  let statusPayload
+  try {
+    statusPayload = JSON.parse(status.stdout || "{}")
+  } catch (error) {
+    console.error("status smoke check failed:")
+    console.error("- JSON parse error: " + error.message)
+    return false
+  }
+  const validStates = new Set([
+    "page_ready",
+    "controller_online",
+    "runtime_ready",
+    "bridge_offline",
+    "bridge_unauthorized",
+    "version_mismatch",
+    "needs_setup",
+  ])
+  if (
+    !validStates.has(statusPayload.state) ||
+    typeof statusPayload.runtime?.version !== "string" ||
+    typeof statusPayload.bridge?.reachable !== "boolean" ||
+    typeof statusPayload.browser?.controllerConnected !== "boolean" ||
+    Object.prototype.hasOwnProperty.call(statusPayload, "raw")
+  ) {
+    console.error("status smoke check failed:")
+    console.error("- unexpected payload: " + JSON.stringify(statusPayload, null, 2))
+    return false
+  }
+
+  for (const agent of ["codex", "claude-code", "cursor", "cline"]) {
+    const setup = spawnSync(
+      process.execPath,
+      ["scripts/setup.js", "--agent", agent, "--check-only", "--json"],
+      {
+        cwd: rootDir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: process.env,
+      }
+    )
+    if (setup.status !== 0) {
+      console.error("setup smoke check failed:")
+      console.error("- agent: " + agent)
+      console.error("- exit code: " + setup.status)
+      console.error("- stderr: " + (setup.stderr.trim() || "(empty)"))
+      return false
+    }
+    try {
+      const payload = JSON.parse(setup.stdout || "{}")
+      const server = payload?.config?.config?.config?.mcpServers?.["yunti-browser-runtime"]
+      if (payload.ok !== true || payload.agent !== agent || server?.command !== "node") {
+        console.error("setup smoke check failed:")
+        console.error("- agent: " + agent)
+        console.error("- unexpected payload: " + JSON.stringify(payload, null, 2))
+        return false
+      }
+    } catch (error) {
+      console.error("setup smoke check failed:")
+      console.error("- agent: " + agent)
+      console.error("- JSON parse error: " + error.message)
+      return false
+    }
+  }
+
+  console.error("setup/status smoke check passed.")
+  return true
+}
+
 function checkPrintConfigSmoke() {
   const agents = ["codex", "claude-code", "cursor", "cline"]
   for (const agent of agents) {
@@ -518,6 +604,7 @@ ok = checkMarkdownLinks() && ok
 ok = checkVersionConsistency() && ok
 ok = checkEdgeRecoveryGuidance() && ok
 ok = checkCliSmoke() && ok
+ok = checkSetupStatusSmoke() && ok
 ok = checkPrintConfigSmoke() && ok
 ok = checkDoctorSmoke() && ok
 ok = run("npm", ["run", "check:action-results"]) && ok

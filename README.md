@@ -69,15 +69,26 @@ npm install -g yunti-browser-runtime
 
 ### 2. 接入你的 Agent
 
-让 CLI 针对 Agent 生成 MCP 配置和 skill 安装指引：
+推荐使用 setup 一次完成可安全自动化的本地接入，并打印 MCP 配置：
 
 ```bash
-yunti-browser-runtime print-config -- --agent codex --human
+yunti-browser-runtime setup --agent codex
+```
+
+它会幂等安装 Codex skill；不会覆盖已有的自定义 skill，也不会擅自改写 Agent
+私有配置。对 Claude Code、Cursor、Cline 使用 `--no-skill`，把输出的 MCP
+配置加入对应 Agent：
+
+```bash
+yunti-browser-runtime setup --agent claude-code --no-skill
+yunti-browser-runtime setup --agent cursor --no-skill
+yunti-browser-runtime setup --agent cline --no-skill
 ```
 
 支持的 `--agent` 示例：`codex`、`claude-code`、`cursor`、`cline`。把输出的 MCP
 配置加入 Agent 后，新建或重载 Agent 会话。Agent 启动 MCP server 时会自动启动
-本地 Bridge，通常不需要另开一个 `bridge` 进程。
+本地 Bridge，通常不需要另开一个 `bridge` 进程。需要只读预览时使用
+`yunti-browser-runtime setup --agent codex --check-only`。
 
 ### 3. 加载浏览器扩展
 
@@ -101,10 +112,13 @@ Chrome / Edge 不允许 npm 静默安装未上架扩展，因此这一步需要�
 ### 4. 验证连接
 
 ```bash
-yunti-browser-runtime doctor
+yunti-browser-runtime status
 ```
 
-看到 runtime、Bridge、extension/controller 版本一致后，让 Agent 调用：
+`status` 会把状态分成 `page_ready`、`controller_online`、`runtime_ready`、
+`bridge_offline` 和 `version_mismatch` 等层级；需要完整 JSON 时使用
+`yunti-browser-runtime status --json`，需要把未就绪当作 shell 失败时加
+`--strict`。看到 runtime、Bridge、extension/controller 版本一致后，让 Agent 调用：
 
 ```text
 yunti_list_browser_targets
@@ -127,16 +141,16 @@ Agent 应能看到 Chrome / Edge 的可访问标签页，并可直接使用 `tab
 
 1. 确认本机有 Node.js 22+。
 2. 执行：npm install -g yunti-browser-runtime
-3. 执行：yunti-browser-runtime print-config -- --agent 当前Agent名称 --human
-4. 根据输出把 MCP server 配置加入当前 Agent；如果输出包含 skill 安装命令，替我执行。当前 Agent 不支持 SKILL.md 时，把 skill 内容加入项目或系统指令。
+3. 执行：yunti-browser-runtime setup --agent 当前Agent名称；Codex 可让它自动安装 skill，其他 Agent 使用 --no-skill 并根据输出加入 MCP 配置。
+4. 根据 setup 输出把 MCP server 配置加入当前 Agent；不要擅自覆盖 Agent 已有的其他 MCP 配置。
 5. 告诉我 MCP server 会自动启动本地 Bridge，一般不需要单独运行 bridge。
 6. 输出扩展目录：$(npm root -g)/yunti-browser-runtime/extension
 7. 只有浏览器“加载已解压的扩展程序”这一步需要我确认：引导我打开 chrome://extensions 或 edge://extensions，开启开发者模式并选择该目录。
 8. 告诉我默认 Bridge URL 是 http://127.0.0.1:48887，本地默认不需要 token，不需要打开 popup、保存设置或刷新页面。
-9. 执行：yunti-browser-runtime doctor
-10. doctor 正常后调用 yunti_list_browser_targets；选择目标页面并调用 yunti_get_page_snapshot 或 yunti_observe_page 验证控制能力。
+9. 执行：yunti-browser-runtime status；需要完整诊断时再执行 yunti-browser-runtime doctor。
+10. status 至少达到 controller_online 后调用 yunti_list_browser_targets；选择目标页面并调用 yunti_get_page_snapshot 或 yunti_observe_page 验证控制能力。
 
-不要遗漏 packaged skill 的安装或接入。不要默认要求我刷新页面、切换标签、重启浏览器或填写 token。页面路由异常时先使用 controller、tabId/targetId 和结构化 recoveryAction 自动恢复；只有浏览器明确阻止注入且自动恢复失败时，才请求我处理。
+不要遗漏 packaged skill 的安装或接入。不要覆盖已有 Agent 配置，不要默认要求我刷新页面、切换标签、重启浏览器或填写 token。页面路由异常时先使用 controller、tabId/targetId 和结构化 recoveryAction 自动恢复；只有浏览器明确阻止注入且自动恢复失败时，才请求我处理。
 ```
 
 </details>
@@ -232,6 +246,9 @@ observe / wait / screenshot / network / console → 验证结果
 
 ```bash
 yunti-browser-runtime --help
+yunti-browser-runtime setup --agent codex
+yunti-browser-runtime status
+yunti-browser-runtime status --json
 yunti-browser-runtime doctor
 yunti-browser-runtime print-config -- --agent codex --human
 yunti-browser-runtime bridge
@@ -243,6 +260,8 @@ yunti-browser-runtime soak-test
 | 命令 | 用途 |
 | --- | --- |
 | `doctor` | 检查 Node、Bridge、扩展、协议和浏览器 controller |
+| `status` | 以简洁状态分层展示 runtime、Bridge、controller 和页面路由；`--strict` 可作为就绪门禁 |
+| `setup` | 幂等安装 Codex skill，打印 MCP 配置、扩展目录和下一步接入指引 |
 | `print-config` | 输出目标 Agent 的 MCP 配置与 skill 安装指引 |
 | `bridge` | 独立启动本地 Bridge，通常只用于调试 |
 | `console` | 启动 Bridge 并显示可选的脱敏本地运行状态页 |

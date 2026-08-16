@@ -46,6 +46,14 @@ controller、自动注册、MCP 页面操作、Content Script 与 CDP 能力保�
 仍可从浏览器工具栏的扩展 popup 查看。详细说明见
 [0.2.7 发布说明](docs/RELEASE_0_2_7.md)。
 
+### 0.2.8 产品化安装与状态诊断
+
+`0.2.8` 增加 `setup` 和 `status` 命令：Codex 可幂等安装随包 skill，其他 Agent
+可直接获得 MCP 配置；状态命令会区分运行时、Bridge、controller、页面路由和版本
+不匹配。它不会覆盖已有 Agent 私有配置、不会要求默认 token，也不会把浏览器扩展
+静默安装到 Chrome / Edge。详细说明见
+[0.2.8 发布说明](docs/RELEASE_0_2_8.md)。
+
 ### 0.2.6 可靠性基线
 
 `0.2.6` 用 38 个确定性复杂场景和真实 Edge 15 分钟耐久测试验证动态页面能力。
@@ -337,7 +345,9 @@ npm run test:soak -- --duration-seconds=180 --allow-short
 | [P8 稳定页面句柄计划](docs/STABLE_PAGE_HANDLE_PLAN.md) | 标签页长期身份、session 内部恢复与验收契约 |
 | [15 分钟耐久测试](docs/SOAK_TEST.md) | 复杂 fixture、覆盖契约、产物与通过标准 |
 | [安全说明](docs/SECURITY.md) | 权限、隐私、数据脱敏和本地边界 |
-| [0.2.6 发布说明](docs/RELEASE_0_2_6.md) | 当前版本目标、实现与验收 |
+| [0.2.8 发布说明](docs/RELEASE_0_2_8.md) | 产品化安装、状态诊断与验收 |
+| [0.2.7 发布说明](docs/RELEASE_0_2_7.md) | 页面无侵入热修复 |
+| [0.2.6 发布说明](docs/RELEASE_0_2_6.md) | 动态页面可靠性、benchmark 与耐久验收 |
 | [项目状态](docs/PROJECT_STATUS.md) | 阶段总览、实测证据和后续工作 |
 | [路线图](docs/ROADMAP.md) | 后续版本与能力规划 |
 | [发布手册](docs/RELEASE.md) | npm 发布、扩展打包与发布后验证 |

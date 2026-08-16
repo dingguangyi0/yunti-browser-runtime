@@ -3,8 +3,7 @@
 # P0 Productized Onboarding Slice
 
 The Kimi WebBridge comparison led to the first local productization slice.
-This is implemented on the current development branch and is not a published
-version yet:
+This is implemented in the `0.2.8` release candidate and is not published yet:
 
 - `yunti-browser-runtime setup --agent codex` idempotently installs the packaged
   Codex skill when it is missing, while refusing to overwrite a differing skill
@@ -20,6 +19,15 @@ version yet:
   tests are synchronized.
 - Chrome Web Store / Edge Add-ons distribution remains the next separate track;
   npm cannot silently install a browser extension.
+
+## 0.2.8 Productized Onboarding Release Candidate
+
+The `0.2.8` candidate is based directly on published `0.2.7` and contains only
+the P0 setup/status slice described above. Runtime browser action behavior and
+the unfinished P8 stable page handle work are unchanged. Release checks pass;
+npm publication and registry verification remain pending.
+
+See [RELEASE_0_2_8.md](RELEASE_0_2_8.md).
 
 ## 0.2.7 Page UI Hotfix
 
